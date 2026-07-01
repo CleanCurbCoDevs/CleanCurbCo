@@ -41,6 +41,8 @@ type FormState = {
   agreements: BookingRequest["agreements"];
 };
 
+export type InitialBookingCustomer = Partial<FormState["customer"]>;
+
 const initialState: FormState = {
   referralCode: "",
   customer: {
@@ -80,14 +82,22 @@ const initialState: FormState = {
 };
 
 export function BookingForm({
+  initialCustomer,
   initialFrequency,
   initialReferralCode = "",
+  serviceAreaChecked = false,
 }: {
+  initialCustomer?: InitialBookingCustomer;
   initialFrequency?: ServiceFrequency;
   initialReferralCode?: string;
+  serviceAreaChecked?: boolean;
 }) {
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
+    customer: {
+      ...initialState.customer,
+      ...initialCustomer,
+    },
     service: {
       ...initialState.service,
       frequency: initialFrequency ?? initialState.service.frequency,
@@ -211,6 +221,16 @@ export function BookingForm({
   return (
     <div className="booking-shell">
       <form className="booking-form" onSubmit={handleSubmit}>
+        {serviceAreaChecked ? (
+          <div className="booking-route-confirmation" role="status">
+            <CheckCircle2 size={20} aria-hidden="true" />
+            <p>
+              Good news. Your address passed the quick service-area check, so
+              we prefilled what we could below.
+            </p>
+          </div>
+        ) : null}
+
         <section className="form-section">
           <h2>Customer Info</h2>
           <div className="form-grid">

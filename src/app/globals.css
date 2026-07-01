@@ -337,6 +337,12 @@ textarea {
   transform: translateY(-1px);
 }
 
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+  transform: none;
+}
+
 .button-primary {
   background: var(--lime);
   color: var(--ink);
@@ -753,6 +759,111 @@ textarea {
   padding: 24px;
 }
 
+.address-checker {
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(0, 255, 0, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 18px;
+  margin-top: 22px;
+  padding: 18px;
+}
+
+.address-checker-heading {
+  align-items: flex-start;
+  display: flex;
+  gap: 12px;
+}
+
+.address-checker-heading svg {
+  color: var(--gold);
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.address-checker-heading h3 {
+  color: white;
+  font-size: 1.35rem;
+  font-weight: 1000;
+  margin: 0 0 4px;
+}
+
+.address-checker-heading p {
+  color: rgba(255, 255, 255, 0.72);
+  margin: 0;
+}
+
+.address-checker-form {
+  display: grid;
+  gap: 14px;
+}
+
+.address-checker .field span {
+  color: white;
+  font-weight: 900;
+}
+
+.address-checker .field input,
+.address-checker .field select {
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+}
+
+.address-checker-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: 1fr;
+}
+
+.address-result {
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.address-result-heading {
+  align-items: center;
+  display: flex;
+  gap: 10px;
+}
+
+.address-result h4 {
+  color: white;
+  font-size: 1.12rem;
+  font-weight: 1000;
+  margin: 0;
+}
+
+.address-result p {
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.address-result-good {
+  background: rgba(0, 255, 0, 0.13);
+  border-color: rgba(0, 255, 0, 0.36);
+}
+
+.address-result-good svg {
+  color: var(--lime);
+}
+
+.address-result-no {
+  background: rgba(255, 193, 7, 0.13);
+  border-color: rgba(255, 193, 7, 0.34);
+}
+
+.address-result-no svg {
+  color: var(--gold);
+}
+
+.address-result-detail strong {
+  color: white;
+}
+
 .route-list {
   display: grid;
   gap: 10px;
@@ -774,6 +885,29 @@ textarea {
 .route-list svg {
   color: var(--gold);
   flex: 0 0 auto;
+}
+
+.booking-route-confirmation {
+  align-items: flex-start;
+  background: rgba(0, 255, 0, 0.12);
+  border: 1px solid rgba(0, 150, 0, 0.2);
+  border-radius: var(--radius);
+  color: var(--ink);
+  display: flex;
+  gap: 10px;
+  padding: 14px;
+}
+
+.booking-route-confirmation svg {
+  color: #178000;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.booking-route-confirmation p {
+  font-weight: 850;
+  line-height: 1.45;
+  margin: 0;
 }
 
 .promise-band {
@@ -2173,6 +2307,10 @@ textarea {
 
   .choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .address-checker-grid {
+    grid-template-columns: 1.2fr 0.65fr 0.75fr;
   }
 
   .proof-gallery {

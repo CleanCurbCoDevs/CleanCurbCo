@@ -16,8 +16,8 @@ export default function ServiceAreaPage() {
           <h1>Now serving Cane Bay.</h1>
           <p>
             We are starting with Cane Bay and nearby Summerville communities,
-            then expanding route by route. Close by but not sure? Send your
-            address and we will check.
+            then expanding route by route. Close by but not sure? Use the
+            instant checker below for a quick yes or no before booking.
           </p>
         </div>
       </section>

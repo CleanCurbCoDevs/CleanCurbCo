@@ -22,6 +22,7 @@ import {
 import { FAQAccordion } from "@/components/faq-accordion";
 import { PricingCard } from "@/components/pricing-card";
 import { SectionHeader } from "@/components/section-header";
+import { ServiceAreaChecker } from "@/components/service-area-checker";
 import { ServiceCard } from "@/components/service-card";
 import {
   addOns,
@@ -331,17 +332,10 @@ export function ServiceAreaSection() {
         <div>
           <SectionHeader kicker="Service area" title="Now Serving Cane Bay">
             We are starting with Cane Bay and nearby Summerville communities,
-            then expanding route by route. If you are close by but not sure
-            whether you are in range, send us your address and we will check.
+            then expanding route by route. Use the quick checker below for a
+            simple yes or no before you book.
           </SectionHeader>
-          <div className="hero-actions">
-            <Link className="button button-primary" href="/book">
-              Check My Address
-            </Link>
-            <Link className="button button-secondary" href="/contact">
-              Join Waitlist
-            </Link>
-          </div>
+          <ServiceAreaChecker />
         </div>
         <ul className="route-list">
           {serviceAreas.map((area) => (

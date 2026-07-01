@@ -1,5 +1,9 @@
 import type { Metadata } from "next";
-import { BookingForm } from "@/components/booking/booking-form";
+import {
+  BookingForm,
+  type InitialBookingCustomer,
+} from "@/components/booking/booking-form";
+import { neighborhoods } from "@/lib/site";
 import type { ServiceFrequency } from "@/types/booking";
 
 export const metadata: Metadata = {
@@ -9,7 +13,16 @@ export const metadata: Metadata = {
 };
 
 type BookPageProps = {
-  searchParams: Promise<{ ref?: string; frequency?: string }>;
+  searchParams: Promise<{
+    ref?: string;
+    frequency?: string;
+    streetAddress?: string;
+    city?: string;
+    state?: string;
+    zipCode?: string;
+    neighborhood?: string;
+    serviceAreaChecked?: string;
+  }>;
 };
 
 export default async function BookPage({ searchParams }: BookPageProps) {
@@ -30,8 +43,10 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       <section className="section section-cream">
         <div className="container">
           <BookingForm
+            initialCustomer={parseCustomerParams(params)}
             initialFrequency={parseFrequencyParam(params.frequency)}
             initialReferralCode={params.ref ?? ""}
+            serviceAreaChecked={params.serviceAreaChecked === "yes"}
           />
         </div>
       </section>
@@ -50,4 +65,36 @@ function parseFrequencyParam(value?: string): ServiceFrequency | undefined {
   };
 
   return value ? frequencies[value.toLowerCase()] : undefined;
+}
+
+function parseCustomerParams(
+  params: Awaited<BookPageProps["searchParams"]>,
+): InitialBookingCustomer {
+  const initialCustomer: InitialBookingCustomer = {};
+  const streetAddress = cleanParam(params.streetAddress);
+  const city = cleanParam(params.city);
+  const state = cleanParam(params.state);
+  const zipCode = cleanParam(params.zipCode);
+  const neighborhood = cleanNeighborhoodParam(params.neighborhood);
+
+  if (streetAddress) initialCustomer.streetAddress = streetAddress;
+  if (city) initialCustomer.city = city;
+  if (state) initialCustomer.state = state;
+  if (zipCode) initialCustomer.zipCode = zipCode;
+  if (neighborhood) initialCustomer.neighborhood = neighborhood;
+
+  return initialCustomer;
+}
+
+function cleanParam(value?: string) {
+  return value?.trim().slice(0, 180) ?? "";
+}
+
+function cleanNeighborhoodParam(value?: string) {
+  const cleanValue = cleanParam(value);
+  if (!cleanValue) {
+    return "";
+  }
+
+  return neighborhoods.includes(cleanValue) ? cleanValue : "Other / Not sure";
 }
