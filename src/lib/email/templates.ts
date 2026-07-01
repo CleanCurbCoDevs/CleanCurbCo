@@ -1,6 +1,11 @@
 import { addOns } from "@/lib/site";
 import { formatFrequency } from "@/lib/pricing";
-import type { BookingRow, ContactMessageRow } from "@/types/database";
+import type {
+  BookingRow,
+  ContactMessageRow,
+  CustomerRequestRow,
+  ReferralRow,
+} from "@/types/database";
 
 export type EmailTemplate = {
   subject: string;
@@ -125,11 +130,98 @@ export function reviewRequestTemplate(booking: BookingRow): EmailTemplate {
   };
 }
 
+export function paymentLinkTemplate(booking: BookingRow): EmailTemplate {
+  const paymentLink = booking.payment_link ?? "";
+  const body = `
+    <p>Your Clean Curb Co. payment link is ready for the cleaning request below.</p>
+    ${
+      paymentLink
+        ? `<p><a href="${escapeHtml(paymentLink)}" style="display:inline-block;background:#00ff38;color:#050505;padding:12px 18px;border-radius:8px;font-weight:800;text-decoration:none">Open payment link</a></p>`
+        : "<p>The payment link is being prepared. We will follow up shortly.</p>"
+    }
+    ${bookingSummaryHtml(booking)}
+  `;
+
+  return {
+    subject: "Your Clean Curb Co. payment link",
+    html: shell("Payment link ready", body),
+    text: paymentLink
+      ? `Your Clean Curb Co. payment link: ${paymentLink}`
+      : "Your Clean Curb Co. payment link is being prepared.",
+  };
+}
+
+export function customerRequestReceivedTemplate(
+  request: CustomerRequestRow,
+): EmailTemplate {
+  const body = `
+    <p>We received your service request and will review it shortly.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Request:</strong> ${escapeHtml(request.request_type.replaceAll("_", " "))}</li>
+      <li><strong>Status:</strong> ${escapeHtml(request.status.replaceAll("_", " "))}</li>
+      <li><strong>Message:</strong> ${escapeHtml(request.message ?? "None provided")}</li>
+    </ul>
+    <p>No service is paused, cancelled, or changed until Clean Curb Co. confirms it.</p>
+  `;
+
+  return {
+    subject: "We received your Clean Curb Co. service request",
+    html: shell("Service request received", body),
+    text: `We received your Clean Curb Co. service request: ${request.request_type}.`,
+  };
+}
+
+export function customerRequestUpdatedTemplate(
+  request: CustomerRequestRow,
+): EmailTemplate {
+  const body = `
+    <p>Your service request has been updated.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Request:</strong> ${escapeHtml(request.request_type.replaceAll("_", " "))}</li>
+      <li><strong>Status:</strong> ${escapeHtml(request.status.replaceAll("_", " "))}</li>
+      <li><strong>Admin note:</strong> ${escapeHtml(request.admin_notes ?? "No note added")}</li>
+    </ul>
+  `;
+
+  return {
+    subject: "Clean Curb Co. service request update",
+    html: shell("Service request update", body),
+    text: `Your Clean Curb Co. service request is now ${request.status}.`,
+  };
+}
+
+export function referralRewardTemplate(
+  referral: ReferralRow,
+  mode: "ready" | "sent",
+): EmailTemplate {
+  const rewardValue = referral.reward_value ?? 5;
+  const body = `
+    <p>Your neighbor referral is ${mode === "ready" ? "ready for reward review" : "marked as rewarded"}.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Referral code:</strong> ${escapeHtml(referral.referral_code ?? "Not provided")}</li>
+      <li><strong>Status:</strong> ${escapeHtml(referral.status.replaceAll("_", " "))}</li>
+      <li><strong>Reward:</strong> $${rewardValue} service credit</li>
+    </ul>
+  `;
+
+  return {
+    subject:
+      mode === "ready"
+        ? "Your Clean Curb Co. referral reward is ready"
+        : "Your Clean Curb Co. referral reward was sent",
+    html: shell(
+      mode === "ready" ? "Referral reward ready" : "Referral reward sent",
+      body,
+    ),
+    text: `Your Clean Curb Co. referral reward is ${mode}.`,
+  };
+}
+
 export function contactConfirmationTemplate(
   message: ContactMessageRow,
 ): EmailTemplate {
   return {
-    subject: "We received your message — Clean Curb Co.",
+    subject: "We received your message - Clean Curb Co.",
     html: shell(
       "Message received",
       `<p>Thanks, ${escapeHtml(message.name)}. We received your message and will follow up soon.</p><p><strong>Reason:</strong> ${escapeHtml(message.reason)}</p><p>${escapeHtml(message.message)}</p>`,

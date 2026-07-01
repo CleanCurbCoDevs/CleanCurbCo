@@ -939,6 +939,184 @@ textarea {
   font-weight: 1000;
 }
 
+.admin-page-heading,
+.admin-row-heading {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+}
+
+.admin-page-heading h1,
+.admin-row-heading h2 {
+  margin: 0;
+}
+
+.filter-bar {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
+.filter-search {
+  min-width: 0;
+}
+
+.filter-actions,
+.action-row {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.compact-actions {
+  align-items: stretch;
+}
+
+.result-count {
+  color: var(--muted);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.status-stack {
+  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-badge.status-paid,
+.status-badge.status-completed,
+.status-badge.status-approved,
+.status-badge.status-reward_ready,
+.status-badge.status-reward_sent,
+.status-badge.status-owner {
+  background: rgba(0, 255, 56, 0.14);
+  border-color: rgba(0, 255, 56, 0.3);
+  color: #075c1b;
+}
+
+.status-badge.status-pending,
+.status-badge.status-reviewing,
+.status-badge.status-scheduled,
+.status-badge.status-confirmed,
+.status-badge.status-qualified,
+.status-badge.status-admin {
+  background: rgba(215, 169, 40, 0.16);
+  border-color: rgba(215, 169, 40, 0.34);
+  color: #735300;
+}
+
+.status-badge.status-failed,
+.status-badge.status-cancelled,
+.status-badge.status-denied,
+.status-badge.status-needs_follow_up {
+  background: rgba(225, 52, 47, 0.12);
+  border-color: rgba(225, 52, 47, 0.24);
+  color: #9d1510;
+}
+
+.admin-data-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.admin-data-grid > div {
+  background: white;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.admin-data-grid span,
+.mini-record span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.status-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-tabs a {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font-size: 0.86rem;
+  font-weight: 900;
+  padding: 8px 10px;
+}
+
+.detail-grid {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: 1fr;
+}
+
+.detail-panel {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  padding: 18px;
+}
+
+.detail-panel h2 {
+  font-size: 1.15rem;
+  margin: 0;
+}
+
+.mini-record {
+  background: white;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 5px;
+  padding: 12px;
+}
+
+.mini-record a {
+  color: var(--purple);
+  font-weight: 900;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.mini-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.mini-list span {
+  background: rgba(0, 255, 56, 0.1);
+  border: 1px solid rgba(0, 255, 56, 0.2);
+  border-radius: var(--radius);
+  font-size: 0.84rem;
+  font-weight: 900;
+  padding: 6px 8px;
+}
+
+.referral-strip {
+  align-items: start;
+}
+
+.referral-strip h2 {
+  color: var(--lime);
+  font-size: 2rem;
+  margin: 0;
+}
+
 .data-table,
 .admin-card-list {
   display: grid;
@@ -1143,6 +1321,36 @@ textarea {
     grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
   }
 
+  .customer-row {
+    grid-template-columns: 1.3fr 1.35fr 1fr 0.8fr 1fr;
+  }
+
+  .admin-page-heading,
+  .admin-row-heading {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .filter-bar {
+    align-items: end;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .filter-search {
+    grid-column: span 2;
+  }
+
+  .filter-actions {
+    grid-column: span 2;
+  }
+
+  .admin-data-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   form.data-row {
     grid-template-columns: 1.4fr 0.7fr auto;
   }
@@ -1174,5 +1382,12 @@ textarea {
 
   .button {
     width: 100%;
+  }
+
+  .action-row,
+  .filter-actions {
+    align-items: stretch;
+    display: grid;
+    grid-template-columns: 1fr;
   }
 }

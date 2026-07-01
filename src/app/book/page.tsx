@@ -7,7 +7,13 @@ export const metadata: Metadata = {
     "Request garbage bin cleaning for Cane Bay and nearby Summerville communities.",
 };
 
-export default function BookPage() {
+type BookPageProps = {
+  searchParams: Promise<{ ref?: string }>;
+};
+
+export default async function BookPage({ searchParams }: BookPageProps) {
+  const params = await searchParams;
+
   return (
     <main>
       <section className="page-hero">
@@ -22,7 +28,7 @@ export default function BookPage() {
       </section>
       <section className="section section-cream">
         <div className="container">
-          <BookingForm />
+          <BookingForm initialReferralCode={params.ref ?? ""} />
         </div>
       </section>
     </main>

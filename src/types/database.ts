@@ -1,4 +1,30 @@
 export type AppRole = "customer" | "admin" | "owner";
+export type ServiceFrequency =
+  | "one_time"
+  | "monthly"
+  | "every_other_month"
+  | "quarterly";
+export type RequestType =
+  | "pause_service"
+  | "cancel_service"
+  | "change_frequency"
+  | "update_address"
+  | "request_add_on"
+  | "billing_question"
+  | "general_help";
+export type CustomerRequestStatus =
+  | "new"
+  | "reviewing"
+  | "approved"
+  | "completed"
+  | "denied"
+  | "cancelled";
+export type ReferralStatus =
+  | "pending"
+  | "qualified"
+  | "reward_ready"
+  | "reward_sent"
+  | "cancelled";
 
 export type BookingRow = {
   id: string;
@@ -26,7 +52,7 @@ export type BookingRow = {
   neighborhood: string | null;
   bin_count: number;
   bin_types: string[];
-  frequency: "one_time" | "monthly" | "every_other_month" | "quarterly";
+  frequency: ServiceFrequency;
   add_ons: string[];
   estimated_price: number;
   scheduling_preference:
@@ -50,6 +76,8 @@ export type BookingRow = {
   payment_link: string | null;
   payment_provider: string | null;
   payment_reference: string | null;
+  referral_code: string | null;
+  referred_by_profile_id: string | null;
 };
 
 export type ProfileRow = {
@@ -64,6 +92,9 @@ export type ProfileRow = {
   marketing_opt_in: boolean;
   sms_opt_in: boolean;
   preferred_contact_method: "email" | "phone" | "sms" | null;
+  referral_code: string | null;
+  referred_by_profile_id: string | null;
+  internal_notes: string | null;
 };
 
 export type ServiceAddressRow = {
@@ -116,6 +147,48 @@ export type ContactMessageRow = {
   reason: string;
   message: string;
   status: "new" | "read" | "replied" | "closed";
+};
+
+export type CustomerRequestRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  customer_id: string | null;
+  booking_id: string | null;
+  request_type: RequestType;
+  status: CustomerRequestStatus;
+  requested_frequency: ServiceFrequency | null;
+  requested_pause_start: string | null;
+  requested_pause_end: string | null;
+  message: string | null;
+  admin_notes: string | null;
+};
+
+export type ReferralRow = {
+  id: string;
+  created_at: string;
+  referrer_profile_id: string | null;
+  referred_profile_id: string | null;
+  referred_booking_id: string | null;
+  referral_code: string | null;
+  referred_email: string | null;
+  status: ReferralStatus;
+  reward_type: string | null;
+  reward_value: number | null;
+  admin_notes: string | null;
+};
+
+export type ActivityEventRow = {
+  id: string;
+  created_at: string;
+  actor_profile_id: string | null;
+  customer_id: string | null;
+  booking_id: string | null;
+  request_id: string | null;
+  referral_id: string | null;
+  event_type: string;
+  message: string;
+  metadata: Record<string, unknown>;
 };
 
 export type Database = {
@@ -220,6 +293,26 @@ export type Database = {
           message: string;
         };
         Update: Partial<ContactMessageRow>;
+        Relationships: [];
+      };
+      customer_requests: {
+        Row: CustomerRequestRow;
+        Insert: Partial<CustomerRequestRow> &
+          Pick<CustomerRequestRow, "request_type">;
+        Update: Partial<CustomerRequestRow>;
+        Relationships: [];
+      };
+      referrals: {
+        Row: ReferralRow;
+        Insert: Partial<ReferralRow>;
+        Update: Partial<ReferralRow>;
+        Relationships: [];
+      };
+      activity_events: {
+        Row: ActivityEventRow;
+        Insert: Partial<ActivityEventRow> &
+          Pick<ActivityEventRow, "event_type" | "message">;
+        Update: Partial<ActivityEventRow>;
         Relationships: [];
       };
     };

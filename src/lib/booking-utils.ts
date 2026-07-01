@@ -5,7 +5,12 @@ import type {
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
-import type { BookingRow } from "@/types/database";
+import type {
+  BookingRow,
+  CustomerRequestStatus,
+  ReferralStatus,
+  RequestType,
+} from "@/types/database";
 
 export const validFrequencies: readonly ServiceFrequency[] = [
   "one_time",
@@ -37,6 +42,33 @@ export const validPaymentStatuses: readonly PaymentStatus[] = [
   "paid",
   "failed",
   "refunded",
+];
+
+export const validRequestTypes: readonly RequestType[] = [
+  "pause_service",
+  "cancel_service",
+  "change_frequency",
+  "update_address",
+  "request_add_on",
+  "billing_question",
+  "general_help",
+];
+
+export const validCustomerRequestStatuses: readonly CustomerRequestStatus[] = [
+  "new",
+  "reviewing",
+  "approved",
+  "completed",
+  "denied",
+  "cancelled",
+];
+
+export const validReferralStatuses: readonly ReferralStatus[] = [
+  "pending",
+  "qualified",
+  "reward_ready",
+  "reward_sent",
+  "cancelled",
 ];
 
 export function bookingRowToRequest(row: BookingRow): BookingRequest {

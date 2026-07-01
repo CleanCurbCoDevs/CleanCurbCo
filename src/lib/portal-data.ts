@@ -2,13 +2,23 @@ import "server-only";
 
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAuth, type AuthResult } from "@/lib/supabase/auth";
-import type { BookingRow, ServiceAddressRow, ServiceVisitRow } from "@/types/database";
+import type {
+  ActivityEventRow,
+  BookingRow,
+  CustomerRequestRow,
+  ReferralRow,
+  ServiceAddressRow,
+  ServiceVisitRow,
+} from "@/types/database";
 
 export type PortalContext = {
   auth: AuthResult;
   bookings: BookingRow[];
   addresses: ServiceAddressRow[];
   visits: ServiceVisitRow[];
+  requests: CustomerRequestRow[];
+  referrals: ReferralRow[];
+  activity: ActivityEventRow[];
 };
 
 export async function getPortalContext(nextPath = "/portal"): Promise<PortalContext> {
@@ -20,11 +30,21 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       bookings: [],
       addresses: [],
       visits: [],
+      requests: [],
+      referrals: [],
+      activity: [],
     };
   }
 
   const supabase = await createServerSupabaseClient();
-  const [bookingsResult, addressesResult, visitsResult] = await Promise.all([
+  const [
+    bookingsResult,
+    addressesResult,
+    visitsResult,
+    requestsResult,
+    referralsResult,
+    activityResult,
+  ] = await Promise.all([
     supabase
       .from("bookings")
       .select("*")
@@ -37,6 +57,18 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       .from("service_visits")
       .select("*")
       .order("route_day", { ascending: false }),
+    supabase
+      .from("customer_requests")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("referrals")
+      .select("*")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("activity_events")
+      .select("*")
+      .order("created_at", { ascending: false }),
   ]);
 
   return {
@@ -44,5 +76,8 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
     bookings: bookingsResult.data ?? [],
     addresses: addressesResult.data ?? [],
     visits: visitsResult.data ?? [],
+    requests: requestsResult.data ?? [],
+    referrals: referralsResult.data ?? [],
+    activity: activityResult.data ?? [],
   };
 }

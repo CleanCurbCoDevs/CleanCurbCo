@@ -109,6 +109,7 @@ export async function POST(request: Request) {
       phone: booking.phone,
       email,
       preferred_contact_method: "email",
+      referred_by_profile_id: booking.referred_by_profile_id,
     },
     { onConflict: "id" },
   );
@@ -136,6 +137,13 @@ export async function POST(request: Request) {
       service_address_id: serviceAddress?.id ?? null,
     })
     .eq("id", booking.id);
+
+  if (booking.referral_code) {
+    await admin
+      .from("referrals")
+      .update({ referred_profile_id: userId })
+      .eq("referred_booking_id", booking.id);
+  }
 
   await admin
     .from("booking_claims")

@@ -5,12 +5,13 @@ import { portalFeatures } from "@/lib/site";
 import { requireAuth, type AuthResult } from "@/lib/supabase/auth";
 
 const portalLinks = [
-  { label: "Overview", href: "/portal" },
+  { label: "Dashboard", href: "/portal" },
   { label: "Bookings", href: "/portal/bookings" },
-  { label: "Plan", href: "/portal/subscription" },
+  { label: "Manage Service", href: "/portal/manage-service" },
   { label: "Billing", href: "/portal/billing" },
   { label: "Photos", href: "/portal/photos" },
   { label: "Referrals", href: "/portal/referrals" },
+  { label: "Account", href: "/portal/account" },
 ];
 
 export async function PortalShell({

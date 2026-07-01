@@ -4,8 +4,11 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 import type {
   BookingRow,
+  ActivityEventRow,
   ContactMessageRow,
+  CustomerRequestRow,
   ProfileRow,
+  ReferralRow,
   ServiceAddressRow,
   ServiceVisitRow,
 } from "@/types/database";
@@ -14,6 +17,9 @@ export type AdminContext = {
   auth: AuthResult;
   bookings: BookingRow[];
   contacts: ContactMessageRow[];
+  requests: CustomerRequestRow[];
+  referrals: ReferralRow[];
+  activity: ActivityEventRow[];
   profiles: ProfileRow[];
   addresses: ServiceAddressRow[];
   visits: ServiceVisitRow[];
@@ -27,6 +33,9 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
       auth,
       bookings: [],
       contacts: [],
+      requests: [],
+      referrals: [],
+      activity: [],
       profiles: [],
       addresses: [],
       visits: [],
@@ -34,7 +43,16 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
   }
 
   const admin = getSupabaseAdmin();
-  const [bookingsResult, contactsResult, profilesResult, addressesResult, visitsResult] =
+  const [
+    bookingsResult,
+    contactsResult,
+    requestsResult,
+    referralsResult,
+    activityResult,
+    profilesResult,
+    addressesResult,
+    visitsResult,
+  ] =
     await Promise.all([
       admin
         .from("bookings")
@@ -42,6 +60,18 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .order("created_at", { ascending: false }),
       admin
         .from("contact_messages")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("customer_requests")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("referrals")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("activity_events")
         .select("*")
         .order("created_at", { ascending: false }),
       admin
@@ -62,6 +92,9 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     auth,
     bookings: bookingsResult.data ?? [],
     contacts: contactsResult.data ?? [],
+    requests: requestsResult.data ?? [],
+    referrals: referralsResult.data ?? [],
+    activity: activityResult.data ?? [],
     profiles: profilesResult.data ?? [],
     addresses: addressesResult.data ?? [],
     visits: visitsResult.data ?? [],

@@ -3,12 +3,13 @@ import { LogoutButton } from "@/components/logout-button";
 import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 
 const adminLinks = [
-  { label: "Overview", href: "/admin" },
+  { label: "Dashboard", href: "/admin" },
   { label: "Bookings", href: "/admin/bookings" },
   { label: "Routes", href: "/admin/routes" },
   { label: "Customers", href: "/admin/customers" },
-  { label: "Services", href: "/admin/services" },
   { label: "Payments", href: "/admin/payments" },
+  { label: "Requests", href: "/admin/requests" },
+  { label: "Referrals", href: "/admin/referrals" },
   { label: "Reviews", href: "/admin/reviews" },
   { label: "Settings", href: "/admin/settings" },
 ];

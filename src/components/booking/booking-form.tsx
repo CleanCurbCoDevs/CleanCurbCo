@@ -11,6 +11,7 @@ import type {
 } from "@/types/booking";
 
 type FormState = {
+  referralCode: string;
   customer: {
     firstName: string;
     lastName: string;
@@ -41,6 +42,7 @@ type FormState = {
 };
 
 const initialState: FormState = {
+  referralCode: "",
   customer: {
     firstName: "",
     lastName: "",
@@ -77,8 +79,11 @@ const initialState: FormState = {
   },
 };
 
-export function BookingForm() {
-  const [form, setForm] = useState<FormState>(initialState);
+export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?: string }) {
+  const [form, setForm] = useState<FormState>(() => ({
+    ...initialState,
+    referralCode: normalizeReferralCode(initialReferralCode),
+  }));
   const [submittedBooking, setSubmittedBooking] =
     useState<BookingRequest | null>(null);
   const [setupHref, setSetupHref] = useState<string | null>(null);
@@ -261,6 +266,16 @@ export function BookingForm() {
                 ))}
               </select>
             </label>
+            <TextField
+              label="Referral code, if you have one"
+              value={form.referralCode}
+              onChange={(value) =>
+                setForm((current) => ({
+                  ...current,
+                  referralCode: normalizeReferralCode(value),
+                }))
+              }
+            />
           </div>
         </section>
 
@@ -604,6 +619,10 @@ function setAgreement(
     ...current,
     agreements: { ...current.agreements, [key]: checked },
   }));
+}
+
+function normalizeReferralCode(value: string) {
+  return value.replace(/[^a-z0-9]/gi, "").slice(0, 24).toUpperCase();
 }
 
 function BookingSummary({ booking }: { booking: BookingRequest }) {

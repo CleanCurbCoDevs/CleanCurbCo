@@ -10,6 +10,7 @@ import { sendAccountSetupEmail } from "@/lib/email/sendAccountSetupEmail";
 import { sendAdminBookingNotification } from "@/lib/email/sendAdminBookingNotification";
 import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
 import { calculateBookingEstimate } from "@/lib/pricing";
+import { findReferrerByCode } from "@/lib/referrals";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -24,6 +25,7 @@ import {
 import type { SchedulingPreference, ServiceFrequency } from "@/types/booking";
 
 type IncomingBooking = {
+  referralCode?: unknown;
   customer?: {
     firstName?: unknown;
     lastName?: unknown;
@@ -107,6 +109,7 @@ export async function POST(request: Request) {
   const requestedDate = cleanString(body.scheduling?.requestedDate, 30) || null;
   const binTypes = cleanArray(body.service?.binTypes);
   const addOns = cleanArray(body.service?.addOns);
+  const referralCode = cleanString(body.referralCode, 40).toUpperCase() || null;
   const waterSpigotAvailable = pickEnum(
     body.instructions?.waterSpigotAvailable,
     validWaterSpigotValues,
@@ -151,6 +154,7 @@ export async function POST(request: Request) {
   const admin = getSupabaseAdmin();
   let customerId: string | null = null;
   let serviceAddressId: string | null = null;
+  let referredByProfileId: string | null = null;
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -199,6 +203,13 @@ export async function POST(request: Request) {
     serviceAddressId = null;
   }
 
+  if (referralCode) {
+    const referrer = await findReferrerByCode(referralCode);
+    if (referrer && referrer.id !== customerId) {
+      referredByProfileId = referrer.id;
+    }
+  }
+
   const { data: booking, error } = await admin
     .from("bookings")
     .insert({
@@ -231,6 +242,8 @@ export async function POST(request: Request) {
       agreement_photos: agreements.photos,
       agreement_payment: agreements.payment,
       payment_status: "not_sent",
+      referral_code: referralCode,
+      referred_by_profile_id: referredByProfileId,
     })
     .select("*")
     .single();
@@ -240,6 +253,17 @@ export async function POST(request: Request) {
       { error: "We could not save that booking request. Please try again." },
       { status: 500 },
     );
+  }
+
+  if (referralCode && referredByProfileId) {
+    await admin.from("referrals").insert({
+      referrer_profile_id: referredByProfileId,
+      referred_profile_id: customerId,
+      referred_booking_id: booking.id,
+      referral_code: referralCode,
+      referred_email: email,
+      status: "pending",
+    });
   }
 
   let redirectTo: string | null = null;
