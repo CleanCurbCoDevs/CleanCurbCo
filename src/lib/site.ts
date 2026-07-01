@@ -16,6 +16,35 @@ export const brand = {
 export const launchPromo =
   "Launch Special: First 2-bin cleaning only $25 when you join a recurring Cane Bay route.";
 
+export const launchNotice =
+  "First route planned for July 13. Book now to reserve your spot - no charge until we're ready to confirm your service.";
+
+export const launchRouteDate = "July 13, 2026";
+
+export const launchRouteHeadline =
+  "First Cane Bay route planned for July 13, 2026.";
+
+export const launchReservationCopy =
+  "Bookings before launch reserve your spot. You won't be charged until we're ready to confirm your route day.";
+
+export const launchBillingNote =
+  "Launch billing note: Bookings submitted before July 13 reserve your spot only. We will not charge until we're ready to confirm your first cleaning.";
+
+export const futureBillingNote =
+  "Starting August 1, new bookings are charged at booking, then billed on the same calendar day according to the selected service frequency. We may adjust payment dates with notice when needed for routing or billing operations.";
+
+export const bookingLaunchTimingNotice =
+  "Our first Clean Curb Co route is planned for July 13, 2026. If you book before then, your request reserves your spot on an upcoming route. You will not be charged until we are ready to confirm your route day and service details.";
+
+export const bookingBillingAfterLaunchNotice =
+  "Starting August 1, 2026, new bookings are charged when submitted or confirmed, then billed again on the same calendar day based on the selected frequency. Monthly plans bill monthly, every-other-month plans bill every other month, and quarterly plans bill every three months. We may adjust payment dates with advance notice.";
+
+export const bookingLaunchAgreement =
+  "I understand Clean Curb Co's first route is planned for July 13, 2026. If I book before then, I will not be charged until Clean Curb Co is ready to confirm service. Starting August 1, 2026, new bookings may be charged at booking and recurring plans will bill according to the selected frequency.";
+
+export const bookingSuccessLaunchMessage =
+  "Your request has been received. If this was submitted before our July 13 launch route, you will not be charged until we're ready to confirm your service.";
+
 export const navItems = [
   { label: "Services", href: "/services" },
   { label: "Pricing", href: "/pricing" },
@@ -166,6 +195,26 @@ export const futureServices = [
 ];
 
 export const faqItems = [
+  {
+    question: "When does Clean Curb Co start service?",
+    answer:
+      "Our first route is planned for July 13, 2026. Bookings before then reserve a spot on an upcoming route.",
+  },
+  {
+    question: "Will I be charged before July 13?",
+    answer:
+      "No. Bookings before July 13 are reservation requests only. We will not charge until we are ready to confirm your route day and service details.",
+  },
+  {
+    question: "How does recurring billing work?",
+    answer:
+      "During launch, recurring billing may be handled at the beginning of the applicable service month. Starting August 1, 2026, new bookings are charged at booking, then billed on the same calendar day according to the selected frequency.",
+  },
+  {
+    question: "Can Clean Curb Co change my billing date?",
+    answer:
+      "We reserve the right to adjust billing dates with notice, especially if needed for routing, billing operations, or service scheduling.",
+  },
   {
     question: "Do I need to be home?",
     answer:

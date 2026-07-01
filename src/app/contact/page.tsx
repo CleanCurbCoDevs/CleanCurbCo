@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { ContactForm } from "@/components/contact-form";
-import { brand } from "@/lib/site";
+import { brand, launchNotice, launchReservationCopy } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: "Contact",
@@ -50,6 +50,11 @@ export default function ContactPage() {
           </article>
         </div>
         <div className="container section-header" style={{ marginTop: 28 }}>
+          <div className="launch-info-card contact-launch-note">
+            <p className="section-kicker">Launch timing</p>
+            <h2>{launchNotice}</h2>
+            <p>{launchReservationCopy}</p>
+          </div>
           <Link className="button button-dark" href="/book">
             Book Now
           </Link>

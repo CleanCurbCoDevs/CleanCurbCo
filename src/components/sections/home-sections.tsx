@@ -26,7 +26,9 @@ import { ServiceAreaChecker } from "@/components/service-area-checker";
 import { ServiceCard } from "@/components/service-card";
 import {
   addOns,
+  futureBillingNote,
   futureServices,
+  launchBillingNote,
   launchPromo,
   oneTimeRows,
   recurringPlans,
@@ -246,6 +248,18 @@ export function PricingSection() {
           and efficient. Extra recurring bins are typically +$8-$10 each.
           Recurring service keeps the stink from getting a comeback tour.
         </SectionHeader>
+        <div className="billing-note-grid">
+          <article className="billing-note-card">
+            <p className="section-kicker">Before launch</p>
+            <h3>No pre-launch charge.</h3>
+            <p>{launchBillingNote}</p>
+          </article>
+          <article className="billing-note-card">
+            <p className="section-kicker">After launch</p>
+            <h3>Clear recurring timing.</h3>
+            <p>{futureBillingNote}</p>
+          </article>
+        </div>
         <div className="route-status-card">
           <div>
             <p className="section-kicker">Route status</p>

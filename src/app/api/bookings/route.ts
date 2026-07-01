@@ -11,6 +11,7 @@ import { sendAdminBookingNotification } from "@/lib/email/sendAdminBookingNotifi
 import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
 import { calculateBookingEstimate } from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
+import { bookingSuccessLaunchMessage } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -60,6 +61,7 @@ type IncomingBooking = {
     weatherAccess?: unknown;
     photos?: unknown;
     payment?: unknown;
+    launchBilling?: unknown;
   };
 };
 
@@ -123,6 +125,7 @@ export async function POST(request: Request) {
     weatherAccess: mustBeTrue(body.agreements?.weatherAccess),
     photos: mustBeTrue(body.agreements?.photos),
     payment: mustBeTrue(body.agreements?.payment),
+    launchBilling: mustBeTrue(body.agreements?.launchBilling),
   };
 
   const missingRequired = [
@@ -298,8 +301,7 @@ export async function POST(request: Request) {
     {
       booking: bookingRowToRequest(booking),
       redirectTo,
-      message:
-        "Thanks! Your request has been received. We will text you shortly to confirm your Cane Bay route day and final price.",
+      message: bookingSuccessLaunchMessage,
     },
     { status: 201 },
   );

@@ -2,7 +2,15 @@
 
 import { useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
-import { addOns, binTypes, launchPromo, neighborhoods } from "@/lib/site";
+import {
+  addOns,
+  binTypes,
+  bookingLaunchAgreement,
+  bookingSuccessLaunchMessage,
+  launchBillingNote,
+  launchPromo,
+  neighborhoods,
+} from "@/lib/site";
 import { calculateEstimatedPrice, formatFrequency } from "@/lib/pricing";
 import type {
   BookingRequest,
@@ -78,6 +86,7 @@ const initialState: FormState = {
     weatherAccess: false,
     photos: false,
     payment: false,
+    launchBilling: false,
   },
 };
 
@@ -204,6 +213,7 @@ export function BookingForm({
             We will text you shortly to confirm your Cane Bay route day and
             final price. Fresh Starts at the Curb.
           </p>
+          <p>{bookingSuccessLaunchMessage}</p>
           {setupHref ? (
             <a className="button button-dark" href={setupHref}>
               Set Up Customer Account
@@ -549,6 +559,13 @@ export function BookingForm({
             onChange={(checked) => setAgreement("payment", checked, setForm)}
             label="I understand payment is due at booking or upon completion, depending on the service selected."
           />
+          <Agreement
+            checked={Boolean(form.agreements.launchBilling)}
+            onChange={(checked) =>
+              setAgreement("launchBilling", checked, setForm)
+            }
+            label={bookingLaunchAgreement}
+          />
         </section>
 
         {error ? (
@@ -589,12 +606,14 @@ export function BookingForm({
         <div className="launch-reminder">
           <p className="section-kicker">Founding Neighbor Special</p>
           <strong>{launchPromo}</strong>
+          <span>{launchBillingNote}</span>
         </div>
         <div className="estimate-panel-section">
           <h3>What happens after you submit?</h3>
           <ol className="number-list">
             <li>We text you to confirm your route day.</li>
             <li>You get your final price before service.</li>
+            <li>No payment is collected before the July 13 launch confirmation.</li>
             <li>We clean the bins and send completion photos.</li>
           </ol>
         </div>

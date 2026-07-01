@@ -1,4 +1,8 @@
-import { addOns } from "@/lib/site";
+import {
+  addOns,
+  bookingSuccessLaunchMessage,
+  launchRouteHeadline,
+} from "@/lib/site";
 import { formatFrequency } from "@/lib/pricing";
 import { policyWindowLabels, requestTypeLabels } from "@/lib/service-policy";
 import type {
@@ -70,6 +74,7 @@ export function bookingSummaryHtml(booking: BookingRow) {
 export function bookingConfirmationTemplate(booking: BookingRow): EmailTemplate {
   const body = `
     <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your Cane Bay route day and final price by text or email.</p>
+    <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
     ${bookingSummaryHtml(booking)}
     <p>Trash day should not stink all week. We are on it.</p>
   `;
@@ -77,7 +82,7 @@ export function bookingConfirmationTemplate(booking: BookingRow): EmailTemplate 
   return {
     subject: "We received your Clean Curb Co. booking request",
     html: shell("Booking request received", body),
-    text: `We received your Clean Curb Co. booking request for ${booking.street_address}. Estimated price: $${booking.estimated_price}.`,
+    text: `We received your Clean Curb Co. booking request for ${booking.street_address}. ${launchRouteHeadline} ${bookingSuccessLaunchMessage} Estimated price: $${booking.estimated_price}.`,
   };
 }
 

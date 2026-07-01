@@ -45,7 +45,7 @@ export default async function PortalBookingsPage() {
                       <small>Checklist complete. Photos are available in the Photos tab.</small>
                     ) : null}
                   </div>
-                  <span>{humanizeStatus(booking.status)}</span>
+                  <span>{bookingStatusLabel(booking.status)}</span>
                   <span>${booking.estimated_price}</span>
                   <span>
                     {booking.confirmed_route_day ??
@@ -67,4 +67,11 @@ export default async function PortalBookingsPage() {
       </section>
     </PortalShell>
   );
+}
+
+function bookingStatusLabel(status: string) {
+  if (status === "new") return "Reserved / pending route confirmation";
+  if (status === "confirmed") return "Confirmed";
+  if (status === "scheduled") return "Scheduled";
+  return humanizeStatus(status);
 }

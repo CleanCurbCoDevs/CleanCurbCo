@@ -39,18 +39,20 @@ export default function PrivacyPage() {
           </p>
           <h2>How we use it</h2>
           <p>
-            We use this information to confirm route days, communicate about
-            service, send payment links, provide before/after service updates,
-            answer questions, manage recurring service, handle support
-            requests, improve neighborhood routes, and keep customer records
-            accurate.
+            We use this information to confirm route timing, send launch
+            updates, communicate about service, send payment links, provide
+            before/after service updates, send service reminders, send
+            billing-related notices, answer questions, manage recurring
+            service, handle support requests, improve neighborhood routes, and
+            keep customer records accurate.
           </p>
           <h2>Texts, emails, and service updates</h2>
           <p>
             Clean Curb Co. may contact you by text message, phone, or email
-            about booking requests, route-day confirmations, reminders, payment
-            links, service updates, customer support, account access, and
-            follow-up. Message and data rates may apply for text messages.
+            about booking requests, launch timing, route-day confirmations,
+            reminders, payment links, service updates, billing notices,
+            customer support, account access, and follow-up. Message and data
+            rates may apply for text messages.
           </p>
           <h2>Photos</h2>
           <p>

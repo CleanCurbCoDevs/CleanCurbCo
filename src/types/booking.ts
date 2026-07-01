@@ -71,6 +71,7 @@ export type BookingRequest = {
     weatherAccess: boolean;
     photos: boolean;
     payment: boolean;
+    launchBilling?: boolean;
   };
 
   payment: {

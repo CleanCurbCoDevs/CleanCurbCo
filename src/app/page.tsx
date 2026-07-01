@@ -1,7 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, DollarSign } from "lucide-react";
-import { brand, launchPromo } from "@/lib/site";
+import {
+  brand,
+  launchPromo,
+  launchReservationCopy,
+  launchRouteHeadline,
+} from "@/lib/site";
 import {
   AddOnsSection,
   ExpectationsSection,
@@ -48,6 +53,10 @@ export default function Home() {
           <p className="hero-supporting">
             Now serving Cane Bay and nearby Summerville neighborhoods.
           </p>
+          <div className="hero-launch-note">
+            <strong>{launchRouteHeadline}</strong>
+            <span>{launchReservationCopy}</span>
+          </div>
           <p className="trust-line">
             Locally owned | Veteran owned | Eco-conscious
           </p>

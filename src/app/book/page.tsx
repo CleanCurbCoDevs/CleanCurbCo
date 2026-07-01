@@ -3,7 +3,11 @@ import {
   BookingForm,
   type InitialBookingCustomer,
 } from "@/components/booking/booking-form";
-import { neighborhoods } from "@/lib/site";
+import {
+  bookingBillingAfterLaunchNotice,
+  bookingLaunchTimingNotice,
+  neighborhoods,
+} from "@/lib/site";
 import type { ServiceFrequency } from "@/types/booking";
 
 export const metadata: Metadata = {
@@ -36,12 +40,25 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           <h1>Join the Cane Bay route.</h1>
           <p>
             Tell us what needs cleaning. We will confirm your route day, final
-            price, and payment link by text before service.
+            price, and payment link by text before service. Pre-launch bookings
+            reserve your spot without an immediate charge.
           </p>
         </div>
       </section>
       <section className="section section-cream">
         <div className="container">
+          <div className="booking-launch-grid">
+            <article className="launch-info-card">
+              <p className="section-kicker">Route launch timing</p>
+              <h2>First route planned for July 13, 2026.</h2>
+              <p>{bookingLaunchTimingNotice}</p>
+            </article>
+            <article className="launch-info-card">
+              <p className="section-kicker">Billing after launch</p>
+              <h2>August billing rhythm.</h2>
+              <p>{bookingBillingAfterLaunchNotice}</p>
+            </article>
+          </div>
           <BookingForm
             initialCustomer={parseCustomerParams(params)}
             initialFrequency={parseFrequencyParam(params.frequency)}

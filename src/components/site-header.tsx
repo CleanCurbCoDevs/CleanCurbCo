@@ -1,13 +1,13 @@
 import Link from "next/link";
 import { CalendarCheck, Menu } from "lucide-react";
 import { BrandLogo } from "@/components/brand-logo";
-import { launchPromo, navItems } from "@/lib/site";
+import { launchNotice, navItems } from "@/lib/site";
 
 export function SiteHeader() {
   return (
     <header className="site-header">
       <Link className="announcement-bar" href="/book">
-        <span>{launchPromo}</span>
+        <span>{launchNotice}</span>
       </Link>
       <div className="container site-header-inner">
         <BrandLogo />

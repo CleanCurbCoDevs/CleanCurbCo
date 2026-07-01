@@ -28,6 +28,27 @@ export default function TermsPage() {
             details, final price, and payment link before service whenever
             practical.
           </p>
+          <h2>Launch Timing and Billing</h2>
+          <p>
+            Clean Curb Co&apos;s first route is planned for July 13, 2026.
+            Bookings submitted before that date are reservation requests and
+            do not guarantee immediate service. Customers who book before
+            launch will not be charged until Clean Curb Co. is ready to confirm
+            service details, route timing, and payment instructions.
+          </p>
+          <p>
+            During the launch period, recurring service billing may be
+            collected at the beginning of the applicable service month.
+            Starting August 1, 2026, new bookings may be charged when submitted
+            or confirmed. Recurring plans will then bill on the same calendar
+            day according to the customer&apos;s selected frequency, unless
+            otherwise adjusted with notice.
+          </p>
+          <p>
+            Clean Curb Co. may change billing or payment dates with customer
+            notification when needed for routing, payment processing, service
+            scheduling, or operational reasons.
+          </p>
           <h2>Route-day scheduling</h2>
           <p>
             We schedule by neighborhood routes to keep service affordable,

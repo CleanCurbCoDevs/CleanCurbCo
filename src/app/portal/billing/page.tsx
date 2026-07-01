@@ -70,6 +70,7 @@ export default async function PortalBillingPage() {
 }
 
 function paymentStatusLabel(status: string) {
+  if (status === "not_sent") return "Payment not yet collected";
   if (status === "paid") return "Paid";
   if (status === "pending") return "Payment pending";
   if (status === "failed") return "Payment failed - please try again or contact us.";
