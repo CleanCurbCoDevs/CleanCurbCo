@@ -18,6 +18,7 @@ export const navItems = [
   { label: "Pricing", href: "/pricing" },
   { label: "Service Area", href: "/service-area" },
   { label: "FAQ", href: "/faq" },
+  { label: "Careers", href: "/careers" },
   { label: "Login", href: "/login" },
 ];
 

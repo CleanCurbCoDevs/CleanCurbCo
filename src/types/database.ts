@@ -62,6 +62,13 @@ export type PaymentStatus =
   | "failed"
   | "refunded"
   | "cancelled";
+export type CareerApplicationStatus =
+  | "new"
+  | "reviewing"
+  | "contacted"
+  | "not_now"
+  | "hired"
+  | "archived";
 
 export type BookingRow = {
   id: string;
@@ -303,6 +310,28 @@ export type PaymentRow = {
   metadata: Record<string, unknown>;
 };
 
+export type CareerApplicationRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  phone: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  role_interest: string | null;
+  availability: string[];
+  has_valid_drivers_license: boolean | null;
+  comfortable_outdoors: boolean | null;
+  comfortable_lifting: boolean | null;
+  experience: string | null;
+  message: string | null;
+  status: CareerApplicationStatus;
+  admin_notes: string | null;
+};
+
 export type ContactMessageRow = {
   id: string;
   created_at: string;
@@ -540,6 +569,13 @@ export type Database = {
         Row: PaymentRow;
         Insert: Partial<PaymentRow> & Pick<PaymentRow, "amount">;
         Update: Partial<PaymentRow>;
+        Relationships: [];
+      };
+      career_applications: {
+        Row: CareerApplicationRow;
+        Insert: Partial<CareerApplicationRow> &
+          Pick<CareerApplicationRow, "first_name" | "last_name" | "email">;
+        Update: Partial<CareerApplicationRow>;
         Relationships: [];
       };
     };

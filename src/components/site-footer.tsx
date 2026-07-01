@@ -3,12 +3,15 @@ import { BrandLogo } from "@/components/brand-logo";
 import { brand } from "@/lib/site";
 
 const footerLinks = [
-  { label: "Services", href: "/services" },
+  { label: "Book Now", href: "/book" },
   { label: "Pricing", href: "/pricing" },
-  { label: "Book", href: "/book" },
-  { label: "FAQ", href: "/faq" },
+  { label: "Services", href: "/services" },
+  { label: "Service Area", href: "/service-area" },
   { label: "Contact", href: "/contact" },
+  { label: "Careers", href: "/careers" },
+  { label: "Employee Login", href: "/employee-login" },
   { label: "Customer Portal", href: "/portal" },
+  { label: "FAQ", href: "/faq" },
   { label: "Privacy", href: "/privacy" },
   { label: "Terms", href: "/terms" },
 ];

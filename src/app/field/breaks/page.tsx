@@ -19,12 +19,12 @@ type FieldBreaksPageProps = {
 const breakReasons = [
   ["lunch", "Lunch"],
   ["bathroom", "Bathroom"],
-  ["tank_empty", "Tank empty"],
-  ["tank_refill", "Tank refill"],
-  ["equipment_issue", "Equipment issue"],
-  ["fuel_stop", "Fuel stop"],
-  ["weather_pause", "Weather pause"],
-  ["customer_delay", "Customer delay"],
+  ["tank_empty", "Tank Empty"],
+  ["tank_refill", "Tank Refill"],
+  ["equipment_issue", "Equipment Issue"],
+  ["fuel_stop", "Fuel Stop"],
+  ["weather_pause", "Weather Pause"],
+  ["customer_delay", "Customer Delay"],
   ["other", "Other"],
 ] as const;
 
@@ -49,8 +49,22 @@ export default async function FieldBreaksPage({
 
   return (
     <FieldShell title="Breaks" auth={context.auth}>
+      <section className="field-dashboard-hero compact">
+        <div>
+          <p className="section-kicker">Route Pause</p>
+          <h2>Log breaks without notifying the next customer.</h2>
+          <p>
+            Lunch, tank refill, weather, customer delays, and equipment pauses
+            all stay attached to the route record.
+          </p>
+        </div>
+        <span className={`status-badge status-${activeBreak ? "in_progress" : "standard"}`}>
+          {activeBreak ? "Break Active" : "Ready"}
+        </span>
+      </section>
+
       {activeBreak ? (
-        <section className="field-card">
+        <section className="field-break-active">
           <span className="status-badge status-in_progress">On Break</span>
           <h2>{humanizeStatus(activeBreak.reason)}</h2>
           <p>
@@ -65,7 +79,7 @@ export default async function FieldBreaksPage({
               <input type="checkbox" name="readyForNext" defaultChecked={Boolean(routeStopId)} />
               <span>Ready for next stop after ending break</span>
             </label>
-            <button className="button button-primary" type="submit">
+            <button className="button button-primary field-big-button" type="submit">
               End Break
             </button>
           </form>
@@ -73,59 +87,81 @@ export default async function FieldBreaksPage({
       ) : (
         <section className="field-card">
           <p className="section-kicker">Start Break</p>
-          <h2>Pause the route flow.</h2>
-          <p>Breaks do not notify the next customer. Resume when ready.</p>
+          <h2>Choose a reason.</h2>
+          {!openRoutes.length ? (
+            <p className="muted">
+              No active route is available yet. Breaks can still be logged, but
+              they are most useful once a route day is active.
+            </p>
+          ) : null}
           <form action={startBreakAction} className="field-form">
-            <label>
-              Route
-              <select name="routeDayId" defaultValue={openRoutes[0]?.id ?? ""}>
-                <option value="">No route selected</option>
-                {openRoutes.map((routeDay) => (
-                  <option key={routeDay.id} value={routeDay.id}>
-                    {routeDay.route_date} - {routeDay.route_name ?? routeDay.service_area}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Reason
-              <select name="reason" defaultValue="lunch">
-                {breakReasons.map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            <label>
-              Notes
-              <textarea name="notes" placeholder="Optional internal note" />
-            </label>
-            <button className="button button-dark" type="submit">
-              Start Break
-            </button>
+            <div className="form-grid">
+              <label>
+                Route
+                <select name="routeDayId" defaultValue={openRoutes[0]?.id ?? ""}>
+                  <option value="">No route selected</option>
+                  {openRoutes.map((routeDay) => (
+                    <option key={routeDay.id} value={routeDay.id}>
+                      {routeDay.route_date} - {routeDay.route_name ?? routeDay.service_area}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Notes
+                <input name="notes" placeholder="Optional internal note" />
+              </label>
+            </div>
+            <div className="break-reason-grid">
+              {breakReasons.map(([value, label]) => (
+                <button
+                  className="break-reason-button"
+                  key={value}
+                  name="reason"
+                  type="submit"
+                  value={value}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </form>
         </section>
       )}
 
-      <section className="field-list">
-        {context.breaks.slice(0, 12).map((routeBreak) => (
-          <article className="field-card compact-field-card" key={routeBreak.id}>
-            <div className="field-card-top">
-              <span className={`status-badge status-${routeBreak.ended_at ? "completed" : "in_progress"}`}>
-                {routeBreak.ended_at ? "Ended" : "Active"}
-              </span>
-              <span>{new Date(routeBreak.started_at).toLocaleString()}</span>
-            </div>
-            <h2>{humanizeStatus(routeBreak.reason)}</h2>
-            <p>
-              Ended:{" "}
-              {routeBreak.ended_at
-                ? new Date(routeBreak.ended_at).toLocaleTimeString()
-                : "Still running"}
-            </p>
-          </article>
-        ))}
+      <section className="field-section">
+        <div className="field-section-heading">
+          <div>
+            <p className="section-kicker">Recent Breaks</p>
+            <h2>Pause history.</h2>
+          </div>
+        </div>
+        {context.breaks.length ? (
+          <div className="field-route-grid">
+            {context.breaks.slice(0, 12).map((routeBreak) => (
+              <article className="field-card compact-field-card" key={routeBreak.id}>
+                <div className="field-card-top">
+                  <span className={`status-badge status-${routeBreak.ended_at ? "completed" : "in_progress"}`}>
+                    {routeBreak.ended_at ? "Ended" : "Active"}
+                  </span>
+                  <span>{new Date(routeBreak.started_at).toLocaleString()}</span>
+                </div>
+                <h2>{humanizeStatus(routeBreak.reason)}</h2>
+                <p>
+                  Ended:{" "}
+                  {routeBreak.ended_at
+                    ? new Date(routeBreak.ended_at).toLocaleTimeString()
+                    : "Still running"}
+                </p>
+              </article>
+            ))}
+          </div>
+        ) : (
+          <section className="field-empty-state slim">
+            <h2>No breaks logged yet.</h2>
+            <p>Break records will appear here once route pauses are started.</p>
+          </section>
+        )}
       </section>
 
       {routeStopId && !activeBreak ? (

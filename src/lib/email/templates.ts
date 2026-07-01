@@ -5,6 +5,7 @@ import type {
   BookingRow,
   ContactMessageRow,
   CustomerRequestRow,
+  CareerApplicationRow,
   ProfileRow,
   ReferralRow,
 } from "@/types/database";
@@ -353,5 +354,48 @@ export function adminContactNotificationTemplate(
       <p>${escapeHtml(message.message)}</p>`,
     ),
     text: `New contact message from ${message.name}: ${message.reason}. ${message.message}`,
+  };
+}
+
+export function careerApplicationConfirmationTemplate(
+  application: CareerApplicationRow,
+): EmailTemplate {
+  const body = `
+    <p>Hi ${escapeHtml(application.first_name)},</p>
+    <p>Thanks for your interest in Clean Curb Co.</p>
+    <p>We received your information and will keep it on file as we grow our local route team.</p>
+    <p><strong>Fresh Starts at the Curb,</strong><br />Clean Curb Co.</p>
+  `;
+
+  return {
+    subject: "We received your Clean Curb Co. career interest form",
+    html: shell("Career interest received", body),
+    text: `Hi ${application.first_name}, thanks for your interest in Clean Curb Co. We received your information and will keep it on file as we grow our local route team. Fresh Starts at the Curb, Clean Curb Co.`,
+  };
+}
+
+export function adminCareerApplicationTemplate(
+  application: CareerApplicationRow,
+  adminUrl: string,
+): EmailTemplate {
+  const body = `
+    <p>A new Clean Curb Co. career interest form was submitted.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Name:</strong> ${escapeHtml(application.first_name)} ${escapeHtml(application.last_name)}</li>
+      <li><strong>Email:</strong> ${escapeHtml(application.email)}</li>
+      <li><strong>Phone:</strong> ${escapeHtml(application.phone ?? "Not provided")}</li>
+      <li><strong>Role interest:</strong> ${escapeHtml(application.role_interest ?? "General Interest")}</li>
+      <li><strong>Availability:</strong> ${escapeHtml(application.availability.join(", ") || "Not provided")}</li>
+      <li><strong>Location:</strong> ${escapeHtml([application.city, application.state, application.zip].filter(Boolean).join(", ") || "Not provided")}</li>
+    </ul>
+    <p><strong>Experience:</strong><br />${escapeHtml(application.experience ?? "Not provided")}</p>
+    <p><strong>Message:</strong><br />${escapeHtml(application.message ?? "Not provided")}</p>
+    <p><a href="${escapeHtml(adminUrl)}" style="display:inline-block;background:#00ff38;color:#050505;padding:12px 18px;border-radius:8px;font-weight:800;text-decoration:none">Open admin careers</a></p>
+  `;
+
+  return {
+    subject: "New Clean Curb Co. career application",
+    html: shell("New career application", body),
+    text: `New career application: ${application.first_name} ${application.last_name}, ${application.email}, ${application.role_interest ?? "General Interest"}. Admin: ${adminUrl}`,
   };
 }

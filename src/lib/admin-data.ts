@@ -5,6 +5,7 @@ import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 import type {
   BookingRow,
   ActivityEventRow,
+  CareerApplicationRow,
   ContactMessageRow,
   CustomerRequestRow,
   NotificationEventRow,
@@ -39,6 +40,7 @@ export type AdminContext = {
   serviceEvents: ServiceEventRow[];
   notificationEvents: NotificationEventRow[];
   payments: PaymentRow[];
+  careerApplications: CareerApplicationRow[];
 };
 
 export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext> {
@@ -63,6 +65,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
       serviceEvents: [],
       notificationEvents: [],
       payments: [],
+      careerApplications: [],
     };
   }
 
@@ -84,6 +87,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     serviceEventsResult,
     notificationEventsResult,
     paymentsResult,
+    careerApplicationsResult,
   ] =
     await Promise.all([
       admin
@@ -150,6 +154,10 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .from("payments")
         .select("*")
         .order("created_at", { ascending: false }),
+      admin
+        .from("career_applications")
+        .select("*")
+        .order("created_at", { ascending: false }),
     ]);
 
   return {
@@ -170,5 +178,6 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     serviceEvents: serviceEventsResult.data ?? [],
     notificationEvents: notificationEventsResult.data ?? [],
     payments: paymentsResult.data ?? [],
+    careerApplications: careerApplicationsResult.data ?? [],
   };
 }

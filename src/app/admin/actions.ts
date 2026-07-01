@@ -17,6 +17,7 @@ import { requireAdmin } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, pickEnum } from "@/lib/validation";
 import type { BookingStatus, PaymentStatus } from "@/types/booking";
 import type {
+  CareerApplicationStatus,
   CustomerRequestStatus,
   Database,
   FieldStopStatus,
@@ -26,6 +27,14 @@ import type {
 
 type AdminClient = ReturnType<typeof getSupabaseAdmin>;
 const preferredContactMethods = ["email", "phone", "sms"] as const;
+const careerApplicationStatuses: readonly CareerApplicationStatus[] = [
+  "new",
+  "reviewing",
+  "contacted",
+  "not_now",
+  "hired",
+  "archived",
+];
 const routeDayStatuses: readonly RouteDayStatus[] = [
   "planned",
   "active",
@@ -705,4 +714,35 @@ export async function removeRouteStopAdminAction(formData: FormData) {
   revalidatePath("/admin/routes");
   revalidatePath("/field/today");
   revalidatePath("/field/routes");
+}
+
+export async function updateCareerApplicationAdminAction(formData: FormData) {
+  const auth = await requireAdmin("/admin/careers");
+  if (auth.status !== "ok") return;
+
+  const applicationId = cleanString(formData.get("applicationId"), 80);
+  if (!applicationId) return;
+
+  const status = pickEnum<CareerApplicationStatus>(
+    formData.get("status"),
+    careerApplicationStatuses,
+    "reviewing",
+  );
+  const admin = getSupabaseAdmin();
+  await admin
+    .from("career_applications")
+    .update({
+      status,
+      admin_notes: cleanLongText(formData.get("adminNotes"), 3000) || null,
+    })
+    .eq("id", applicationId);
+
+  await logActivity(admin, {
+    actor_profile_id: auth.userId,
+    event_type: "career_application_updated",
+    message: `Career application marked ${status}.`,
+    metadata: { applicationId, status },
+  });
+
+  revalidatePath("/admin/careers");
 }

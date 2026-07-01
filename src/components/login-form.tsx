@@ -5,7 +5,13 @@ import { useState } from "react";
 import Link from "next/link";
 import { LogIn } from "lucide-react";
 
-export function LoginForm() {
+export function LoginForm({
+  nextPath,
+  buttonLabel = "Log In",
+}: {
+  nextPath?: string;
+  buttonLabel?: string;
+}) {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -25,7 +31,7 @@ export function LoginForm() {
         body: JSON.stringify({
           email,
           password,
-          next: searchParams.get("next") ?? undefined,
+          next: searchParams.get("next") ?? nextPath ?? undefined,
         }),
       });
       const data = (await response.json()) as {
@@ -78,7 +84,7 @@ export function LoginForm() {
       {error ? <p className="confirmation-panel">{error}</p> : null}
       <button className="button button-dark" type="submit" disabled={isSubmitting}>
         <LogIn size={20} aria-hidden="true" />
-        {isSubmitting ? "Logging In..." : "Log In"}
+        {isSubmitting ? "Signing In..." : buttonLabel}
       </button>
       <Link className="muted underline-link" href="/reset-password">
         Forgot your password?

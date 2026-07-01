@@ -5,6 +5,7 @@ import { requireField, type AuthResult } from "@/lib/supabase/auth";
 import type {
   BookingRow,
   PaymentRow,
+  ProfileRow,
   RouteBreakRow,
   RouteDayRow,
   RouteStopRow,
@@ -25,6 +26,7 @@ export type FieldContext = {
   photos: ServicePhotoRow[];
   breaks: RouteBreakRow[];
   payments: PaymentRow[];
+  profiles: ProfileRow[];
 };
 
 export function businessToday() {
@@ -57,6 +59,7 @@ export async function getFieldContext(nextPath = "/field/today"): Promise<FieldC
       photos: [],
       breaks: [],
       payments: [],
+      profiles: [],
     };
   }
 
@@ -71,6 +74,7 @@ export async function getFieldContext(nextPath = "/field/today"): Promise<FieldC
     photosResult,
     breaksResult,
     paymentsResult,
+    profilesResult,
   ] = await Promise.all([
     admin
       .from("route_days")
@@ -108,6 +112,10 @@ export async function getFieldContext(nextPath = "/field/today"): Promise<FieldC
       .from("payments")
       .select("*")
       .order("created_at", { ascending: false }),
+    admin
+      .from("profiles")
+      .select("*")
+      .order("created_at", { ascending: false }),
   ]);
 
   return {
@@ -121,5 +129,6 @@ export async function getFieldContext(nextPath = "/field/today"): Promise<FieldC
     photos: photosResult.data ?? [],
     breaks: breaksResult.data ?? [],
     payments: paymentsResult.data ?? [],
+    profiles: profilesResult.data ?? [],
   };
 }

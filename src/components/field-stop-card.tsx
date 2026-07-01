@@ -44,6 +44,7 @@ export function FieldStopCard({
   const googleMaps = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
   const addOns = booking.add_ons.length ? booking.add_ons.join(", ") : "None";
   const paymentStatus = payment?.status ?? booking.payment_status;
+  const actionLabel = getStopActionLabel(stop.status);
 
   return (
     <article className="field-card">
@@ -72,6 +73,15 @@ export function FieldStopCard({
         <span>Gate: {address?.gate_code ?? "none"}</span>
         <span>Route: {routeDay?.route_name ?? routeDay?.route_date ?? "not assigned"}</span>
       </div>
+      {stop.issue_flags.length ? (
+        <div className="status-stack">
+          {stop.issue_flags.slice(0, 3).map((flag) => (
+            <span className="status-badge status-needs_follow_up" key={flag}>
+              {humanizeStatus(flag)}
+            </span>
+          ))}
+        </div>
+      ) : null}
       {booking.customer_notes || address?.notes || stop.technician_notes ? (
         <p className="field-note">
           {booking.customer_notes ?? address?.notes ?? stop.technician_notes}
@@ -84,17 +94,32 @@ export function FieldStopCard({
         <a className="button button-outline" href={googleMaps} target="_blank" rel="noreferrer">
           Google Maps
         </a>
-        <form action={updateStopStatusAction}>
-          <input type="hidden" name="visitId" value={visit.id} />
-          <input type="hidden" name="status" value="in_progress" />
-          <button className="button button-primary" type="submit">
-            Start Service
-          </button>
-        </form>
+        {stop.status === "completed" || stop.status === "needs_follow_up" ? (
+          <Link className="button button-primary" href={`/field/stops/${visit.id}`}>
+            {actionLabel}
+          </Link>
+        ) : (
+          <form action={updateStopStatusAction}>
+            <input type="hidden" name="visitId" value={visit.id} />
+            <input type="hidden" name="status" value="in_progress" />
+            <button className="button button-primary" type="submit">
+              {actionLabel}
+            </button>
+          </form>
+        )}
         <Link className="button button-dark" href={`/field/stops/${visit.id}`}>
           View Details
         </Link>
       </div>
     </article>
   );
+}
+
+function getStopActionLabel(status: RouteStopRow["status"]) {
+  if (status === "scheduled") return "Start Stop";
+  if (status === "on_the_way") return "Continue";
+  if (status === "in_progress") return "Continue Service";
+  if (status === "completed") return "View Completed Stop";
+  if (status === "needs_follow_up") return "Review Issue";
+  return "Open Stop";
 }
