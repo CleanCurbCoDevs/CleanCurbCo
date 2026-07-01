@@ -37,7 +37,7 @@ const proofPhotos = [
     src: "/images/proof/bin-cleaning-action-driveway.jpeg",
     alt: "Clean Curb Co. rinsing a residential garbage bin on a driveway.",
     caption: "High-pressure rinse inside and out",
-    className: "large",
+    className: "featured",
     position: "center 48%",
   },
   {
@@ -59,6 +59,25 @@ const proofPhotos = [
     position: "center 50%",
   },
 ];
+
+const pricingPlanLinks = {
+  one_time: {
+    href: "/book?frequency=one-time",
+    label: "Book One-Time Clean",
+  },
+  monthly: {
+    href: "/book?frequency=monthly",
+    label: "Book Monthly Plan",
+  },
+  every_other_month: {
+    href: "/book?frequency=every-other-month",
+    label: "Book Every-Other-Month Plan",
+  },
+  quarterly: {
+    href: "/book?frequency=quarterly",
+    label: "Book Quarterly Plan",
+  },
+} as const;
 
 export function ProblemSection() {
   const problems = [
@@ -112,29 +131,14 @@ export function ProofSection() {
           Bay and nearby Summerville neighborhoods.
         </SectionHeader>
         <div className="proof-gallery" aria-label="Clean Curb Co. service photos">
-          {proofPhotos.map((photo) => (
-            <figure
-              className={`proof-card${photo.className ? ` ${photo.className}` : ""}`}
-              key={photo.src}
-            >
-              <span className="proof-image-frame">
-                <Image
-                  src={photo.src}
-                  alt={photo.alt}
-                  fill
-                  sizes={
-                    photo.className === "large"
-                      ? "(max-width: 719px) 100vw, 58vw"
-                      : "(max-width: 719px) 100vw, 28vw"
-                  }
-                  className="proof-image"
-                  style={{ objectPosition: photo.position }}
-                />
-              </span>
-              <figcaption>{photo.caption}</figcaption>
-            </figure>
-          ))}
+          <ProofPhotoCard photo={proofPhotos[0]} priority />
+          <div className="proof-support-grid">
+            {proofPhotos.slice(1).map((photo) => (
+              <ProofPhotoCard photo={photo} key={photo.src} />
+            ))}
+          </div>
         </div>
+        <p className="proof-note">Real service photos from launch prep.</p>
       </div>
     </section>
   );
@@ -271,8 +275,8 @@ export function PricingSection() {
                 </li>
               ))}
             </ul>
-            <Link className="button button-dark" href="/book">
-              Book One-Time
+            <Link className="button button-dark" href={pricingPlanLinks.one_time.href}>
+              {pricingPlanLinks.one_time.label}
             </Link>
           </article>
           {recurringPlans.map((plan) => (
@@ -284,6 +288,8 @@ export function PricingSection() {
               suffix={plan.suffix}
               frequency={plan.frequency}
               highlights={plan.highlights}
+              ctaHref={pricingPlanLinks[plan.id].href}
+              ctaLabel={pricingPlanLinks[plan.id].label}
               featured={plan.featured}
             />
           ))}
@@ -543,4 +549,36 @@ export function FutureServicesSection() {
 
 function CalendarIcon() {
   return <ClipboardCheck size={20} aria-hidden="true" />;
+}
+
+function ProofPhotoCard({
+  photo,
+  priority,
+}: {
+  photo: (typeof proofPhotos)[number];
+  priority?: boolean;
+}) {
+  return (
+    <figure
+      className={`proof-card${photo.className ? ` ${photo.className}` : ""}`}
+      key={photo.src}
+    >
+      <span className="proof-image-frame">
+        <Image
+          src={photo.src}
+          alt={photo.alt}
+          fill
+          sizes={
+            photo.className === "featured"
+              ? "(max-width: 719px) 100vw, 1180px"
+              : "(max-width: 719px) 100vw, 33vw"
+          }
+          className="proof-image"
+          style={{ objectPosition: photo.position }}
+          loading={priority ? "eager" : "lazy"}
+        />
+      </span>
+      <figcaption>{photo.caption}</figcaption>
+    </figure>
+  );
 }

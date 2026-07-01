@@ -8,6 +8,8 @@ type PricingCardProps = {
   suffix: string;
   frequency: string;
   highlights: string[];
+  ctaHref: string;
+  ctaLabel: string;
   featured?: boolean;
 };
 
@@ -18,6 +20,8 @@ export function PricingCard({
   suffix,
   frequency,
   highlights,
+  ctaHref,
+  ctaLabel,
   featured,
 }: PricingCardProps) {
   return (
@@ -41,9 +45,9 @@ export function PricingCard({
       </ul>
       <Link
         className={`button ${featured ? "button-primary" : "button-dark"}`}
-        href="/book"
+        href={ctaHref}
       >
-        Book This Plan
+        {ctaLabel}
       </Link>
     </article>
   );

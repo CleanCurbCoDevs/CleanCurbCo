@@ -557,7 +557,13 @@ textarea {
 
 .proof-gallery {
   display: grid;
-  gap: 14px;
+  gap: 18px;
+  grid-template-columns: 1fr;
+}
+
+.proof-support-grid {
+  display: grid;
+  gap: 18px;
   grid-template-columns: 1fr;
 }
 
@@ -574,14 +580,14 @@ textarea {
 }
 
 .proof-image-frame {
-  aspect-ratio: 4 / 3;
+  aspect-ratio: 16 / 10;
   display: block;
   overflow: hidden;
   position: relative;
 }
 
-.proof-card.large .proof-image-frame {
-  aspect-ratio: 16 / 11;
+.proof-card.featured .proof-image-frame {
+  aspect-ratio: 16 / 9;
 }
 
 .proof-image {
@@ -596,6 +602,14 @@ textarea {
   font-weight: 950;
   min-height: 54px;
   padding: 13px 15px;
+}
+
+.proof-note {
+  color: var(--muted);
+  font-size: 0.95rem;
+  font-weight: 850;
+  margin: 14px 0 0;
+  text-align: center;
 }
 
 .step-number {
@@ -2056,14 +2070,57 @@ textarea {
 
 .footer-grid {
   display: grid;
-  gap: 26px;
+  gap: 30px;
   grid-template-columns: 1fr;
 }
 
+.footer-brand {
+  display: grid;
+  gap: 16px;
+}
+
+.footer-brand .muted {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.6;
+  margin: 0;
+  max-width: 340px;
+}
+
+.footer-column {
+  display: grid;
+  gap: 12px;
+}
+
+.footer-column h2 {
+  color: var(--gold-soft);
+  font-size: 0.86rem;
+  font-weight: 950;
+  letter-spacing: 0;
+  margin: 0;
+  text-transform: uppercase;
+}
+
 .footer-links {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  display: grid;
+  gap: 7px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.footer-links a {
+  color: rgba(255, 255, 255, 0.78);
+  display: inline-flex;
+  line-height: 1.35;
+  padding: 7px 0;
+  word-break: break-word;
+}
+
+.footer-links a:hover {
+  background: transparent;
+  color: white;
+  text-decoration: underline;
+  text-underline-offset: 4px;
 }
 
 .footer-small {
@@ -2119,15 +2176,15 @@ textarea {
   }
 
   .proof-gallery {
-    grid-template-columns: 1.35fr 1fr;
+    grid-template-columns: 1fr;
   }
 
-  .proof-card.large {
-    grid-row: span 3;
+  .proof-support-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
-  .proof-card.large .proof-image-frame {
-    min-height: 100%;
+  .proof-support-grid .proof-image-frame {
+    aspect-ratio: 4 / 3;
   }
 
   .route-status-card {
@@ -2139,7 +2196,7 @@ textarea {
   }
 
   .footer-grid {
-    grid-template-columns: 1fr 1.2fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .mock-row {
@@ -2288,6 +2345,14 @@ textarea {
 @media (min-width: 980px) {
   .grid-4 {
     grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .footer-grid {
+    grid-template-columns:
+      minmax(250px, 1.15fr)
+      minmax(120px, 0.72fr)
+      minmax(150px, 0.78fr)
+      minmax(330px, 1.35fr);
   }
 
   .service-area-panel {

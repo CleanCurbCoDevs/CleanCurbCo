@@ -79,9 +79,19 @@ const initialState: FormState = {
   },
 };
 
-export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?: string }) {
+export function BookingForm({
+  initialFrequency,
+  initialReferralCode = "",
+}: {
+  initialFrequency?: ServiceFrequency;
+  initialReferralCode?: string;
+}) {
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
+    service: {
+      ...initialState.service,
+      frequency: initialFrequency ?? initialState.service.frequency,
+    },
     referralCode: normalizeReferralCode(initialReferralCode),
   }));
   const [submittedBooking, setSubmittedBooking] =
@@ -96,7 +106,7 @@ export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?
         binCount: form.service.binCount,
         frequency: form.service.frequency,
         addOns: form.service.addOns,
-        applyFoundingNeighborPromo: form.service.frequency !== "one_time",
+        applyFoundingNeighborPromo: false,
       }),
     [form.service.addOns, form.service.binCount, form.service.frequency],
   );
@@ -547,10 +557,9 @@ export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?
           <span>/ visit</span>
         </div>
         <p>
-          {form.service.frequency === "one_time"
-            ? formatFrequency(form.service.frequency)
-            : "Estimated first visit"}{" "}
-          for {form.service.binCount}
+          <strong>{formatFrequency(form.service.frequency)}</strong>
+          <br />
+          Estimated visit for {form.service.binCount}
           {form.service.binCount === 1 ? " bin" : " bins"}.
         </p>
         <p className="estimate-note">

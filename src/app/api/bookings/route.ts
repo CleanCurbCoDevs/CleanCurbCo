@@ -148,7 +148,7 @@ export async function POST(request: Request) {
     binCount,
     frequency,
     addOns,
-    applyFoundingNeighborPromo: frequency !== "one_time",
+    applyFoundingNeighborPromo: false,
   });
 
   const admin = getSupabaseAdmin();

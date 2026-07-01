@@ -2,18 +2,35 @@ import Link from "next/link";
 import { BrandLogo } from "@/components/brand-logo";
 import { brand } from "@/lib/site";
 
-const footerLinks = [
-  { label: "Book Now", href: "/book" },
-  { label: "Pricing", href: "/pricing" },
-  { label: "Services", href: "/services" },
-  { label: "Service Area", href: "/service-area" },
-  { label: "Contact", href: "/contact" },
-  { label: "Careers", href: "/careers" },
-  { label: "Employee Login", href: "/employee-login" },
-  { label: "Customer Portal", href: "/portal" },
-  { label: "FAQ", href: "/faq" },
-  { label: "Privacy", href: "/privacy" },
-  { label: "Terms", href: "/terms" },
+const footerGroups = [
+  {
+    title: "Service",
+    links: [
+      { label: "Book Now", href: "/book" },
+      { label: "Pricing", href: "/pricing" },
+      { label: "Services", href: "/services" },
+      { label: "Service Area", href: "/service-area" },
+      { label: "FAQ", href: "/faq" },
+    ],
+  },
+  {
+    title: "Account",
+    links: [
+      { label: "Customer Portal", href: "/portal" },
+      { label: "Employee Login", href: "/employee-login" },
+      { label: "Careers", href: "/careers" },
+    ],
+  },
+  {
+    title: "Contact / Legal",
+    links: [
+      { label: brand.phone, href: brand.phoneHref },
+      { label: brand.email, href: brand.emailHref },
+      { label: "Contact", href: "/contact" },
+      { label: "Privacy", href: "/privacy" },
+      { label: "Terms", href: "/terms" },
+    ],
+  },
 ];
 
 export function SiteFooter() {
@@ -21,39 +38,31 @@ export function SiteFooter() {
     <footer className="site-footer">
       <div className="container">
         <div className="footer-grid">
-          <div className="grid">
+          <div className="footer-brand">
             <BrandLogo />
             <p className="muted">
-              Residential garbage bin cleaning, sanitizing, and deodorizing
-              for neighbors who would rather not touch that bin.
-            </p>
-            <p className="muted">
-              Locally owned | Veteran owned | Eco-conscious
-              <br />
-              Now building routes in {brand.area}
-            </p>
-            <p className="muted">
-              <a className="contact-link" href={brand.phoneHref}>
-                {brand.phone}
-              </a>
-              <br />
-              <a className="contact-link" href={brand.emailHref}>
-                {brand.email}
-              </a>
+              Locally owned, veteran-owned garbage bin cleaning for Cane Bay
+              and nearby Summerville communities.
             </p>
           </div>
-          <nav className="footer-links" aria-label="Footer navigation">
-            {footerLinks.map((item) => (
-              <Link href={item.href} key={item.href}>
-                {item.label}
-              </Link>
-            ))}
-          </nav>
+          {footerGroups.map((group) => (
+            <nav
+              className="footer-column"
+              aria-label={`${group.title} footer links`}
+              key={group.title}
+            >
+              <h2>{group.title}</h2>
+              <ul className="footer-links">
+                {group.links.map((item) => (
+                  <li key={item.href}>
+                    <Link href={item.href}>{item.label}</Link>
+                  </li>
+                ))}
+              </ul>
+            </nav>
+          ))}
         </div>
-        <p className="footer-small">
-          {brand.legalNote} Public-facing service is provided under the Clean
-          Curb Co. brand.
-        </p>
+        <p className="footer-small">{brand.legalNote}</p>
       </div>
     </footer>
   );

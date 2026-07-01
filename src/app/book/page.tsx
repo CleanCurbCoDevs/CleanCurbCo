@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { BookingForm } from "@/components/booking/booking-form";
+import type { ServiceFrequency } from "@/types/booking";
 
 export const metadata: Metadata = {
   title: "Book Garbage Bin Cleaning",
@@ -8,7 +9,7 @@ export const metadata: Metadata = {
 };
 
 type BookPageProps = {
-  searchParams: Promise<{ ref?: string }>;
+  searchParams: Promise<{ ref?: string; frequency?: string }>;
 };
 
 export default async function BookPage({ searchParams }: BookPageProps) {
@@ -28,9 +29,25 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       </section>
       <section className="section section-cream">
         <div className="container">
-          <BookingForm initialReferralCode={params.ref ?? ""} />
+          <BookingForm
+            initialFrequency={parseFrequencyParam(params.frequency)}
+            initialReferralCode={params.ref ?? ""}
+          />
         </div>
       </section>
     </main>
   );
+}
+
+function parseFrequencyParam(value?: string): ServiceFrequency | undefined {
+  const frequencies: Record<string, ServiceFrequency> = {
+    "one-time": "one_time",
+    one_time: "one_time",
+    monthly: "monthly",
+    "every-other-month": "every_other_month",
+    every_other_month: "every_other_month",
+    quarterly: "quarterly",
+  };
+
+  return value ? frequencies[value.toLowerCase()] : undefined;
 }
