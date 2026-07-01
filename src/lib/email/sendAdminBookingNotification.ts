@@ -9,6 +9,7 @@ export function sendAdminBookingNotification(booking: BookingRow) {
   return sendTransactionalEmail({
     to: getResendEnv().adminEmails,
     ...template,
+    replyTo: booking.email,
     templateKey: "admin_booking_notification",
     relatedBookingId: booking.id,
     idempotencyKey: `admin-booking-${booking.id}`,

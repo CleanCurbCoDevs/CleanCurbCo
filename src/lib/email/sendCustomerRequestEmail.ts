@@ -43,6 +43,7 @@ export function sendAdminCustomerRequestAlert(
   return sendTransactionalEmail({
     to: getResendEnv().adminEmails,
     ...template,
+    replyTo: profile.email ?? booking?.email ?? undefined,
     templateKey: "admin_customer_request_alert",
     relatedBookingId: booking?.id ?? request.booking_id,
     idempotencyKey: `admin-customer-request-${request.id}`,

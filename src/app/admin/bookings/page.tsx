@@ -145,6 +145,9 @@ export default async function AdminBookingsPage({
                 (payment) => payment.booking_id === booking.id,
               );
               const latestPayment = bookingPayments[0] ?? null;
+              const visit = context.visits.find(
+                (item) => item.booking_id === booking.id,
+              );
 
               return (
                 <form
@@ -312,6 +315,14 @@ export default async function AdminBookingsPage({
                         href={`/admin/customers/${booking.customer_id}`}
                       >
                         View Customer
+                      </Link>
+                    ) : null}
+                    {visit ? (
+                      <Link
+                        className="button button-outline"
+                        href={`/admin/checklists/${visit.id}`}
+                      >
+                        Checklist
                       </Link>
                     ) : null}
                     {referral ? (

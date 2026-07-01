@@ -18,7 +18,7 @@ export async function sendCareerApplicationEmails(
   );
   const { adminEmails } = getResendEnv();
 
-  await Promise.all([
+  await Promise.allSettled([
     sendTransactionalEmail({
       to: application.email,
       ...confirmation,
@@ -28,6 +28,7 @@ export async function sendCareerApplicationEmails(
     sendTransactionalEmail({
       to: adminEmails,
       ...adminTemplate,
+      replyTo: application.email,
       templateKey: "admin_career_application",
       idempotencyKey: `admin-career-${application.id}`,
     }),

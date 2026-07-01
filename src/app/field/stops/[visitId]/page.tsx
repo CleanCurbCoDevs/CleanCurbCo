@@ -5,7 +5,6 @@ import {
   deleteServicePhotoAction,
   markManualPaidAction,
   readyForNextStopAction,
-  saveChecklistAction,
   saveTechnicianNotesAction,
   sendPaymentLinkFromFieldAction,
   startBreakAction,
@@ -13,9 +12,11 @@ import {
   uploadServicePhotosAction,
 } from "@/app/field/actions";
 import { PaymentLinkButton } from "@/components/payment-link-button";
+import { ServiceChecklistPanel } from "@/components/service-checklist-panel";
 import { FieldShell } from "@/components/shells/field-shell";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
 import { getFieldContext } from "@/lib/field-data";
+import { ensureServiceChecklistBundle } from "@/lib/service-checklists";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isAdminRole } from "@/lib/supabase/roles";
 import type { ServicePhotoRow } from "@/types/database";
@@ -26,25 +27,8 @@ export const metadata: Metadata = {
 
 type FieldStopPageProps = {
   params: Promise<{ visitId: string }>;
+  searchParams: Promise<Record<string, string | undefined>>;
 };
-
-const checklistItems = [
-  ["arrived_at_property", "Arrived at property"],
-  ["bins_located", "Bins located"],
-  ["before_photos_taken", "Before photos taken"],
-  ["loose_debris_removed", "Loose debris removed"],
-  ["cleaner_applied", "Cleaner applied"],
-  ["bins_pressure_washed", "Bins pressure washed"],
-  ["scrubbed_if_needed", "Scrubbed if needed"],
-  ["sanitized", "Sanitized"],
-  ["deodorized", "Deodorized"],
-  ["trash_pad_cleaned", "Trash pad cleaned, if purchased"],
-  ["add_ons_completed", "Add-ons completed"],
-  ["after_photos_taken", "After photos taken"],
-  ["bins_returned_neatly", "Bins returned neatly"],
-  ["work_area_checked", "Work area checked"],
-  ["service_completed", "Service completed"],
-] as const;
 
 const issueFlags = [
   ["bin_inaccessible", "Bin inaccessible"],
@@ -69,8 +53,11 @@ const breakReasons = [
   ["other", "Other"],
 ] as const;
 
-export default async function FieldStopPage({ params }: FieldStopPageProps) {
-  const { visitId } = await params;
+export default async function FieldStopPage({
+  params,
+  searchParams,
+}: FieldStopPageProps) {
+  const [{ visitId }, query] = await Promise.all([params, searchParams]);
   const context = await getFieldContext(`/field/stops/${visitId}`);
   const visit = context.visits.find((item) => item.id === visitId);
   const stop = context.routeStops.find((item) => item.service_visit_id === visitId);
@@ -79,13 +66,16 @@ export default async function FieldStopPage({ params }: FieldStopPageProps) {
   const address = context.addresses.find(
     (item) => item.customer_id === booking?.customer_id && item.is_primary,
   );
-  const checklist = context.checklists.find((item) => item.route_stop_id === stop?.id);
   const payments = context.payments.filter(
     (item) => item.booking_id === booking?.id || item.service_visit_id === visit?.id,
   );
   const latestPayment = payments[0] ?? null;
   const photos = context.photos.filter((item) => item.route_stop_id === stop?.id);
   const signedPhotos = await createSignedPhotos(photos);
+  const serviceChecklistBundle = await createChecklistBundle(visitId);
+  const signedChecklistDocuments = serviceChecklistBundle
+    ? await createSignedChecklistDocuments(serviceChecklistBundle.documents)
+    : [];
   const manualPaymentAllowed =
     context.auth.status === "ok" && isAdminRole(context.auth.profile.role);
 
@@ -193,22 +183,16 @@ export default async function FieldStopPage({ params }: FieldStopPageProps) {
 
       <section className="field-card">
         <p className="section-kicker">Service Checklist</p>
-        <form action={saveChecklistAction} className="field-checklist">
-          <input type="hidden" name="visitId" value={visit.id} />
-          {checklistItems.map(([name, label]) => (
-            <label key={name}>
-              <input
-                type="checkbox"
-                name={name}
-                defaultChecked={Boolean(checklist?.[name])}
-              />
-              <span>{label}</span>
-            </label>
-          ))}
-          <button className="button button-dark" type="submit">
-            Save Checklist
-          </button>
-        </form>
+        {serviceChecklistBundle ? (
+          <ServiceChecklistPanel
+            bundle={serviceChecklistBundle}
+            documents={signedChecklistDocuments}
+            notice={query.checklist}
+            returnTo={`/field/stops/${visit.id}`}
+          />
+        ) : (
+          <p className="muted">Full checklist is not available for this stop yet.</p>
+        )}
       </section>
 
       <PhotoSection
@@ -448,6 +432,35 @@ async function createSignedPhotos(photos: ServicePhotoRow[]) {
         .from(photo.storage_bucket)
         .createSignedUrl(photo.storage_path, 60 * 60);
       return { ...photo, signedUrl: data?.signedUrl ?? null };
+    }),
+  );
+}
+
+async function createChecklistBundle(visitId: string) {
+  const admin = getSupabaseAdmin();
+  return ensureServiceChecklistBundle(admin, visitId);
+}
+
+async function createSignedChecklistDocuments(
+  documents: Array<{
+    id: string;
+    storage_bucket: string;
+    storage_path: string;
+    generated_at: string;
+  }>,
+) {
+  const admin = getSupabaseAdmin();
+  return Promise.all(
+    documents.map(async (document) => {
+      const { data } = await admin.storage
+        .from(document.storage_bucket)
+        .createSignedUrl(document.storage_path, 60 * 60);
+      return {
+        id: document.id,
+        storage_path: document.storage_path,
+        generated_at: document.generated_at,
+        signedUrl: data?.signedUrl ?? null,
+      };
     }),
   );
 }

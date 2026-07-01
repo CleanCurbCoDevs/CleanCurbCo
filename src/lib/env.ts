@@ -13,26 +13,38 @@ export function isSupabaseConfigured() {
 export function getSiteUrl() {
   return (
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "https://clean-curb-co-beta.vercel.app"
+    "https://cleancurbco.com"
   );
 }
 
-export function getResendEnv() {
-  const adminEmails = (process.env.ADMIN_EMAILS ?? "")
+function splitEmails(value?: string) {
+  return (value ?? "")
     .split(",")
     .map((email) => email.trim())
     .filter(Boolean);
+}
+
+function uniqueEmails(emails: string[]) {
+  return Array.from(new Set(emails.map((email) => email.trim()).filter(Boolean)));
+}
+
+export function getResendEnv() {
+  const replyTo =
+    process.env.RESEND_REPLY_TO_EMAIL ??
+    process.env.RESEND_REPLY_TO ??
+    "cleancurbco@stonebranchcapital.com";
+  const adminEmails = uniqueEmails([
+    ...splitEmails(process.env.ADMIN_NOTIFICATION_EMAIL),
+    ...splitEmails(process.env.ADMIN_EMAILS),
+  ]);
 
   return {
     apiKey: process.env.RESEND_API_KEY ?? "",
     from:
       process.env.RESEND_FROM_EMAIL ??
-      "Clean Curb Co. <cleancurbco@stonebranchcapital.com>",
-    replyTo:
-      process.env.RESEND_REPLY_TO ?? "cleancurbco@stonebranchcapital.com",
-    adminEmails: adminEmails.length
-      ? adminEmails
-      : ["cleancurbco@stonebranchcapital.com"],
+      "Clean Curb Co. <no-reply@cleancurbco.com>",
+    replyTo,
+    adminEmails: adminEmails.length ? adminEmails : [replyTo],
   };
 }
 

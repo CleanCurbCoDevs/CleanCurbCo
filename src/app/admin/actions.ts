@@ -570,31 +570,18 @@ export async function addBookingToRouteAdminAction(formData: FormData) {
 
   if (!routeDay || !booking || existingStop) return;
 
-  const { data: existingVisit } = await admin
+  const { data: createdVisit } = await admin
     .from("service_visits")
+    .insert({
+      booking_id: booking.id,
+      customer_id: booking.customer_id,
+      route_day: routeDay.route_date,
+      status: "scheduled",
+    })
     .select("*")
-    .eq("booking_id", booking.id)
-    .maybeSingle();
-
-  let visitId = existingVisit?.id ?? "";
-  if (!visitId) {
-    const { data: createdVisit } = await admin
-      .from("service_visits")
-      .insert({
-        booking_id: booking.id,
-        customer_id: booking.customer_id,
-        route_day: routeDay.route_date,
-        status: "scheduled",
-      })
-      .select("*")
-      .single();
-    visitId = createdVisit?.id ?? "";
-  } else {
-    await admin
-      .from("service_visits")
-      .update({ route_day: routeDay.route_date, status: "scheduled" })
-      .eq("id", visitId);
-  }
+    .single();
+  const visitId = createdVisit?.id ?? "";
+  if (!visitId) return;
 
   const { data: lastStop } = await admin
     .from("route_stops")

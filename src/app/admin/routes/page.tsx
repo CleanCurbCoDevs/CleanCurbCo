@@ -216,12 +216,20 @@ export default async function AdminRoutesPage() {
                             </span>
                           </div>
                           {visit ? (
-                            <Link
-                              className="button button-outline"
-                              href={`/field/stops/${visit.id}`}
-                            >
-                              Field View
-                            </Link>
+                            <div className="action-row">
+                              <Link
+                                className="button button-outline"
+                                href={`/field/stops/${visit.id}`}
+                              >
+                                Field View
+                              </Link>
+                              <Link
+                                className="button button-outline"
+                                href={`/admin/checklists/${visit.id}`}
+                              >
+                                Checklist
+                              </Link>
+                            </div>
                           ) : null}
                         </div>
                         <form action={updateRouteStopAdminAction} className="data-row">

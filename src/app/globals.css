@@ -1390,6 +1390,8 @@ textarea {
 .status-badge.status-paid,
 .status-badge.status-completed,
 .status-badge.status-approved,
+.status-badge.status-submitted,
+.status-badge.status-not_applicable,
 .status-badge.status-reward_ready,
 .status-badge.status-reward_sent,
 .status-badge.status-owner,
@@ -1401,6 +1403,7 @@ textarea {
 
 .status-badge.status-pending,
 .status-badge.status-reviewing,
+.status-badge.status-draft,
 .status-badge.status-scheduled,
 .status-badge.status-confirmed,
 .status-badge.status-on_the_way,
@@ -1420,6 +1423,8 @@ textarea {
 .status-badge.status-failed,
 .status-badge.status-cancelled,
 .status-badge.status-denied,
+.status-badge.status-voided,
+.status-badge.status-issue_found,
 .status-badge.status-needs_follow_up,
 .status-badge.status-skipped,
 .status-badge.status-rescheduled,
@@ -2085,6 +2090,190 @@ textarea {
   grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
 }
 
+.service-checklist-shell {
+  display: grid;
+  gap: 16px;
+}
+
+.service-checklist-hero {
+  align-items: start;
+  background: linear-gradient(135deg, #050505, #23132d);
+  border: 1px solid rgba(255, 227, 138, 0.28);
+  border-radius: var(--radius-lg);
+  color: white;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  justify-content: space-between;
+  padding: 18px;
+}
+
+.service-checklist-hero h1,
+.service-checklist-hero p {
+  margin: 0;
+}
+
+.service-checklist-hero .muted {
+  color: #e8dfc4;
+  margin-top: 8px;
+}
+
+.notice-card {
+  background: rgba(0, 255, 56, 0.11);
+  border: 1px solid rgba(0, 255, 56, 0.3);
+  border-radius: var(--radius);
+  color: var(--black);
+  font-weight: 900;
+  padding: 12px 14px;
+}
+
+.service-checklist-summary {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.service-checklist-summary > div {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+}
+
+.service-checklist-summary span,
+.service-checklist-item legend {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.service-checklist-documents {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 10px;
+  padding: 14px;
+}
+
+.service-checklist-documents h2 {
+  margin: 0;
+}
+
+.service-checklist-documents pre {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  font: inherit;
+  margin: 0;
+  overflow: auto;
+  padding: 12px;
+  white-space: pre-wrap;
+}
+
+.service-checklist-form,
+.service-checklist-sections {
+  display: grid;
+  gap: 14px;
+}
+
+.service-checklist-section {
+  background: #ffffff;
+  border: 1px solid rgba(17, 17, 17, 0.11);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+}
+
+.service-checklist-section summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+  list-style: none;
+  padding: 14px 16px;
+}
+
+.service-checklist-section summary::-webkit-details-marker {
+  display: none;
+}
+
+.service-checklist-section summary span {
+  font-size: 1.05rem;
+  font-weight: 1000;
+}
+
+.service-checklist-section summary small {
+  color: var(--muted);
+  font-weight: 900;
+}
+
+.service-checklist-items {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.service-checklist-item {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 12px;
+  padding: 12px;
+}
+
+.service-checklist-item > div:first-child {
+  align-items: start;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: space-between;
+}
+
+.service-checklist-item fieldset {
+  border: 0;
+  margin: 0;
+  min-inline-size: 0;
+  padding: 0;
+}
+
+.checklist-status-options {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin-top: 8px;
+}
+
+.checklist-status-options label {
+  align-items: center;
+  background: white;
+  border: 1px solid rgba(17, 17, 17, 0.1);
+  border-radius: var(--radius);
+  display: flex;
+  font-weight: 900;
+  gap: 8px;
+  min-height: 46px;
+  padding: 8px 10px;
+}
+
+.checklist-status-options input {
+  height: 20px;
+  width: 20px;
+}
+
+.compact-field textarea {
+  min-height: 78px;
+}
+
+.service-checklist-finalize {
+  border-color: rgba(255, 59, 48, 0.28);
+}
+
 .field-complete-panel {
   background: rgba(0, 255, 56, 0.1);
   border: 1px solid rgba(0, 255, 56, 0.25);
@@ -2489,6 +2678,14 @@ textarea {
   }
 
   .field-checklist.compact {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .service-checklist-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .checklist-status-options {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 

@@ -69,6 +69,13 @@ export type CareerApplicationStatus =
   | "not_now"
   | "hired"
   | "archived";
+export type ChecklistStatus = "draft" | "submitted" | "voided";
+export type ChecklistItemStatus =
+  | "pending"
+  | "completed"
+  | "not_applicable"
+  | "issue_found";
+export type ChecklistDocumentType = "checklist_pdf" | "correction_note" | "other";
 
 export type BookingRow = {
   id: string;
@@ -216,6 +223,17 @@ export type ServiceChecklistRow = {
   updated_at: string;
   service_visit_id: string | null;
   route_stop_id: string | null;
+  booking_id: string | null;
+  customer_id: string | null;
+  status: ChecklistStatus;
+  services_performed: string[];
+  overall_notes: string | null;
+  submitted_at: string | null;
+  submitted_by: string | null;
+  pdf_storage_bucket: string | null;
+  pdf_storage_path: string | null;
+  pdf_generated_at: string | null;
+  correction_notes: string | null;
   arrived_at_property: boolean;
   bins_located: boolean;
   before_photos_taken: boolean;
@@ -233,6 +251,63 @@ export type ServiceChecklistRow = {
   service_completed: boolean;
   completed_by: string | null;
   completed_at: string | null;
+};
+
+export type ChecklistTemplateRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  template_key: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+};
+
+export type ChecklistTemplateItemRow = {
+  id: string;
+  created_at: string;
+  template_id: string | null;
+  section_key: string;
+  section_name: string;
+  item_key: string;
+  label: string;
+  sort_order: number;
+  is_required: boolean;
+};
+
+export type ServiceChecklistItemRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  checklist_id: string;
+  service_visit_id: string | null;
+  booking_id: string | null;
+  section_key: string;
+  section_name: string;
+  item_key: string;
+  label: string;
+  sort_order: number;
+  is_required: boolean;
+  status: ChecklistItemStatus;
+  notes: string | null;
+  resolved_at: string | null;
+  resolved_by: string | null;
+};
+
+export type ServiceChecklistDocumentRow = {
+  id: string;
+  created_at: string;
+  checklist_id: string;
+  service_visit_id: string | null;
+  booking_id: string | null;
+  customer_id: string | null;
+  document_type: ChecklistDocumentType;
+  storage_bucket: string;
+  storage_path: string;
+  is_customer_visible: boolean;
+  generated_by: string | null;
+  generated_at: string;
+  notes: string | null;
 };
 
 export type ServicePhotoRow = {
@@ -536,6 +611,40 @@ export type Database = {
         Row: ServiceChecklistRow;
         Insert: Partial<ServiceChecklistRow>;
         Update: Partial<ServiceChecklistRow>;
+        Relationships: [];
+      };
+      checklist_templates: {
+        Row: ChecklistTemplateRow;
+        Insert: Partial<ChecklistTemplateRow> &
+          Pick<ChecklistTemplateRow, "template_key" | "name">;
+        Update: Partial<ChecklistTemplateRow>;
+        Relationships: [];
+      };
+      checklist_template_items: {
+        Row: ChecklistTemplateItemRow;
+        Insert: Partial<ChecklistTemplateItemRow> &
+          Pick<
+            ChecklistTemplateItemRow,
+            "section_key" | "section_name" | "item_key" | "label"
+          >;
+        Update: Partial<ChecklistTemplateItemRow>;
+        Relationships: [];
+      };
+      service_checklist_items: {
+        Row: ServiceChecklistItemRow;
+        Insert: Partial<ServiceChecklistItemRow> &
+          Pick<
+            ServiceChecklistItemRow,
+            "checklist_id" | "section_key" | "section_name" | "item_key" | "label"
+          >;
+        Update: Partial<ServiceChecklistItemRow>;
+        Relationships: [];
+      };
+      service_checklist_documents: {
+        Row: ServiceChecklistDocumentRow;
+        Insert: Partial<ServiceChecklistDocumentRow> &
+          Pick<ServiceChecklistDocumentRow, "checklist_id" | "storage_path">;
+        Update: Partial<ServiceChecklistDocumentRow>;
         Relationships: [];
       };
       service_photos: {

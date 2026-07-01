@@ -9,6 +9,8 @@ import type {
   PaymentRow,
   ReferralRow,
   ServiceAddressRow,
+  ServiceChecklistDocumentRow,
+  ServiceChecklistItemRow,
   ServiceChecklistRow,
   ServicePhotoRow,
   ServiceVisitRow,
@@ -23,6 +25,8 @@ export type PortalContext = {
   referrals: ReferralRow[];
   activity: ActivityEventRow[];
   checklists: ServiceChecklistRow[];
+  checklistItems: ServiceChecklistItemRow[];
+  checklistDocuments: ServiceChecklistDocumentRow[];
   photos: ServicePhotoRow[];
   payments: PaymentRow[];
 };
@@ -40,6 +44,8 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       referrals: [],
       activity: [],
       checklists: [],
+      checklistItems: [],
+      checklistDocuments: [],
       photos: [],
       payments: [],
     };
@@ -54,6 +60,8 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
     referralsResult,
     activityResult,
     checklistsResult,
+    checklistItemsResult,
+    checklistDocumentsResult,
     photosResult,
     paymentsResult,
   ] = await Promise.all([
@@ -86,6 +94,14 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       .select("*")
       .order("created_at", { ascending: false }),
     supabase
+      .from("service_checklist_items")
+      .select("*")
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("service_checklist_documents")
+      .select("*")
+      .order("generated_at", { ascending: false }),
+    supabase
       .from("service_photos")
       .select("*")
       .order("created_at", { ascending: false }),
@@ -104,6 +120,8 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
     referrals: referralsResult.data ?? [],
     activity: activityResult.data ?? [],
     checklists: checklistsResult.data ?? [],
+    checklistItems: checklistItemsResult.data ?? [],
+    checklistDocuments: checklistDocumentsResult.data ?? [],
     photos: photosResult.data ?? [],
     payments: paymentsResult.data ?? [],
   };

@@ -6,6 +6,7 @@ const adminLinks = [
   { label: "Dashboard", href: "/admin" },
   { label: "Bookings", href: "/admin/bookings" },
   { label: "Routes", href: "/admin/routes" },
+  { label: "Checklists", href: "/admin/checklists" },
   { label: "Customers", href: "/admin/customers" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Requests", href: "/admin/requests" },

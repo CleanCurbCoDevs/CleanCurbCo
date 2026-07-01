@@ -280,6 +280,9 @@ export default async function CustomerDetailPage({
               const checklist = checklists.find(
                 (item) => item.service_visit_id === visit.id,
               );
+              const documents = context.checklistDocuments.filter(
+                (document) => document.service_visit_id === visit.id,
+              );
               const visitPhotos = photos.filter(
                 (photo) => photo.service_visit_id === visit.id,
               );
@@ -294,6 +297,8 @@ export default async function CustomerDetailPage({
                     {visitPhotos.filter((photo) => photo.photo_type === "before").length} before /{" "}
                     {visitPhotos.filter((photo) => photo.photo_type === "after").length} after
                   </span>
+                  <span>{documents.length} checklist PDF(s)</span>
+                  <Link href={`/admin/checklists/${visit.id}`}>Open checklist</Link>
                 </article>
               );
             })}

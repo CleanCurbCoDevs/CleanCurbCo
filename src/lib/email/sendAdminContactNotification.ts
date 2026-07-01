@@ -9,6 +9,7 @@ export function sendAdminContactNotification(message: ContactMessageRow) {
   return sendTransactionalEmail({
     to: getResendEnv().adminEmails,
     ...template,
+    replyTo: message.email,
     templateKey: "admin_contact_notification",
     idempotencyKey: `admin-contact-${message.id}`,
   });

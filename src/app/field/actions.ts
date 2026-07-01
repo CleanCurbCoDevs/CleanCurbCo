@@ -208,16 +208,22 @@ export async function saveChecklistAction(formData: FormData) {
     .maybeSingle();
 
   if (existing) {
-    await admin
-      .from("service_checklists")
-      .update(checklist)
-      .eq("id", existing.id);
-  } else {
-    await admin.from("service_checklists").insert({
-      service_visit_id: visit.id,
-      route_stop_id: stop.id,
-      ...checklist,
-    });
+      await admin
+        .from("service_checklists")
+        .update({
+          ...checklist,
+          booking_id: booking?.id ?? null,
+          customer_id: booking?.customer_id ?? null,
+        })
+        .eq("id", existing.id);
+    } else {
+      await admin.from("service_checklists").insert({
+        service_visit_id: visit.id,
+        route_stop_id: stop.id,
+        booking_id: booking?.id ?? null,
+        customer_id: booking?.customer_id ?? null,
+        ...checklist,
+      });
   }
 
   await recordServiceEvent({
@@ -394,16 +400,22 @@ export async function completeStopAction(formData: FormData) {
   };
 
   if (checklist) {
-    await admin
-      .from("service_checklists")
-      .update(checklistUpdate)
-      .eq("id", checklist.id);
-  } else {
-    await admin.from("service_checklists").insert({
-      service_visit_id: visit.id,
-      route_stop_id: stop.id,
-      ...checklistUpdate,
-    });
+      await admin
+        .from("service_checklists")
+        .update({
+          ...checklistUpdate,
+          booking_id: booking.id,
+          customer_id: booking.customer_id,
+        })
+        .eq("id", checklist.id);
+    } else {
+      await admin.from("service_checklists").insert({
+        service_visit_id: visit.id,
+        route_stop_id: stop.id,
+        booking_id: booking.id,
+        customer_id: booking.customer_id,
+        ...checklistUpdate,
+      });
   }
 
   await Promise.all([

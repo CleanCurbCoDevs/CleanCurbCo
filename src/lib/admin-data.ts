@@ -15,6 +15,8 @@ import type {
   RouteBreakRow,
   RouteDayRow,
   RouteStopRow,
+  ServiceChecklistDocumentRow,
+  ServiceChecklistItemRow,
   ServiceChecklistRow,
   ServiceAddressRow,
   ServiceEventRow,
@@ -35,6 +37,8 @@ export type AdminContext = {
   routeDays: RouteDayRow[];
   routeStops: RouteStopRow[];
   checklists: ServiceChecklistRow[];
+  checklistItems: ServiceChecklistItemRow[];
+  checklistDocuments: ServiceChecklistDocumentRow[];
   photos: ServicePhotoRow[];
   breaks: RouteBreakRow[];
   serviceEvents: ServiceEventRow[];
@@ -60,6 +64,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
       routeDays: [],
       routeStops: [],
       checklists: [],
+      checklistItems: [],
+      checklistDocuments: [],
       photos: [],
       breaks: [],
       serviceEvents: [],
@@ -82,6 +88,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     routeDaysResult,
     routeStopsResult,
     checklistsResult,
+    checklistItemsResult,
+    checklistDocumentsResult,
     photosResult,
     breaksResult,
     serviceEventsResult,
@@ -135,6 +143,14 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .select("*")
         .order("created_at", { ascending: false }),
       admin
+        .from("service_checklist_items")
+        .select("*")
+        .order("sort_order", { ascending: true }),
+      admin
+        .from("service_checklist_documents")
+        .select("*")
+        .order("generated_at", { ascending: false }),
+      admin
         .from("service_photos")
         .select("*")
         .order("created_at", { ascending: false }),
@@ -173,6 +189,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     routeDays: routeDaysResult.data ?? [],
     routeStops: routeStopsResult.data ?? [],
     checklists: checklistsResult.data ?? [],
+    checklistItems: checklistItemsResult.data ?? [],
+    checklistDocuments: checklistDocumentsResult.data ?? [],
     photos: photosResult.data ?? [],
     breaks: breaksResult.data ?? [],
     serviceEvents: serviceEventsResult.data ?? [],
