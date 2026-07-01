@@ -16,7 +16,8 @@ export default function PricingPage() {
           <h1>Simple bin cleaning prices.</h1>
           <p>
             One-time cleans, recurring route service, and practical add-ons for
-            dirty outdoor problems.
+            dirty outdoor problems. Recurring service keeps the stink from
+            getting a comeback tour.
           </p>
         </div>
       </section>

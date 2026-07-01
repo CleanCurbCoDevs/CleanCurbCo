@@ -155,6 +155,26 @@ textarea {
   z-index: 40;
 }
 
+.announcement-bar {
+  align-items: center;
+  background:
+    linear-gradient(90deg, var(--lime), var(--gold-soft) 58%, #ffffff);
+  color: var(--ink);
+  display: flex;
+  font-size: 0.9rem;
+  font-weight: 950;
+  justify-content: center;
+  line-height: 1.35;
+  min-height: 40px;
+  padding: 8px 18px;
+  text-align: center;
+}
+
+.announcement-bar:hover {
+  background:
+    linear-gradient(90deg, #35ff5d, #ffeeb0 58%, #ffffff);
+}
+
 .site-header-inner {
   align-items: center;
   display: flex;
@@ -351,7 +371,7 @@ textarea {
 
 .hero-image {
   object-fit: cover;
-  object-position: center;
+  object-position: center 48%;
   z-index: 0;
 }
 
@@ -394,10 +414,47 @@ textarea {
   max-width: 600px;
 }
 
+.hero-supporting {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 1rem;
+  font-weight: 850;
+  margin: -4px 0 0;
+}
+
+.offer-badge {
+  background: rgba(0, 255, 56, 0.95);
+  border: 2px solid rgba(255, 255, 255, 0.7);
+  border-radius: var(--radius);
+  color: var(--ink);
+  font-weight: 950;
+  line-height: 1.35;
+  margin: 0;
+  max-width: 680px;
+  padding: 9px 12px;
+}
+
 .trust-line {
   color: var(--gold-soft);
   font-weight: 900;
   margin: 0;
+}
+
+.hero-chip-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: center;
+  max-width: 760px;
+}
+
+.hero-chip-list span {
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 999px;
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.86rem;
+  font-weight: 900;
+  padding: 8px 11px;
 }
 
 .hero-actions {
@@ -496,6 +553,49 @@ textarea {
 .problem-list svg {
   color: var(--lime);
   flex: 0 0 auto;
+}
+
+.proof-gallery {
+  display: grid;
+  gap: 14px;
+  grid-template-columns: 1fr;
+}
+
+.proof-card {
+  background: var(--ink);
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: var(--radius);
+  box-shadow: 0 18px 40px rgba(5, 5, 5, 0.12);
+  color: white;
+  display: grid;
+  gap: 0;
+  margin: 0;
+  overflow: hidden;
+}
+
+.proof-image-frame {
+  aspect-ratio: 4 / 3;
+  display: block;
+  overflow: hidden;
+  position: relative;
+}
+
+.proof-card.large .proof-image-frame {
+  aspect-ratio: 16 / 11;
+}
+
+.proof-image {
+  object-fit: cover;
+}
+
+.proof-card figcaption {
+  align-items: center;
+  border-top: 3px solid var(--lime);
+  color: rgba(255, 255, 255, 0.88);
+  display: flex;
+  font-weight: 950;
+  min-height: 54px;
+  padding: 13px 15px;
 }
 
 .step-number {
@@ -604,6 +704,31 @@ textarea {
   color: var(--lime);
 }
 
+.route-status-card {
+  align-items: center;
+  background: #111111;
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  color: white;
+  display: grid;
+  gap: 18px;
+  margin: 0 0 22px;
+  padding: 20px;
+}
+
+.route-status-card h3 {
+  color: white;
+  font-size: 1.35rem;
+  font-weight: 950;
+  margin: 0 0 8px;
+}
+
+.route-status-card p {
+  color: rgba(255, 255, 255, 0.78);
+  line-height: 1.55;
+  margin: 0;
+}
+
 .service-area-panel {
   background: var(--ink);
   border-radius: var(--radius);
@@ -696,7 +821,7 @@ textarea {
 .final-cta {
   background:
     linear-gradient(90deg, rgba(5, 5, 5, 0.92), rgba(5, 5, 5, 0.72)),
-    url("/clean-curb-hero.png");
+    url("/images/proof/bin-cleaning-process.jpeg");
   background-position: center;
   background-size: cover;
   color: white;
@@ -830,6 +955,21 @@ textarea {
   margin-top: 3px;
 }
 
+.required-mark {
+  color: var(--red);
+}
+
+.submit-area {
+  display: grid;
+  gap: 10px;
+}
+
+.submit-area .muted {
+  font-size: 0.95rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
 .estimate-panel {
   align-self: start;
   background: var(--ink);
@@ -864,6 +1004,42 @@ textarea {
 .estimate-panel li {
   color: rgba(255, 255, 255, 0.78);
   line-height: 1.5;
+}
+
+.estimate-note {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  margin: 0;
+  padding-top: 12px;
+}
+
+.launch-reminder {
+  background: rgba(0, 255, 56, 0.12);
+  border: 1px solid rgba(0, 255, 56, 0.3);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 6px;
+  padding: 12px;
+}
+
+.launch-reminder strong {
+  color: white;
+  line-height: 1.4;
+}
+
+.estimate-panel-section {
+  border-top: 1px solid rgba(255, 255, 255, 0.14);
+  display: grid;
+  gap: 10px;
+  padding-top: 14px;
+}
+
+.number-list {
+  color: rgba(255, 255, 255, 0.78);
+  display: grid;
+  gap: 8px;
+  line-height: 1.45;
+  margin: 0;
+  padding-left: 20px;
 }
 
 .confirmation-panel {
@@ -1940,6 +2116,22 @@ textarea {
 
   .choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .proof-gallery {
+    grid-template-columns: 1.35fr 1fr;
+  }
+
+  .proof-card.large {
+    grid-row: span 3;
+  }
+
+  .proof-card.large .proof-image-frame {
+    min-height: 100%;
+  }
+
+  .route-status-card {
+    grid-template-columns: minmax(0, 1fr) auto;
   }
 
   .booking-shell {

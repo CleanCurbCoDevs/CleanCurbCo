@@ -22,7 +22,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           <h1>Join the Cane Bay route.</h1>
           <p>
             Tell us what needs cleaning. We will confirm your route day, final
-            price, and payment link by text.
+            price, and payment link by text before service.
           </p>
         </div>
       </section>

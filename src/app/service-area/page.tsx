@@ -15,8 +15,9 @@ export default function ServiceAreaPage() {
           <p className="section-kicker">Service Area</p>
           <h1>Now serving Cane Bay.</h1>
           <p>
-            Route density keeps service affordable, reliable, and efficient.
-            Outside the route? Join the waitlist.
+            We are starting with Cane Bay and nearby Summerville communities,
+            then expanding route by route. Close by but not sure? Send your
+            address and we will check.
           </p>
         </div>
       </section>

@@ -35,6 +35,11 @@ export default async function PortalPage() {
             Your Clean Curb Co. service details will stay organized here as
             route days, payment links, and photos are added.
           </p>
+          <p className="muted">
+            Already booked? Make sure this account uses the same email address
+            from your booking. New here? Book your first cleaning and we will
+            help connect the account.
+          </p>
           <Link className="button button-dark" href="/book">
             Request Another Cleaning
           </Link>

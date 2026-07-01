@@ -96,7 +96,7 @@ export function ContactForm() {
       <form className="booking-form" onSubmit={handleSubmit}>
         <div className="form-grid">
           <label className="field">
-            <span>Name</span>
+            <span>Name <span className="required-mark">*</span></span>
             <input
               value={request.name}
               onChange={(event) => updateField("name", event.target.value)}
@@ -104,7 +104,7 @@ export function ContactForm() {
             />
           </label>
           <label className="field">
-            <span>Phone</span>
+            <span>Phone <span className="required-mark">*</span></span>
             <input
               type="tel"
               value={request.phone}
@@ -113,7 +113,7 @@ export function ContactForm() {
             />
           </label>
           <label className="field">
-            <span>Email</span>
+            <span>Email <span className="required-mark">*</span></span>
             <input
               type="email"
               value={request.email}
@@ -122,7 +122,7 @@ export function ContactForm() {
             />
           </label>
           <label className="field">
-            <span>Address or neighborhood</span>
+            <span>Address or neighborhood <span className="required-mark">*</span></span>
             <input
               value={request.location}
               onChange={(event) => updateField("location", event.target.value)}
@@ -145,7 +145,7 @@ export function ContactForm() {
           </select>
         </label>
         <label className="field">
-          <span>Message</span>
+          <span>Message <span className="required-mark">*</span></span>
           <textarea
             value={request.message}
             onChange={(event) => updateField("message", event.target.value)}
@@ -153,7 +153,11 @@ export function ContactForm() {
             placeholder="Tell us what you need cleaned, what neighborhood you are in, or how many neighbors might want route service."
           />
         </label>
-        {error ? <p className="confirmation-panel">{error}</p> : null}
+        {error ? (
+          <p className="confirmation-panel" role="alert">
+            {error}
+          </p>
+        ) : null}
         <button className="button button-dark" type="submit" disabled={isSubmitting}>
           <Send size={20} aria-hidden="true" />
           {isSubmitting ? "Sending..." : "Send Message"}

@@ -17,7 +17,8 @@ export default function LoginPage() {
           <h1>Welcome back.</h1>
           <p>
             View your Clean Curb Co. bookings, route updates, payment links,
-            and service photos.
+            and service photos. Already booked? Use the email address from
+            your booking to access your account.
           </p>
         </div>
       </section>
@@ -30,8 +31,9 @@ export default function LoginPage() {
             <p className="section-kicker">New here?</p>
             <h2>Book first, then set up your account.</h2>
             <p>
-              For launch, customer accounts are linked after booking so your
-              route request and service address stay together.
+              New here? Book your first cleaning first, then we will help you
+              get your account set up so your route request and service
+              address stay together.
             </p>
             <Link className="button button-dark" href="/book">
               Book a Cleaning

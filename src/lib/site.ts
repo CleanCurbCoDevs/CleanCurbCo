@@ -13,12 +13,14 @@ export const brand = {
   logoAlt: "Clean Curb Co. logo — Fresh Starts at the Curb.",
 };
 
+export const launchPromo =
+  "Launch Special: First 2-bin cleaning only $25 when you join a recurring Cane Bay route.";
+
 export const navItems = [
   { label: "Services", href: "/services" },
   { label: "Pricing", href: "/pricing" },
   { label: "Service Area", href: "/service-area" },
   { label: "FAQ", href: "/faq" },
-  { label: "Careers", href: "/careers" },
   { label: "Login", href: "/login" },
 ];
 

@@ -64,7 +64,7 @@ export function LoginForm({
         </div>
       ) : null}
       <label className="field">
-        <span>Email</span>
+        <span>Email <span className="required-mark">*</span></span>
         <input
           type="email"
           value={email}
@@ -73,7 +73,7 @@ export function LoginForm({
         />
       </label>
       <label className="field">
-        <span>Password</span>
+        <span>Password <span className="required-mark">*</span></span>
         <input
           type="password"
           value={password}
@@ -81,7 +81,11 @@ export function LoginForm({
           required
         />
       </label>
-      {error ? <p className="confirmation-panel">{error}</p> : null}
+      {error ? (
+        <p className="confirmation-panel" role="alert">
+          {error}
+        </p>
+      ) : null}
       <button className="button button-dark" type="submit" disabled={isSubmitting}>
         <LogIn size={20} aria-hidden="true" />
         {isSubmitting ? "Signing In..." : buttonLabel}

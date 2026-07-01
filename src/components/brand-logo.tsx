@@ -12,7 +12,6 @@ export function BrandLogo() {
           width={72}
           height={72}
           className="brand-logo-image"
-          priority
         />
       </span>
       <span className="brand-text">

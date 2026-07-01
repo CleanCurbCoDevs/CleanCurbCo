@@ -24,9 +24,13 @@ export function SiteFooter() {
           <div className="grid">
             <BrandLogo />
             <p className="muted">
+              Residential garbage bin cleaning, sanitizing, and deodorizing
+              for neighbors who would rather not touch that bin.
+            </p>
+            <p className="muted">
               Locally owned | Veteran owned | Eco-conscious
               <br />
-              Now serving {brand.area}
+              Now building routes in {brand.area}
             </p>
             <p className="muted">
               <a className="contact-link" href={brand.phoneHref}>

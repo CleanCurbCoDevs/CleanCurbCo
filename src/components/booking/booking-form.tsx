@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
-import { addOns, binTypes, neighborhoods } from "@/lib/site";
+import { addOns, binTypes, launchPromo, neighborhoods } from "@/lib/site";
 import { calculateEstimatedPrice, formatFrequency } from "@/lib/pricing";
 import type {
   BookingRequest,
@@ -521,12 +521,22 @@ export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?
           />
         </section>
 
-        {error ? <p className="confirmation-panel">{error}</p> : null}
+        {error ? (
+          <p className="confirmation-panel" role="alert">
+            {error}
+          </p>
+        ) : null}
 
-        <button className="button button-dark" type="submit" disabled={isSubmitting}>
-          <Send size={20} aria-hidden="true" />
-          {isSubmitting ? "Sending Request..." : "Submit Booking Request"}
-        </button>
+        <div className="submit-area">
+          <button className="button button-dark" type="submit" disabled={isSubmitting}>
+            <Send size={20} aria-hidden="true" />
+            {isSubmitting ? "Sending Request..." : "Request My Cleaning"}
+          </button>
+          <p className="muted">
+            No surprise charges. We confirm your route day and final price
+            before service.
+          </p>
+        </div>
       </form>
 
       <aside className="estimate-panel">
@@ -543,6 +553,22 @@ export function BookingForm({ initialReferralCode = "" }: { initialReferralCode?
           for {form.service.binCount}
           {form.service.binCount === 1 ? " bin" : " bins"}.
         </p>
+        <p className="estimate-note">
+          Estimate shown until we confirm your route day, add-ons, and final
+          price.
+        </p>
+        <div className="launch-reminder">
+          <p className="section-kicker">Founding Neighbor Special</p>
+          <strong>{launchPromo}</strong>
+        </div>
+        <div className="estimate-panel-section">
+          <h3>What happens after you submit?</h3>
+          <ol className="number-list">
+            <li>We text you to confirm your route day.</li>
+            <li>You get your final price before service.</li>
+            <li>We clean the bins and send completion photos.</li>
+          </ol>
+        </div>
         <ul className="check-list">
           <li>
             <CheckCircle2 size={18} aria-hidden="true" />
@@ -577,7 +603,10 @@ function TextField({
 }) {
   return (
     <label className="field">
-      <span>{label}</span>
+      <span>
+        {label}
+        {required ? <span className="required-mark"> *</span> : null}
+      </span>
       <input
         type={type}
         value={value}

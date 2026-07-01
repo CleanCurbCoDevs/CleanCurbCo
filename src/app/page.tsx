@@ -1,16 +1,19 @@
 import Image from "next/image";
 import Link from "next/link";
 import { ArrowRight, CalendarCheck, DollarSign } from "lucide-react";
-import { brand } from "@/lib/site";
+import { brand, launchPromo } from "@/lib/site";
 import {
   AddOnsSection,
+  ExpectationsSection,
   FAQSection,
   FinalCTASection,
   FreshStartPromiseSection,
   HowItWorksSection,
   PricingSection,
+  ProofSection,
   ProblemSection,
   ServiceAreaSection,
+  WhatGetsCleanedSection,
   WhyChooseUsSection,
 } from "@/components/sections/home-sections";
 
@@ -19,10 +22,10 @@ export default function Home() {
     <main>
       <section className="hero-section">
         <Image
-          src="/clean-curb-hero.png"
-          alt="Two curbside garbage bins being washed with clean water."
+          src="/images/proof/bin-cleaning-action-driveway.jpeg"
+          alt="Clean Curb Co. pressure washing a residential garbage bin on a driveway."
           fill
-          priority
+          preload
           sizes="100vw"
           className="hero-image"
         />
@@ -34,21 +37,30 @@ export default function Home() {
             width={132}
             height={132}
             className="hero-logo"
-            priority
+            loading="eager"
           />
           <p className="eyebrow">Clean Curb Co. | Cane Bay, SC</p>
+          <p className="offer-badge">{launchPromo}</p>
           <h1>Fresh Starts at the Curb.</h1>
           <p className="hero-subtitle">
-            Professional garbage bin cleaning in Cane Bay and nearby
-            Summerville communities.
+            We clean, sanitize, and deodorize the trash bins you hate touching.
+          </p>
+          <p className="hero-supporting">
+            Now serving Cane Bay and nearby Summerville neighborhoods.
           </p>
           <p className="trust-line">
             Locally owned | Veteran owned | Eco-conscious
           </p>
+          <div className="hero-chip-list" aria-label="Service highlights">
+            <span>Veteran-owned</span>
+            <span>Local Cane Bay routes</span>
+            <span>Before/after photos</span>
+            <span>Route-day text updates</span>
+          </div>
           <div className="hero-actions">
             <Link className="button button-primary" href="/book">
               <CalendarCheck size={20} aria-hidden="true" />
-              Book Now
+              Book My Bin Cleaning
             </Link>
             <Link className="button button-secondary" href="#pricing">
               <DollarSign size={20} aria-hidden="true" />
@@ -63,10 +75,13 @@ export default function Home() {
       </section>
 
       <ProblemSection />
+      <ProofSection />
+      <WhatGetsCleanedSection />
       <HowItWorksSection />
       <PricingSection />
       <AddOnsSection />
       <ServiceAreaSection />
+      <ExpectationsSection />
       <WhyChooseUsSection />
       <FreshStartPromiseSection />
       <FAQSection />
