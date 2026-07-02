@@ -116,6 +116,7 @@ export async function POST(request: Request) {
       {
         error: turnstileResult.error,
         requestId: turnstileResult.requestId,
+        codes: turnstileResult.codes ?? [],
       },
       { status: turnstileResult.status },
     );
