@@ -8,8 +8,8 @@ export const brand = {
   area: "Cane Bay / Summerville, SC",
   phone: "+1 (843) 888-4121",
   phoneHref: "tel:+18438884121",
-  email: "cleancurbco@stonebranchcapital.com",
-  emailHref: "mailto:cleancurbco@stonebranchcapital.com",
+  email: "contact@cleancurbco.com",
+  emailHref: "mailto:contact@cleancurbco.com",
   logoAlt: "Clean Curb Co. logo — Fresh Starts at the Curb.",
 };
 

@@ -9,25 +9,38 @@ import {
   sendAdminCustomerRequestAlert,
   sendCustomerRequestReceived,
 } from "@/lib/email/sendCustomerRequestEmail";
-import { calculateBookingEstimate } from "@/lib/pricing";
+import {
+  sendAccountDeletionRequested,
+  sendAdminAccountDeletionRequest,
+  sendAdminRouteDateResponse,
+  sendRouteDateResponse,
+} from "@/lib/email/sendOperationsEmail";
+import { getSiteUrl } from "@/lib/env";
+import { writeAdminAuditLog } from "@/lib/server/admin-audit";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { createRequestId, logger } from "@/lib/server/logger";
 import {
   evaluatePolicyWindow,
   getBookingServiceDate,
   getCancellationFee,
-  getCancellationPolicyStatus,
   getFullChargeApplies,
   namesMatch,
-  type PolicyWindow,
   requiresTypedAcknowledgment,
 } from "@/lib/service-policy";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAuth } from "@/lib/supabase/auth";
+import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleanArray, cleanLongText, cleanString, pickEnum } from "@/lib/validation";
 import type { ServiceFrequency } from "@/types/booking";
-import type { BookingRow, CustomerRequestStatus, RequestType } from "@/types/database";
+import type { BookingRow, RequestType } from "@/types/database";
 
 const preferredContactMethods = ["email", "phone", "sms"] as const;
+
+export type AccountDeletionRequestState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  requestId?: string;
+};
 
 export async function updatePortalAccountAction(formData: FormData) {
   const auth = await requireAuth("/portal/account");
@@ -172,7 +185,7 @@ export async function createCustomerRequestAction(formData: FormData) {
   const cancellationFee = getCancellationFee(requestType, policyWindow);
   const fullChargeApplies = getFullChargeApplies(requestType, policyWindow);
   const originalEstimatedPrice = booking?.estimated_price ?? null;
-  const nextStatus = getInitialRequestStatus(requestType, policyWindow, Boolean(booking));
+  const nextStatus = "new";
   const message = buildRequestMessage(formData, customerMessage);
 
   const { data: request } = await admin
@@ -201,20 +214,6 @@ export async function createCustomerRequestAction(formData: FormData) {
     .single();
 
   if (request) {
-    if (booking) {
-      await applyEligibleSelfServiceChange({
-        admin,
-        booking,
-        requestType,
-        policyWindow,
-        requestedFrequency,
-        requestedRouteDay,
-        requestedAddOns,
-        requestedRemovedAddOns,
-        formData,
-      });
-    }
-
     await admin.from("activity_events").insert({
       actor_profile_id: auth.userId,
       customer_id: auth.userId,
@@ -234,6 +233,16 @@ export async function createCustomerRequestAction(formData: FormData) {
     await Promise.allSettled([
       sendCustomerRequestReceived(request, auth.profile, booking, serviceDate),
       sendAdminCustomerRequestAlert(request, auth.profile, booking, serviceDate),
+      createAdminNotification({
+        type: "customer_service_change_request",
+        title: "Service change request",
+        message: `${auth.profile.first_name ?? "Customer"} requested ${requestType.replaceAll("_", " ")}.`,
+        href: `/admin/requests?q=${request.id}`,
+        customer_id: auth.userId,
+        booking_id: bookingId,
+        customer_request_id: request.id,
+        severity: requestType === "cancel_service" ? "warning" : "info",
+      }),
     ]);
 
     logger.info("customer_service_request_submitted", {
@@ -248,7 +257,7 @@ export async function createCustomerRequestAction(formData: FormData) {
         status: request.status,
         policyWindow,
         policyAcknowledged,
-        selfServiceApplied: ["approved", "completed"].includes(request.status),
+        selfServiceApplied: false,
       },
     });
   }
@@ -261,30 +270,261 @@ export async function createCustomerRequestAction(formData: FormData) {
   return { ok: true };
 }
 
-function getInitialRequestStatus(
-  requestType: RequestType,
-  policyWindow: PolicyWindow,
-  hasBooking: boolean,
-): CustomerRequestStatus {
-  if (policyWindow !== "standard" || !hasBooking) return "new";
-
-  if (
-    [
-      "cancel_service",
-      "change_frequency",
-      "update_address",
-      "add_service",
-      "drop_service",
-    ].includes(requestType)
-  ) {
-    return "completed";
+export async function requestAccountDeletionAction(
+  _previousState: AccountDeletionRequestState,
+  formData: FormData,
+): Promise<AccountDeletionRequestState> {
+  const requestId = createRequestId();
+  const auth = await requireAuth("/portal/account");
+  if (auth.status !== "ok") {
+    return {
+      status: "error",
+      message: "Please log in before requesting account deletion.",
+      requestId,
+    };
   }
 
-  if (requestType === "reschedule_service") {
-    return "approved";
+  const confirmation = cleanString(formData.get("confirmation"), 20);
+  const password = cleanString(formData.get("password"), 200);
+  const reason = cleanLongText(formData.get("reason"), 1000) || null;
+
+  if (confirmation !== "DELETE") {
+    return {
+      status: "error",
+      message: "Type DELETE to confirm this account deletion request.",
+      requestId,
+    };
   }
 
-  return "new";
+  if (auth.email && password) {
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.auth.signInWithPassword({
+      email: auth.email,
+      password,
+    });
+    if (error) {
+      return {
+        status: "error",
+        message: "Password confirmation failed. Please try again.",
+        requestId,
+      };
+    }
+  } else if (auth.email) {
+    return {
+      status: "error",
+      message: "Please confirm your password before submitting this request.",
+      requestId,
+    };
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: existing } = await admin
+    .from("account_deletion_requests")
+    .select("*")
+    .eq("customer_id", auth.userId)
+    .in("status", ["pending", "approved"])
+    .maybeSingle();
+
+  if (existing) {
+    return {
+      status: "success",
+      message: "Your account deletion request is already pending review.",
+      requestId,
+    };
+  }
+
+  const { data: deletionRequest, error } = await admin
+    .from("account_deletion_requests")
+    .insert({
+      customer_id: auth.userId,
+      customer_email: auth.profile.email ?? auth.email,
+      status: "pending",
+      requested_by_user_id: auth.userId,
+      requested_by_role: "customer",
+      request_reason: reason,
+    })
+    .select("*")
+    .single();
+
+  if (error || !deletionRequest) {
+    logger.error("account_deletion_request_insert_failed", {
+      requestId,
+      action: "account_deletion_requested",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: auth.userId,
+      error,
+    });
+    return {
+      status: "error",
+      message: "We could not submit that request. Please contact Clean Curb Co.",
+      requestId,
+    };
+  }
+
+  await admin
+    .from("profiles")
+    .update({
+      account_status: "pending_deletion",
+      deletion_requested_at: new Date().toISOString(),
+    })
+    .eq("id", auth.userId);
+
+  await Promise.allSettled([
+    admin.from("activity_events").insert({
+      actor_profile_id: auth.userId,
+      customer_id: auth.userId,
+      event_type: "account_deletion_requested",
+      message: "Customer requested account deletion.",
+      metadata: { requestId, deletionRequestId: deletionRequest.id },
+    }),
+    writeAdminAuditLog({
+      action: "customer_deletion_requested",
+      actor_user_id: auth.userId,
+      actor_email: auth.profile.email,
+      actor_role: auth.profile.role,
+      target_type: "account_deletion_request",
+      target_id: deletionRequest.id,
+      customer_id: auth.userId,
+      before_summary: { accountStatus: auth.profile.account_status },
+      after_summary: { accountStatus: "pending_deletion", status: "pending" },
+      note: reason,
+      request_id: requestId,
+      status: "success",
+    }),
+    createAdminNotification({
+      type: "account_deletion_request",
+      title: "Account deletion requested",
+      message: `${auth.profile.first_name ?? "Customer"} requested account deletion.`,
+      href: `/admin/requests?deletion=${deletionRequest.id}`,
+      customer_id: auth.userId,
+      account_deletion_request_id: deletionRequest.id,
+      severity: "warning",
+    }),
+    sendAccountDeletionRequested(deletionRequest, auth.profile),
+    sendAdminAccountDeletionRequest(
+      deletionRequest,
+      auth.profile,
+      `${getSiteUrl()}/admin/requests?deletion=${deletionRequest.id}`,
+    ),
+  ]);
+
+  revalidatePath("/portal/account");
+  revalidatePath("/admin/requests");
+  revalidatePath("/admin/customers");
+
+  return {
+    status: "success",
+    message: "Your account deletion request was submitted for admin review.",
+    requestId,
+  };
+}
+
+export async function respondToRouteDateOfferAction(formData: FormData) {
+  const requestId = createRequestId();
+  const auth = await requireAuth("/portal/bookings");
+  if (auth.status !== "ok") return;
+
+  const bookingId = cleanString(formData.get("bookingId"), 80);
+  const response = cleanString(formData.get("response"), 20);
+  const note = cleanLongText(formData.get("note"), 1000) || null;
+  if (!bookingId || !["confirm", "decline"].includes(response)) return;
+
+  const admin = getSupabaseAdmin();
+  const { data: previousBooking } = await admin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .eq("customer_id", auth.userId)
+    .maybeSingle();
+
+  if (!previousBooking || previousBooking.route_offer_status !== "offered") {
+    return;
+  }
+
+  const confirmed = response === "confirm";
+  const update: Partial<BookingRow> = {
+    route_offer_status: confirmed ? "customer_confirmed" : "customer_declined",
+    route_responded_at: new Date().toISOString(),
+    route_response_note: note,
+    confirmed_route_day: confirmed
+      ? previousBooking.proposed_route_day ?? previousBooking.confirmed_route_day
+      : previousBooking.confirmed_route_day,
+    status: confirmed ? "scheduled" : "needs_follow_up",
+  };
+
+  const { data: booking } = await admin
+    .from("bookings")
+    .update(update)
+    .eq("id", previousBooking.id)
+    .select("*")
+    .single();
+
+  if (!booking) return;
+
+  await Promise.allSettled([
+    admin.from("activity_events").insert({
+      actor_profile_id: auth.userId,
+      customer_id: auth.userId,
+      booking_id: booking.id,
+      event_type: confirmed
+        ? "route_date_confirmed_by_customer"
+        : "route_date_declined_by_customer",
+      message: confirmed
+        ? "Customer confirmed proposed route date."
+        : "Customer declined proposed route date.",
+      metadata: { requestId, note },
+    }),
+    writeAdminAuditLog({
+      action: confirmed
+        ? "route_date_confirmed_by_customer"
+        : "route_date_declined_by_customer",
+      actor_user_id: auth.userId,
+      actor_email: auth.profile.email,
+      actor_role: auth.profile.role,
+      target_type: "booking",
+      target_id: booking.id,
+      customer_id: auth.userId,
+      booking_id: booking.id,
+      before_summary: {
+        status: previousBooking.status,
+        routeOfferStatus: previousBooking.route_offer_status,
+      },
+      after_summary: {
+        status: booking.status,
+        routeOfferStatus: booking.route_offer_status,
+        confirmedRouteDay: booking.confirmed_route_day,
+      },
+      note,
+      request_id: requestId,
+      status: "success",
+    }),
+    createAdminNotification({
+      type: confirmed ? "route_date_confirmed" : "route_date_declined",
+      title: confirmed ? "Route date confirmed" : "Route date declined",
+      message: `${booking.first_name} ${booking.last_name} ${confirmed ? "confirmed" : "declined"} a route date.`,
+      href: `/admin/bookings?q=${booking.id}`,
+      customer_id: auth.userId,
+      booking_id: booking.id,
+      severity: confirmed ? "info" : "warning",
+    }),
+    sendRouteDateResponse(booking, confirmed ? "confirmed" : "declined"),
+    sendAdminRouteDateResponse(booking, confirmed ? "confirmed" : "declined"),
+  ]);
+
+  logger.info("customer_route_date_response_saved", {
+    requestId,
+    action: "route_date_response",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: auth.userId,
+    bookingId: booking.id,
+    metadata: { response },
+  });
+
+  revalidatePath("/portal");
+  revalidatePath("/portal/bookings");
+  revalidatePath("/admin/bookings");
 }
 
 function buildRequestMessage(formData: FormData, baseMessage: string) {
@@ -307,123 +547,4 @@ function buildRequestMessage(formData: FormData, baseMessage: string) {
   ]
     .filter(Boolean)
     .join("\n\n");
-}
-
-async function applyEligibleSelfServiceChange({
-  admin,
-  booking,
-  requestType,
-  policyWindow,
-  requestedFrequency,
-  requestedRouteDay,
-  requestedAddOns,
-  requestedRemovedAddOns,
-  formData,
-}: {
-  admin: ReturnType<typeof getSupabaseAdmin>;
-  booking: BookingRow;
-  requestType: RequestType;
-  policyWindow: PolicyWindow;
-  requestedFrequency: ServiceFrequency | null;
-  requestedRouteDay: string | null;
-  requestedAddOns: string[];
-  requestedRemovedAddOns: string[];
-  formData: FormData;
-}) {
-  if (policyWindow !== "standard") {
-    await admin
-      .from("bookings")
-      .update({
-        last_customer_change_request_at: new Date().toISOString(),
-        cancellation_policy_status: getCancellationPolicyStatus(
-          requestType,
-          policyWindow,
-        ),
-      })
-      .eq("id", booking.id);
-    return;
-  }
-
-  const update: Partial<BookingRow> = {
-    last_customer_change_request_at: new Date().toISOString(),
-    cancellation_policy_status: "none",
-  };
-
-  if (requestType === "cancel_service") {
-    update.status = "cancelled";
-  }
-
-  if (requestType === "reschedule_service" && requestedRouteDay) {
-    update.requested_date = requestedRouteDay;
-    update.confirmed_route_day = null;
-    update.status = "needs_follow_up";
-  }
-
-  if (requestType === "change_frequency" && requestedFrequency) {
-    update.frequency = requestedFrequency;
-    update.estimated_price = calculateBookingEstimate({
-      binCount: booking.bin_count,
-      frequency: requestedFrequency,
-      addOns: booking.add_ons ?? [],
-      applyFoundingNeighborPromo: requestedFrequency !== "one_time",
-    });
-  }
-
-  if (requestType === "add_service" || requestType === "drop_service") {
-    const addOns =
-      requestType === "add_service"
-        ? Array.from(new Set([...(booking.add_ons ?? []), ...requestedAddOns]))
-        : (booking.add_ons ?? []).filter(
-            (addOn) => !requestedRemovedAddOns.includes(addOn),
-          );
-    update.add_ons = addOns;
-    update.estimated_price = calculateBookingEstimate({
-      binCount: booking.bin_count,
-      frequency: booking.frequency,
-      addOns,
-      applyFoundingNeighborPromo: booking.frequency !== "one_time",
-    });
-  }
-
-  if (requestType === "update_address") {
-    const streetAddress = cleanString(formData.get("streetAddress"), 180);
-    if (streetAddress) {
-      const addressUpdate = {
-        street_address: streetAddress,
-        city: cleanString(formData.get("city"), 80) || "Summerville",
-        state: cleanString(formData.get("state"), 20) || "SC",
-        zip_code: cleanString(formData.get("zipCode"), 20) || null,
-        neighborhood: cleanString(formData.get("neighborhood"), 120) || null,
-        notes: cleanLongText(formData.get("addressNotes"), 1000) || null,
-        is_primary: true,
-      };
-
-      update.street_address = addressUpdate.street_address;
-      update.city = addressUpdate.city;
-      update.state = addressUpdate.state;
-      update.zip_code = addressUpdate.zip_code;
-      update.neighborhood = addressUpdate.neighborhood;
-
-      if (booking.service_address_id && booking.customer_id) {
-        await admin
-          .from("service_addresses")
-          .update(addressUpdate)
-          .eq("id", booking.service_address_id)
-          .eq("customer_id", booking.customer_id);
-      } else if (booking.customer_id) {
-        const { data: address } = await admin
-          .from("service_addresses")
-          .insert({
-            customer_id: booking.customer_id,
-            label: "Home",
-            ...addressUpdate,
-          })
-          .select("id")
-          .single();
-        update.service_address_id = address?.id ?? null;
-      }
-    }
-  }
-
-  await admin.from("bookings").update(update).eq("id", booking.id);
 }

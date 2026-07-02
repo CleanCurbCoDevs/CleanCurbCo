@@ -7,6 +7,7 @@ import {
 import { formatFrequency } from "@/lib/pricing";
 import { policyWindowLabels, requestTypeLabels } from "@/lib/service-policy";
 import type {
+  AccountDeletionRequestRow,
   BookingRow,
   ContactMessageRow,
   CustomerRequestRow,
@@ -34,6 +35,18 @@ function escapeHtml(value: unknown) {
 
 function emailButton(href: string, label: string) {
   return `<a href="${escapeHtml(href)}" style="display:inline-block;background:#00ff38;color:#050505;padding:13px 18px;border-radius:10px;font-weight:800;text-decoration:none">${escapeHtml(label)}</a>`;
+}
+
+function securityNoticeHtml(action: string) {
+  return `
+    <p style="background:#f8f4e8;border:1px solid #dedbd0;border-radius:12px;padding:14px">
+      We received a request to ${escapeHtml(action)}. If you requested this, no action is needed. If you did not request this, contact Clean Curb Co. immediately and change your password.
+    </p>
+  `;
+}
+
+function securityNoticeText(action: string) {
+  return `We received a request to ${action}. If you requested this, no action is needed. If you did not request this, contact Clean Curb Co. immediately and change your password.`;
 }
 
 function textFooter(audience: EmailAudience = "customer") {
@@ -145,10 +158,24 @@ export function bookingSummaryHtml(booking: BookingRow) {
   `;
 }
 
-export function bookingConfirmationTemplate(booking: BookingRow): EmailTemplate {
+export function bookingConfirmationTemplate(
+  booking: BookingRow,
+  options: { accountSetupUrl?: string | null; paymentSetupUrl?: string | null } = {},
+): EmailTemplate {
   const body = `
     <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your Cane Bay route day and final price by text or email.</p>
     <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
+    ${
+      options.accountSetupUrl
+        ? `<p>${emailButton(options.accountSetupUrl, "Create account")}</p>`
+        : ""
+    }
+    ${
+      options.paymentSetupUrl
+        ? `<p>${emailButton(options.paymentSetupUrl, "Add payment info")}</p>
+           <p>You can securely add payment information now if you'd like. Your payment details are handled securely through Stripe. Clean Curb Co. does not store your full card number or CVC. You will not be charged until your service/payment terms are confirmed.</p>`
+        : ""
+    }
     ${bookingSummaryHtml(booking)}
     <p>Trash day should not stink all week. We are on it.</p>
   `;
@@ -157,7 +184,17 @@ export function bookingConfirmationTemplate(booking: BookingRow): EmailTemplate 
     subject: "We received your Clean Curb Co. booking request",
     html: shell("Booking request received", body),
     text: customerText(
-      `We received your Clean Curb Co. booking request for ${booking.street_address}. ${launchRouteHeadline} ${bookingSuccessLaunchMessage} Estimated price: $${booking.estimated_price}.`,
+      [
+        `We received your Clean Curb Co. booking request for ${booking.street_address}.`,
+        `${launchRouteHeadline} ${bookingSuccessLaunchMessage}`,
+        `Estimated price: $${booking.estimated_price}.`,
+        options.accountSetupUrl ? `Create account: ${options.accountSetupUrl}` : "",
+        options.paymentSetupUrl
+          ? `Add payment info securely through Stripe: ${options.paymentSetupUrl}. Clean Curb Co. does not store your full card number or CVC. You will not be charged until service/payment terms are confirmed.`
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" "),
     ),
   };
 }
@@ -321,8 +358,9 @@ export function customerRequestReceivedTemplate(
   serviceDate?: string | null,
 ): EmailTemplate {
   const body = `
-    <p>We received your service request. If review is needed, Clean Curb Co. will follow up before making final changes.</p>
+    <p>We received your service request. Our team will review it and confirm next steps before making final operational changes.</p>
     ${customerRequestSummaryHtml(request, booking, serviceDate)}
+    ${securityNoticeHtml(requestTypeLabels[request.request_type] ?? "change your service")}
     <p>No service is paused, cancelled, or changed until Clean Curb Co. confirms it.</p>
   `;
 
@@ -330,7 +368,7 @@ export function customerRequestReceivedTemplate(
     subject: "We received your Clean Curb Co. service request",
     html: shell("Service request received", body),
     text: customerText(
-      `We received your Clean Curb Co. service request: ${request.request_type}.`,
+      `We received your Clean Curb Co. service request: ${request.request_type}. Our team will review it and confirm next steps. ${securityNoticeText(requestTypeLabels[request.request_type] ?? "change your service")}`,
     ),
   };
 }
@@ -341,6 +379,11 @@ export function customerRequestUpdatedTemplate(
   const body = `
     <p>Your service request has been updated.</p>
     ${customerRequestSummaryHtml(request)}
+    ${
+      request.customer_visible_admin_message
+        ? `<p><strong>Message from Clean Curb Co.:</strong> ${escapeHtml(request.customer_visible_admin_message)}</p>`
+        : ""
+    }
   `;
 
   return {
@@ -350,6 +393,215 @@ export function customerRequestUpdatedTemplate(
       `Your Clean Curb Co. service request is now ${request.status}.`,
     ),
   };
+}
+
+export function accountDeletionRequestedTemplate(
+  request: AccountDeletionRequestRow,
+  profile: ProfileRow,
+): EmailTemplate {
+  const body = `
+    <p>We received your Clean Curb Co. account deletion request. Our team will review it before processing because account records can include bookings, service history, checklist PDFs, payment references, and legal or operational records.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Status:</strong> ${escapeHtml(request.status)}</li>
+      <li><strong>Submitted:</strong> ${escapeHtml(new Date(request.created_at).toLocaleString("en-US"))}</li>
+      <li><strong>Account:</strong> ${escapeHtml(profile.email ?? request.customer_email ?? "Customer account")}</li>
+    </ul>
+    ${securityNoticeHtml("delete your Clean Curb Co. account")}
+  `;
+
+  return {
+    subject: "We received your Clean Curb Co. account deletion request",
+    html: shell("Account deletion request received", body),
+    text: customerText(
+      `We received your Clean Curb Co. account deletion request. Our team will review it before processing. ${securityNoticeText("delete your Clean Curb Co. account")}`,
+    ),
+  };
+}
+
+export function adminAccountDeletionRequestTemplate(
+  request: AccountDeletionRequestRow,
+  profile: ProfileRow,
+  adminUrl: string,
+): EmailTemplate {
+  const body = `
+    <p>A customer requested account deletion. Review before disabling portal access or processing deletion.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Customer:</strong> ${escapeHtml([profile.first_name, profile.last_name].filter(Boolean).join(" ") || profile.email || "Customer")}</li>
+      <li><strong>Email:</strong> ${escapeHtml(profile.email ?? request.customer_email ?? "No email")}</li>
+      <li><strong>Reason:</strong> ${escapeHtml(request.request_reason ?? "No reason provided")}</li>
+      <li><strong>Status:</strong> ${escapeHtml(request.status)}</li>
+    </ul>
+    <p>${emailButton(adminUrl, "Open request queue")}</p>
+  `;
+
+  return {
+    subject: "[Admin] Account deletion request - Clean Curb Co.",
+    html: shell("Account deletion request", body, { audience: "internal" }),
+    text: internalText(
+      `Account deletion request from ${profile.email ?? request.customer_email ?? "customer"}. Admin: ${adminUrl}`,
+    ),
+  };
+}
+
+export function accountDeletionDecisionTemplate(
+  request: AccountDeletionRequestRow,
+  statusLabel: string,
+): EmailTemplate {
+  const body = `
+    <p>Your Clean Curb Co. account deletion request was updated.</p>
+    <ul style="line-height:1.7;padding-left:18px">
+      <li><strong>Status:</strong> ${escapeHtml(statusLabel)}</li>
+      <li><strong>Message:</strong> ${escapeHtml(request.customer_visible_admin_message ?? "Please contact us if you have questions.")}</li>
+    </ul>
+    <p>If you have questions about retained service, payment, or legal records, reply to this email and our team will help.</p>
+  `;
+
+  return {
+    subject: "Update on your Clean Curb Co. account deletion request",
+    html: shell("Account request updated", body),
+    text: customerText(
+      `Your account deletion request status is now ${statusLabel}. ${request.customer_visible_admin_message ?? "Please contact us if you have questions."}`,
+    ),
+  };
+}
+
+export function bookingDecisionTemplate(
+  booking: BookingRow,
+  decision: "accepted" | "declined" | "needs_more_information",
+  message?: string | null,
+): EmailTemplate {
+  const titles = {
+    accepted: "Booking accepted",
+    declined: "Booking declined",
+    needs_more_information: "We need a little more information",
+  };
+  const body = `
+    <p>${escapeHtml(decisionCopy(decision))}</p>
+    ${message ? `<p><strong>Message from Clean Curb Co.:</strong> ${escapeHtml(message)}</p>` : ""}
+    ${bookingSummaryHtml(booking)}
+  `;
+
+  return {
+    subject: `${titles[decision]} - Clean Curb Co.`,
+    html: shell(titles[decision], body),
+    text: customerText(
+      `${decisionCopy(decision)} ${message ?? ""}`.trim(),
+    ),
+  };
+}
+
+export function routeDateOfferedTemplate(
+  booking: BookingRow,
+  portalUrl: string,
+): EmailTemplate {
+  const routeDay = booking.proposed_route_day ?? booking.confirmed_route_day ?? "";
+  const body = `
+    <p>We can service your address on <strong>${escapeHtml(routeDay)}</strong>. Please confirm or decline the proposed route day in your customer portal.</p>
+    ${booking.route_offer_message ? `<p>${escapeHtml(booking.route_offer_message)}</p>` : ""}
+    <p>${emailButton(portalUrl, "Review route date")}</p>
+    ${bookingSummaryHtml(booking)}
+  `;
+
+  return {
+    subject: "Please confirm your Clean Curb Co. route date",
+    html: shell("Route date offered", body),
+    text: customerText(
+      `We can service your address on ${routeDay}. Please confirm or decline in your portal: ${portalUrl}`,
+    ),
+  };
+}
+
+export function routeDateResponseTemplate(
+  booking: BookingRow,
+  response: "confirmed" | "declined",
+): EmailTemplate {
+  const body = `
+    <p>We received your route date ${escapeHtml(response)} response.</p>
+    <p>${
+      response === "confirmed"
+        ? `Your route date is confirmed for ${escapeHtml(booking.confirmed_route_day ?? booking.proposed_route_day ?? "the proposed date")}.`
+        : "Our team will follow up with another route option."
+    }</p>
+    ${securityNoticeHtml(`${response} a route date`)}
+  `;
+
+  return {
+    subject:
+      response === "confirmed"
+        ? "Your Clean Curb Co. route date is confirmed"
+        : "We received your route date response",
+    html: shell(
+      response === "confirmed" ? "Route date confirmed" : "Route date declined",
+      body,
+    ),
+    text: customerText(
+      response === "confirmed"
+        ? `Your Clean Curb Co. route date is confirmed for ${booking.confirmed_route_day ?? booking.proposed_route_day ?? "the proposed date"}. ${securityNoticeText("confirm a route date")}`
+        : `We received your declined route date response. Our team will follow up with another option. ${securityNoticeText("decline a route date")}`,
+    ),
+  };
+}
+
+export function adminRouteDateResponseTemplate(
+  booking: BookingRow,
+  response: "confirmed" | "declined",
+): EmailTemplate {
+  return {
+    subject: `[Admin] Customer ${response} route date - Clean Curb Co.`,
+    html: shell(
+      `Customer ${response} route date`,
+      `<p>${escapeHtml(booking.first_name)} ${escapeHtml(booking.last_name)} ${escapeHtml(response)} the route date for ${escapeHtml(booking.street_address)}.</p>${bookingSummaryHtml(booking)}`,
+      { audience: "internal" },
+    ),
+    text: internalText(
+      `Customer ${response} route date for booking ${booking.id}, ${booking.street_address}.`,
+    ),
+  };
+}
+
+export function paymentSetupInviteTemplate(
+  booking: BookingRow,
+  setupUrl: string,
+  accountSetupUrl?: string | null,
+): EmailTemplate {
+  const body = `
+    <p>You can securely add payment information now if you'd like, so your account is ready when your route is confirmed.</p>
+    <p>${emailButton(setupUrl, "Add payment info")}</p>
+    ${accountSetupUrl ? `<p>${emailButton(accountSetupUrl, "Create account")}</p>` : ""}
+    <p>Your payment details are handled securely through Stripe. Clean Curb Co. does not store your full card number or CVC. You will not be charged until your service/payment terms are confirmed.</p>
+    ${bookingSummaryHtml(booking)}
+  `;
+
+  return {
+    subject: "Optional payment setup for your Clean Curb Co. booking",
+    html: shell("Add payment info when ready", body),
+    text: customerText(
+      `You can securely add payment information now if you'd like: ${setupUrl}. Clean Curb Co. does not store your full card number or CVC. You will not be charged until service/payment terms are confirmed.`,
+    ),
+  };
+}
+
+export function paymentSetupCompletedTemplate(booking: BookingRow): EmailTemplate {
+  return {
+    subject: "Payment information added - Clean Curb Co.",
+    html: shell(
+      "Payment information added",
+      `<p>Your payment information was added successfully through Stripe. Clean Curb Co. does not store your full card number or CVC.</p>${bookingSummaryHtml(booking)}`,
+    ),
+    text: customerText(
+      "Your payment information was added successfully through Stripe. Clean Curb Co. does not store your full card number or CVC.",
+    ),
+  };
+}
+
+function decisionCopy(decision: "accepted" | "declined" | "needs_more_information") {
+  if (decision === "accepted") {
+    return "Your Clean Curb Co. booking request has been accepted. We will keep you posted as your route is scheduled.";
+  }
+  if (decision === "declined") {
+    return "We are sorry, but we cannot accept that booking request as submitted. Please contact us if you would like to discuss another option.";
+  }
+  return "Our team needs a little more information before we can finalize your Clean Curb Co. booking request.";
 }
 
 export function adminCustomerRequestAlertTemplate(

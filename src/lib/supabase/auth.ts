@@ -52,6 +52,19 @@ export async function getCurrentProfile(): Promise<AuthResult> {
     .maybeSingle();
 
   if (profile) {
+    if (
+      profile.role === "customer" &&
+      (profile.portal_access_enabled === false ||
+        profile.account_status === "portal_disabled" ||
+        profile.account_status === "deleted")
+    ) {
+      return {
+        status: "forbidden",
+        message:
+          "This customer portal account is disabled. Please contact Clean Curb Co. for help.",
+      };
+    }
+
     return {
       status: "ok",
       userId: user.id,

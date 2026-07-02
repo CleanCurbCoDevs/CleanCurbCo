@@ -1,11 +1,14 @@
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripeEnv } from "@/lib/env";
+import { sendPaymentSetupCompleted } from "@/lib/email/sendOperationsEmail";
 import { sendPaymentReceived } from "@/lib/email/sendPaymentReceived";
+import { writeAdminAuditLog } from "@/lib/server/admin-audit";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { createRequestId, logger } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import type { BookingRow, PaymentRow, PaymentStatus } from "@/types/database";
+import type { BookingRow, PaymentRow, PaymentStatus, ProfileRow } from "@/types/database";
 
 export const runtime = "nodejs";
 
@@ -15,8 +18,10 @@ function getStringId(
   value:
     | string
     | Stripe.PaymentIntent
+    | Stripe.SetupIntent
     | Stripe.Subscription
     | Stripe.Customer
+    | Stripe.DeletedCustomer
     | null,
 ) {
   if (!value) return null;
@@ -169,6 +174,108 @@ async function updatePaymentState(input: {
   }
 }
 
+async function updatePaymentSetupState(input: {
+  session: Stripe.Checkout.Session;
+  requestId: string;
+  status: "completed" | "cancelled" | "failed";
+}) {
+  const admin = getSupabaseAdmin();
+  const bookingId = input.session.metadata?.booking_id ?? null;
+  if (!bookingId) return;
+
+  const { data: previousBooking } = await admin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (!previousBooking) return;
+
+  const stripeCustomerId = getStringId(input.session.customer);
+  const completed = input.status === "completed";
+  const { data: booking } = await admin
+    .from("bookings")
+    .update({
+      payment_setup_status: input.status,
+      payment_method_on_file: completed,
+      payment_setup_completed_at: completed ? new Date().toISOString() : null,
+      stripe_setup_session_id: input.session.id,
+      stripe_customer_id: stripeCustomerId ?? previousBooking.stripe_customer_id,
+      payment_provider: "stripe",
+    })
+    .eq("id", previousBooking.id)
+    .select("*")
+    .single();
+
+  if (booking?.customer_id && stripeCustomerId) {
+    const profileUpdate: Partial<ProfileRow> = {
+      stripe_customer_id: stripeCustomerId,
+    };
+    if (completed) {
+      profileUpdate.payment_method_on_file = true;
+      profileUpdate.payment_setup_completed_at = booking.payment_setup_completed_at;
+    }
+
+    await admin
+      .from("profiles")
+      .update(profileUpdate)
+      .eq("id", booking.customer_id);
+  }
+
+  await recordPaymentEvent({
+    booking: booking ?? previousBooking,
+    eventType: `stripe_payment_setup_${input.status}`,
+    message: `Stripe payment setup ${input.status}.`,
+    metadata: {
+      checkoutSessionId: input.session.id,
+      setupIntentId: getStringId(input.session.setup_intent),
+      purpose: input.session.metadata?.purpose ?? "payment_setup",
+    },
+  });
+
+  await Promise.allSettled([
+    writeAdminAuditLog({
+      action: `payment_setup_${input.status}`,
+      actor_user_id: null,
+      actor_email: null,
+      actor_role: "stripe",
+      target_type: "booking",
+      target_id: previousBooking.id,
+      customer_id: previousBooking.customer_id,
+      booking_id: previousBooking.id,
+      before_summary: {
+        paymentSetupStatus: previousBooking.payment_setup_status,
+        paymentMethodOnFile: previousBooking.payment_method_on_file,
+      },
+      after_summary: {
+        paymentSetupStatus: input.status,
+        paymentMethodOnFile: completed,
+        stripeSetupSessionId: input.session.id,
+      },
+      request_id: input.requestId,
+      status: "success",
+      metadata: {
+        stripeEvent: "checkout.session.completed",
+        purpose: input.session.metadata?.purpose ?? "payment_setup",
+      },
+    }),
+    createAdminNotification({
+      type: completed ? "payment_setup_completed" : "payment_setup_failed",
+      title: completed ? "Payment setup completed" : "Payment setup not completed",
+      message: completed
+        ? `${previousBooking.first_name} ${previousBooking.last_name} added payment information.`
+        : `${previousBooking.first_name} ${previousBooking.last_name} did not complete payment setup.`,
+      href: `/admin/bookings?q=${previousBooking.id}`,
+      customer_id: previousBooking.customer_id,
+      booking_id: previousBooking.id,
+      severity: completed ? "info" : "warning",
+    }),
+    completed && booking
+      ? sendPaymentSetupCompleted(booking)
+      : Promise.resolve({ status: "skipped" as const, reason: "Not completed." }),
+  ]);
+}
+
 export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
   const route = "/api/stripe/webhook";
@@ -209,6 +316,14 @@ export async function POST(request: Request) {
     switch (event.type) {
       case "checkout.session.completed": {
         const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === "setup" || session.metadata?.purpose === "payment_setup") {
+          await updatePaymentSetupState({
+            session,
+            requestId,
+            status: "completed",
+          });
+          break;
+        }
         const paymentStatus: PaymentStatus =
           session.payment_status === "paid" ? "paid" : "pending";
         const bookingStatus: BookingPaymentStatus =
@@ -229,6 +344,14 @@ export async function POST(request: Request) {
       }
       case "checkout.session.expired": {
         const session = event.data.object as Stripe.Checkout.Session;
+        if (session.mode === "setup" || session.metadata?.purpose === "payment_setup") {
+          await updatePaymentSetupState({
+            session,
+            requestId,
+            status: "cancelled",
+          });
+          break;
+        }
         await updatePaymentState({
           paymentId: session.metadata?.payment_id ?? null,
           bookingId: session.metadata?.booking_id ?? null,

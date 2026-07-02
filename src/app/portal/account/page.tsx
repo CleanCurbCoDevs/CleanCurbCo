@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { updatePortalAccountAction } from "@/app/portal/actions";
+import { AccountDeletionRequestForm } from "@/components/account-deletion-request-form";
 import { PortalShell } from "@/components/shells/portal-shell";
 import { getPortalContext } from "@/lib/portal-data";
 import { neighborhoods } from "@/lib/site";
@@ -14,6 +15,9 @@ export default async function PortalAccountPage() {
   const profile = context.auth.status === "ok" ? context.auth.profile : null;
   const primaryAddress =
     context.addresses.find((address) => address.is_primary) ?? context.addresses[0];
+  const hasPendingDeletionRequest = context.deletionRequests.some((request) =>
+    ["pending", "approved"].includes(request.status),
+  );
 
   return (
     <PortalShell title="Account settings" auth={context.auth}>
@@ -142,6 +146,12 @@ export default async function PortalAccountPage() {
         ) : (
           <p>Account settings are available after sign-in.</p>
         )}
+
+        {profile ? (
+          <AccountDeletionRequestForm
+            hasPendingRequest={hasPendingDeletionRequest}
+          />
+        ) : null}
       </section>
     </PortalShell>
   );

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { PaymentSetupButton } from "@/components/payment-setup-button";
 import { PaymentLinkButton } from "@/components/payment-link-button";
 import { PortalShell } from "@/components/shells/portal-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
@@ -16,12 +17,33 @@ export default async function PortalBillingPage() {
         return { payment, booking };
       })
     : context.bookings.map((booking) => ({ payment: null, booking }));
+  const profilePaymentMethodOnFile =
+    context.auth.status === "ok" && context.auth.profile.payment_method_on_file;
+  const paymentSetupBooking = context.bookings.find(
+    (booking) =>
+      !profilePaymentMethodOnFile &&
+      !booking.payment_method_on_file &&
+      booking.payment_setup_status !== "completed",
+  );
 
   return (
     <PortalShell title="Billing and payments" auth={context.auth}>
       <section className="placeholder-panel">
         <p className="section-kicker">Billing</p>
         <h1>Payment history and links.</h1>
+        {paymentSetupBooking ? (
+          <div className="confirmation-panel">
+            <strong>Payment information not yet added.</strong>
+            <p>
+              Add a secure payment method through Stripe so your account is
+              ready once your route date is confirmed.
+            </p>
+            <PaymentSetupButton
+              bookingId={paymentSetupBooking.id}
+              returnPath="/portal/billing"
+            />
+          </div>
+        ) : null}
         {records.length ? (
           <div className="data-table">
             {records.map(({ payment, booking }) => {

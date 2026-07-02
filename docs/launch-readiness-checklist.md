@@ -9,8 +9,8 @@ Verify these items in Resend before public launch:
 - SPF records allow the configured email provider.
 - A DMARC TXT record exists for `cleancurbco.com`.
 - Transactional sender matches the verified domain, for example `Clean Curb Co. <no-reply@cleancurbco.com>`.
-- Customer replies route to `cleancurbco@stonebranchcapital.com`.
-- Internal admin notifications route to `cleancurbco@stonebranchcapital.com` or another intentionally configured admin inbox.
+- Customer replies route to `contact@cleancurbco.com`.
+- Internal admin notifications route to `admin@cleancurbco.com` or another intentionally configured admin inbox.
 
 ## Vercel Monitoring
 

@@ -26,6 +26,31 @@ export type CustomerRequestStatus =
   | "completed"
   | "denied"
   | "cancelled";
+export type AccountStatus =
+  | "active"
+  | "portal_disabled"
+  | "pending_deletion"
+  | "deleted";
+export type AccountDeletionStatus =
+  | "pending"
+  | "approved"
+  | "declined"
+  | "cancelled"
+  | "completed";
+export type RouteOfferStatus =
+  | "none"
+  | "offered"
+  | "customer_confirmed"
+  | "customer_declined"
+  | "admin_approved"
+  | "admin_declined";
+export type PaymentSetupStatus =
+  | "not_started"
+  | "link_sent"
+  | "pending"
+  | "completed"
+  | "cancelled"
+  | "failed";
 export type ReferralStatus =
   | "pending"
   | "qualified"
@@ -138,6 +163,18 @@ export type BookingRow = {
     | "fee_may_apply"
     | "full_charge_may_apply"
     | null;
+  route_offer_status: RouteOfferStatus;
+  proposed_route_day: string | null;
+  route_offer_message: string | null;
+  route_offer_sent_at: string | null;
+  route_responded_at: string | null;
+  route_response_note: string | null;
+  customer_visible_admin_message: string | null;
+  payment_setup_status: PaymentSetupStatus;
+  stripe_customer_id: string | null;
+  stripe_setup_session_id: string | null;
+  payment_method_on_file: boolean;
+  payment_setup_completed_at: string | null;
 };
 
 export type ProfileRow = {
@@ -156,6 +193,12 @@ export type ProfileRow = {
   referred_by_profile_id: string | null;
   stripe_customer_id: string | null;
   internal_notes: string | null;
+  account_status: AccountStatus;
+  portal_access_enabled: boolean;
+  deletion_requested_at: string | null;
+  deleted_at: string | null;
+  payment_method_on_file: boolean;
+  payment_setup_completed_at: string | null;
 };
 
 export type ServiceAddressRow = {
@@ -442,6 +485,11 @@ export type CustomerRequestRow = {
   requested_removed_add_ons: string[];
   message: string | null;
   admin_notes: string | null;
+  customer_visible_admin_message: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
+  requested_services: string[];
+  metadata_json: Record<string, unknown>;
 };
 
 export type ReferralRow = {
@@ -488,6 +536,39 @@ export type AdminAuditLogRow = {
   request_id: string | null;
   status: "success" | "failure";
   metadata: Record<string, unknown>;
+};
+
+export type AccountDeletionRequestRow = {
+  id: string;
+  customer_id: string | null;
+  customer_email: string | null;
+  status: AccountDeletionStatus;
+  requested_by_user_id: string | null;
+  requested_by_role: string;
+  request_reason: string | null;
+  admin_note: string | null;
+  customer_visible_admin_message: string | null;
+  reviewed_by_user_id: string | null;
+  reviewed_at: string | null;
+  completed_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type AdminNotificationRow = {
+  id: string;
+  type: string;
+  title: string;
+  message: string;
+  href: string | null;
+  customer_id: string | null;
+  booking_id: string | null;
+  customer_request_id: string | null;
+  account_deletion_request_id: string | null;
+  severity: "info" | "warning" | "urgent";
+  metadata: Record<string, unknown>;
+  read_at: string | null;
+  created_at: string;
 };
 
 export type Database = {
@@ -624,6 +705,19 @@ export type Database = {
         Insert: Partial<AdminAuditLogRow> &
           Pick<AdminAuditLogRow, "action" | "target_type" | "target_id">;
         Update: Partial<AdminAuditLogRow>;
+        Relationships: [];
+      };
+      account_deletion_requests: {
+        Row: AccountDeletionRequestRow;
+        Insert: Partial<AccountDeletionRequestRow>;
+        Update: Partial<AccountDeletionRequestRow>;
+        Relationships: [];
+      };
+      admin_notifications: {
+        Row: AdminNotificationRow;
+        Insert: Partial<AdminNotificationRow> &
+          Pick<AdminNotificationRow, "type" | "title" | "message">;
+        Update: Partial<AdminNotificationRow>;
         Relationships: [];
       };
       route_days: {

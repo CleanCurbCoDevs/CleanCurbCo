@@ -3,6 +3,7 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import { updateCustomerProfileAdminAction } from "@/app/admin/actions";
 import { AdminCustomerEmailForm } from "@/components/admin-customer-email-form";
+import { AdminCustomerAccountControls } from "@/components/admin-customer-account-controls";
 import { AdminShell } from "@/components/shells/admin-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getAdminContext } from "@/lib/admin-data";
@@ -47,6 +48,9 @@ export default async function CustomerDetailPage({
 
   const bookings = getCustomerBookings(profile.id, context.bookings);
   const requests = getCustomerRequests(profile.id, context.requests);
+  const deletionRequests = context.deletionRequests.filter(
+    (request) => request.customer_id === profile.id,
+  );
   const referrals = getCustomerReferrals(profile.id, context.referrals);
   const addresses = context.addresses.filter(
     (address) => address.customer_id === profile.id,
@@ -95,6 +99,11 @@ export default async function CustomerDetailPage({
             </span>
             <span className="status-badge">
               ${unpaidBalance(bookings)} unpaid
+            </span>
+            <span className="status-badge">
+              {profile.payment_method_on_file
+                ? "Payment method on file"
+                : "No payment method on file"}
             </span>
           </div>
         </div>
@@ -218,6 +227,12 @@ export default async function CustomerDetailPage({
           stripeCustomerId={profile.stripe_customer_id}
         />
 
+        <AdminCustomerAccountControls
+          profileId={profile.id}
+          accountStatus={profile.account_status ?? "active"}
+          portalAccessEnabled={profile.portal_access_enabled ?? true}
+        />
+
         <section className="detail-grid">
           <DetailPanel title="Service addresses" empty="No addresses linked.">
             {addresses.map((address) => (
@@ -258,6 +273,17 @@ export default async function CustomerDetailPage({
                   <article className="mini-record" key={booking.id}>
                     <strong>${booking.estimated_price}</strong>
                     <span>{humanizeStatus(booking.payment_status)}</span>
+                    <span>
+                      Payment setup:{" "}
+                      {booking.payment_method_on_file
+                        ? "method on file"
+                        : humanizeStatus(
+                            booking.payment_setup_status ?? "not_started",
+                          )}
+                    </span>
+                    {booking.stripe_customer_id ? (
+                      <span>Stripe customer: {booking.stripe_customer_id}</span>
+                    ) : null}
                     <span>{booking.payment_method ?? "No method recorded"}</span>
                   </article>
                 )))}
@@ -324,6 +350,17 @@ export default async function CustomerDetailPage({
                 <strong>{humanizeStatus(request.request_type)}</strong>
                 <span>{humanizeStatus(request.status)}</span>
                 <span>{request.message ?? "No message"}</span>
+              </article>
+            ))}
+          </DetailPanel>
+
+          <DetailPanel title="Account deletion requests" empty="No deletion requests.">
+            {deletionRequests.map((request) => (
+              <article className="mini-record" key={request.id}>
+                <strong>{humanizeStatus(request.status)}</strong>
+                <span>{request.request_reason ?? "No reason provided"}</span>
+                <span>{formatDateTime(request.created_at)}</span>
+                {request.admin_note ? <span>Internal note saved</span> : null}
               </article>
             ))}
           </DetailPanel>

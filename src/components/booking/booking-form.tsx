@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
+import { PaymentSetupButton } from "@/components/payment-setup-button";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import {
   addOns,
@@ -119,6 +120,11 @@ export function BookingForm({
   const [submittedBooking, setSubmittedBooking] =
     useState<BookingRequest | null>(null);
   const [setupHref, setSetupHref] = useState<string | null>(null);
+  const [paymentSetup, setPaymentSetup] = useState<{
+    href: string;
+    bookingId: string;
+    token?: string | null;
+  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -192,6 +198,11 @@ export function BookingForm({
       const data = (await response.json()) as {
         booking?: BookingRequest;
         redirectTo?: string | null;
+        paymentSetupHref?: string | null;
+        paymentSetupContext?: {
+          bookingId?: string;
+          token?: string | null;
+        } | null;
         error?: string;
         requestId?: string;
       };
@@ -202,6 +213,15 @@ export function BookingForm({
 
       setSubmittedBooking(data.booking);
       setSetupHref(data.redirectTo ?? null);
+      setPaymentSetup(
+        data.paymentSetupHref && data.paymentSetupContext?.bookingId
+          ? {
+              href: data.paymentSetupHref,
+              bookingId: data.paymentSetupContext.bookingId,
+              token: data.paymentSetupContext.token,
+            }
+          : null,
+      );
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -230,6 +250,21 @@ export function BookingForm({
             <a className="button button-dark" href={setupHref}>
               Set Up Customer Account
             </a>
+          ) : null}
+          {paymentSetup ? (
+            <div className="payment-setup-success-cta">
+              <p>
+                You can securely add payment information now so your account is
+                ready when your route is confirmed. You will not be charged
+                until service/payment terms are confirmed.
+              </p>
+              <PaymentSetupButton
+                bookingId={paymentSetup.bookingId}
+                token={paymentSetup.token}
+                returnPath={paymentSetup.href}
+                label="Add Payment Info"
+              />
+            </div>
           ) : null}
           <p>
             <strong>Booking ID:</strong> {submittedBooking.id}

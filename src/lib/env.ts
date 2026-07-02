@@ -28,14 +28,22 @@ function uniqueEmails(emails: string[]) {
   return Array.from(new Set(emails.map((email) => email.trim()).filter(Boolean)));
 }
 
+const ownerNotificationEmails = [
+  "pkarasiewicz@stonebranchcapital.com",
+  "bdecker@stonebranchcapital.com",
+  "jdoms@stonebranchcapital.com",
+];
+
 export function getResendEnv() {
   const replyTo =
     process.env.RESEND_REPLY_TO_EMAIL ??
     process.env.RESEND_REPLY_TO ??
-    "cleancurbco@stonebranchcapital.com";
+    "contact@cleancurbco.com";
   const adminEmails = uniqueEmails([
+    ...splitEmails(process.env.ADMIN_NOTIFICATION_EMAILS),
     ...splitEmails(process.env.ADMIN_NOTIFICATION_EMAIL),
     ...splitEmails(process.env.ADMIN_EMAILS),
+    ...ownerNotificationEmails,
   ]);
 
   return {

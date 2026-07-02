@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { getResendEnv, isResendConfigured } from "@/lib/env";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -72,6 +73,43 @@ function logEmailResult(
   });
 }
 
+function isCriticalEmailTemplate(templateKey: string) {
+  return (
+    templateKey.startsWith("admin_") ||
+    [
+      "booking_confirmation",
+      "customer_request_received",
+      "account_deletion_requested",
+      "payment_setup_invite",
+      "payment_setup_completed",
+    ].includes(templateKey)
+  );
+}
+
+async function notifyCriticalEmailFailure(input: {
+  templateKey: string;
+  subject: string;
+  relatedBookingId?: string | null;
+  errorMessage: string;
+}) {
+  if (!isCriticalEmailTemplate(input.templateKey)) return;
+
+  await createAdminNotification({
+    type: "critical_email_failed",
+    title: "Critical email failed",
+    message: `${input.templateKey} failed: ${input.subject}`,
+    href: input.relatedBookingId
+      ? `/admin/bookings?q=${input.relatedBookingId}`
+      : "/admin",
+    booking_id: input.relatedBookingId ?? null,
+    severity: "urgent",
+    metadata: {
+      templateKey: input.templateKey,
+      errorMessage: input.errorMessage,
+    },
+  });
+}
+
 export async function sendTransactionalEmail(input: SendEmailInput) {
   const recipients = Array.isArray(input.to) ? input.to : [input.to];
   const { from, replyTo } = getResendEnv();
@@ -110,6 +148,13 @@ export async function sendTransactionalEmail(input: SendEmailInput) {
       status: "skipped",
       relatedBookingId: input.relatedBookingId,
       relatedVisitId: input.relatedVisitId,
+      errorMessage: "Resend is not configured.",
+    });
+
+    await notifyCriticalEmailFailure({
+      templateKey: input.templateKey,
+      subject: input.subject,
+      relatedBookingId: input.relatedBookingId,
       errorMessage: "Resend is not configured.",
     });
 
@@ -166,6 +211,12 @@ export async function sendTransactionalEmail(input: SendEmailInput) {
     });
 
     if (error) {
+      await notifyCriticalEmailFailure({
+        templateKey: input.templateKey,
+        subject: input.subject,
+        relatedBookingId: input.relatedBookingId,
+        errorMessage: errorMessage ?? "Resend send error.",
+      });
       return { status: "failed" as const, error };
     }
 
@@ -193,6 +244,13 @@ export async function sendTransactionalEmail(input: SendEmailInput) {
       status: "failed",
       relatedBookingId: input.relatedBookingId,
       relatedVisitId: input.relatedVisitId,
+      errorMessage,
+    });
+
+    await notifyCriticalEmailFailure({
+      templateKey: input.templateKey,
+      subject: input.subject,
+      relatedBookingId: input.relatedBookingId,
       errorMessage,
     });
 

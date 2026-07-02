@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import {
   sendPaymentLinkAction,
+  sendPaymentSetupInviteAction,
   sendReviewRequestAction,
   updateBookingAdminAction,
 } from "@/app/admin/actions";
@@ -217,6 +218,24 @@ export default async function AdminBookingsPage({
                           "None"}
                       </strong>
                     </div>
+                    <div>
+                      <span>Payment setup</span>
+                      <strong>
+                        {booking.payment_method_on_file
+                          ? "Method on file"
+                          : humanizeStatus(
+                              booking.payment_setup_status ?? "not_started",
+                            )}
+                      </strong>
+                    </div>
+                    <div>
+                      <span>Stripe customer</span>
+                      <strong>
+                        {booking.stripe_customer_id ??
+                          latestPayment?.stripe_customer_id ??
+                          "None"}
+                      </strong>
+                    </div>
                   </div>
 
                   <div className="form-grid">
@@ -236,6 +255,14 @@ export default async function AdminBookingsPage({
                         type="date"
                         name="confirmedRouteDay"
                         defaultValue={booking.confirmed_route_day ?? ""}
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Proposed route day</span>
+                      <input
+                        type="date"
+                        name="proposedRouteDay"
+                        defaultValue={booking.proposed_route_day ?? ""}
                       />
                     </label>
                     <label className="field">
@@ -290,6 +317,14 @@ export default async function AdminBookingsPage({
                       defaultValue={booking.internal_notes ?? ""}
                     />
                   </label>
+                  <label className="field">
+                    <span>Customer-facing message</span>
+                    <textarea
+                      name="customerVisibleAdminMessage"
+                      defaultValue={booking.customer_visible_admin_message ?? ""}
+                      placeholder="Used for booking decisions or route date offers."
+                    />
+                  </label>
                   <p className="muted">
                     Customer notes: {booking.customer_notes ?? "None"} | Water
                     spigot: {booking.water_spigot_available ?? "Not sure"}
@@ -308,10 +343,65 @@ export default async function AdminBookingsPage({
                     </button>
                     <button
                       className="button button-outline"
+                      formAction={sendPaymentSetupInviteAction}
+                      type="submit"
+                    >
+                      Send Payment Setup
+                    </button>
+                    <button
+                      className="button button-outline"
                       formAction={sendReviewRequestAction}
                       type="submit"
                     >
                       Send Review Request
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="accept"
+                    >
+                      Accept Booking
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="decline"
+                    >
+                      Decline Booking
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="needs_more_info"
+                    >
+                      Need Info
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="offer_route"
+                    >
+                      Offer Route Date
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="approve_requested_date"
+                    >
+                      Approve Requested Date
+                    </button>
+                    <button
+                      className="button button-outline"
+                      name="bookingDecision"
+                      type="submit"
+                      value="decline_requested_date"
+                    >
+                      Date Unavailable
                     </button>
                     {booking.customer_id ? (
                       <Link

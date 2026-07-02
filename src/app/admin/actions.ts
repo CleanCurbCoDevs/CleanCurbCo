@@ -2,18 +2,33 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  humanizeStatus,
   validCustomerRequestStatuses,
   validBookingStatuses,
   validPaymentStatuses,
   validReferralStatuses,
 } from "@/lib/booking-utils";
+import {
+  createAccountSetupLink,
+  createClaimToken,
+  createPaymentSetupLink,
+  hashClaimToken,
+} from "@/lib/booking-claims";
 import { sendCustomerRequestUpdate } from "@/lib/email/sendCustomerRequestEmail";
+import {
+  sendAccountDeletionDecision,
+  sendBookingDecision,
+  sendPaymentSetupInvite,
+  sendRouteDateOffer,
+} from "@/lib/email/sendOperationsEmail";
 import { sendPaymentLink } from "@/lib/email/sendPaymentLink";
 import { sendReferralRewardEmail } from "@/lib/email/sendReferralReward";
 import { sendReviewRequest } from "@/lib/email/sendReviewRequest";
 import { sendRouteConfirmation } from "@/lib/email/sendRouteConfirmation";
-import { isStripeConfigured } from "@/lib/env";
+import { getSiteUrl, isStripeConfigured } from "@/lib/env";
+import { calculateBookingEstimate } from "@/lib/pricing";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { createRequestId, logger, maskEmail, maskPhone } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -21,7 +36,9 @@ import { requireAdmin } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, isValidEmail, pickEnum } from "@/lib/validation";
 import type { BookingStatus, PaymentStatus } from "@/types/booking";
 import type {
+  BookingRow,
   CareerApplicationStatus,
+  AccountDeletionStatus,
   CustomerRequestStatus,
   Database,
   FieldStopStatus,
@@ -164,6 +181,11 @@ export async function updateBookingAdminAction(formData: FormData) {
   const paymentProvider = cleanString(formData.get("paymentProvider"), 80) || null;
   const paymentReference =
     cleanString(formData.get("paymentReference"), 120) || null;
+  const bookingDecision = cleanString(formData.get("bookingDecision"), 40);
+  const proposedRouteDay =
+    cleanString(formData.get("proposedRouteDay"), 30) || null;
+  const customerVisibleAdminMessage =
+    cleanLongText(formData.get("customerVisibleAdminMessage"), 1500) || null;
 
   const admin = getSupabaseAdmin();
   const { data: previousBooking } = await admin
@@ -172,18 +194,54 @@ export async function updateBookingAdminAction(formData: FormData) {
     .eq("id", bookingId)
     .maybeSingle();
 
+  const bookingUpdate: Partial<BookingRow> = {
+    status,
+    confirmed_route_day: confirmedRouteDay,
+    internal_notes: internalNotes,
+    payment_status: paymentStatus,
+    payment_link: paymentLink,
+    payment_method: paymentMethod,
+    payment_provider: paymentProvider,
+    payment_reference: paymentReference,
+    customer_visible_admin_message: customerVisibleAdminMessage,
+  };
+
+  if (bookingDecision === "accept") {
+    bookingUpdate.status = "confirmed";
+    bookingUpdate.route_offer_status = "admin_approved";
+  }
+
+  if (bookingDecision === "decline") {
+    bookingUpdate.status = "cancelled";
+    bookingUpdate.route_offer_status = "admin_declined";
+  }
+
+  if (bookingDecision === "contact" || bookingDecision === "needs_more_info") {
+    bookingUpdate.status = "needs_follow_up";
+  }
+
+  if (bookingDecision === "offer_route" && proposedRouteDay) {
+    bookingUpdate.status = "needs_follow_up";
+    bookingUpdate.route_offer_status = "offered";
+    bookingUpdate.proposed_route_day = proposedRouteDay;
+    bookingUpdate.route_offer_message = customerVisibleAdminMessage;
+    bookingUpdate.route_offer_sent_at = new Date().toISOString();
+  }
+
+  if (bookingDecision === "approve_requested_date" && previousBooking?.requested_date) {
+    bookingUpdate.status = "scheduled";
+    bookingUpdate.route_offer_status = "admin_approved";
+    bookingUpdate.confirmed_route_day = previousBooking.requested_date;
+  }
+
+  if (bookingDecision === "decline_requested_date") {
+    bookingUpdate.status = "needs_follow_up";
+    bookingUpdate.route_offer_status = "admin_declined";
+  }
+
   const { data: updatedBooking } = await admin
     .from("bookings")
-    .update({
-      status,
-      confirmed_route_day: confirmedRouteDay,
-      internal_notes: internalNotes,
-      payment_status: paymentStatus,
-      payment_link: paymentLink,
-      payment_method: paymentMethod,
-      payment_provider: paymentProvider,
-      payment_reference: paymentReference,
-    })
+    .update(bookingUpdate)
     .eq("id", bookingId)
     .select("*")
     .single();
@@ -222,6 +280,8 @@ export async function updateBookingAdminAction(formData: FormData) {
         status: updatedBooking.status,
         paymentStatus: updatedBooking.payment_status,
         confirmedRouteDay: updatedBooking.confirmed_route_day,
+        decision: bookingDecision || null,
+        routeOfferStatus: updatedBooking.route_offer_status,
       },
       request_id: requestId,
       status: "success",
@@ -237,6 +297,12 @@ export async function updateBookingAdminAction(formData: FormData) {
     });
 
     await advanceReferralForBooking(admin, updatedBooking.id);
+
+    if (bookingDecision) {
+      await handleBookingDecisionNotification(updatedBooking, bookingDecision, {
+        customerVisibleAdminMessage,
+      });
+    }
   }
 
   if (
@@ -252,6 +318,47 @@ export async function updateBookingAdminAction(formData: FormData) {
   revalidatePath("/admin/routes");
   revalidatePath("/admin/payments");
   revalidatePath("/admin/referrals");
+}
+
+async function handleBookingDecisionNotification(
+  booking: BookingRow,
+  decision: string,
+  options: { customerVisibleAdminMessage?: string | null },
+) {
+  const message = options.customerVisibleAdminMessage ?? null;
+  const portalUrl = `${getSiteUrl()}/portal/bookings?routeOffer=${booking.id}`;
+
+  if (decision === "accept") {
+    await sendBookingDecision(booking, "accepted", message);
+  }
+
+  if (decision === "decline") {
+    await sendBookingDecision(booking, "declined", message);
+  }
+
+  if (decision === "contact" || decision === "needs_more_info") {
+    await sendBookingDecision(booking, "needs_more_information", message);
+  }
+
+  if (decision === "offer_route") {
+    await sendRouteDateOffer(booking, portalUrl);
+  }
+
+  if (decision === "approve_requested_date") {
+    await sendRouteConfirmation(
+      booking,
+      booking.confirmed_route_day ?? booking.requested_date ?? "your requested date",
+    );
+  }
+
+  if (decision === "decline_requested_date") {
+    await sendBookingDecision(
+      booking,
+      "needs_more_information",
+      message ??
+        "We are sorry, that requested route day is full or unavailable. Please contact us or choose another possible date.",
+    );
+  }
 }
 
 export async function updatePaymentStatusAction(
@@ -370,6 +477,97 @@ export async function sendPaymentLinkAction(formData: FormData) {
     });
   }
 
+  revalidatePath("/admin/payments");
+}
+
+export async function sendPaymentSetupInviteAction(formData: FormData) {
+  const auth = await requireAdmin("/admin/bookings");
+  if (auth.status !== "ok") return;
+
+  const requestId = createRequestId();
+  const bookingId = cleanString(formData.get("bookingId"), 80);
+  if (!bookingId) return;
+
+  const admin = getSupabaseAdmin();
+  const { data: booking } = await admin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
+
+  if (!booking) return;
+
+  let setupUrl = createPaymentSetupLink(booking.id);
+  let accountSetupUrl: string | null = null;
+
+  if (!booking.customer_id) {
+    const token = createClaimToken();
+    await admin.from("booking_claims").insert({
+      booking_id: booking.id,
+      email: booking.email,
+      token_hash: hashClaimToken(token),
+    });
+    setupUrl = createPaymentSetupLink(booking.id, token);
+    accountSetupUrl = createAccountSetupLink(booking.id, token);
+  }
+
+  await admin
+    .from("bookings")
+    .update({
+      payment_setup_status: "link_sent",
+      payment_provider: "stripe",
+    })
+    .eq("id", booking.id);
+
+  await Promise.allSettled([
+    sendPaymentSetupInvite(booking, setupUrl, accountSetupUrl),
+    logActivity(admin, {
+      actor_profile_id: auth.userId,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      event_type: "payment_setup_invite_sent",
+      message: "Payment setup invite sent from admin.",
+      metadata: { requestId },
+    }),
+    writeAdminAuditLog({
+      action: "payment_setup_invite_sent",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "booking",
+      target_id: booking.id,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      before_summary: {
+        paymentSetupStatus: booking.payment_setup_status,
+      },
+      after_summary: {
+        paymentSetupStatus: "link_sent",
+      },
+      request_id: requestId,
+      status: "success",
+    }),
+    createAdminNotification({
+      type: "payment_setup_invite_sent",
+      title: "Payment setup invite sent",
+      message: `Payment setup invite sent to ${booking.first_name} ${booking.last_name}.`,
+      href: `/admin/bookings?q=${booking.id}`,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      severity: "info",
+    }),
+  ]);
+
+  logger.info("admin_payment_setup_invite_sent", {
+    requestId,
+    action: "payment_setup_invite_sent",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: booking.customer_id,
+    bookingId: booking.id,
+  });
+
+  revalidatePath("/admin/bookings");
   revalidatePath("/admin/payments");
 }
 
@@ -796,20 +994,46 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
   );
   const bookingStatusInput = cleanString(formData.get("bookingStatus"), 40);
   const paymentStatusInput = cleanString(formData.get("paymentStatus"), 40);
+  const adminNotes = cleanLongText(formData.get("adminNotes"), 3000) || null;
+  const customerMessage =
+    cleanLongText(formData.get("customerVisibleAdminMessage"), 1500) || null;
   if (!requestId) return;
 
   const admin = getSupabaseAdmin();
+  const { data: previousRequest } = await admin
+    .from("customer_requests")
+    .select("*")
+    .eq("id", requestId)
+    .maybeSingle();
   const { data: request } = await admin
     .from("customer_requests")
     .update({
       status,
-      admin_notes: cleanLongText(formData.get("adminNotes"), 3000) || null,
+      admin_notes: adminNotes,
+      customer_visible_admin_message: customerMessage,
+      reviewed_by_user_id: auth.userId,
+      reviewed_at: new Date().toISOString(),
     })
     .eq("id", requestId)
     .select("*")
     .single();
 
   if (request) {
+    if (
+      request.booking_id &&
+      ["approved", "completed"].includes(status)
+    ) {
+      const { data: booking } = await admin
+        .from("bookings")
+        .select("*")
+        .eq("id", request.booking_id)
+        .maybeSingle();
+
+      if (booking) {
+        await applyApprovedCustomerRequest(admin, booking, request);
+      }
+    }
+
     if (request.booking_id && (bookingStatusInput || paymentStatusInput)) {
       const bookingUpdate: {
         status?: BookingStatus;
@@ -856,9 +1080,11 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
       booking_id: request.booking_id,
       before_summary: {},
       after_summary: {
+        previousStatus: previousRequest?.status ?? null,
         status: request.status,
         bookingStatus: bookingStatusInput || null,
         paymentStatus: paymentStatusInput || null,
+        customerVisibleMessage: Boolean(request.customer_visible_admin_message),
       },
       note: request.admin_notes,
       request_id: auditRequestId,
@@ -891,6 +1117,345 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
   revalidatePath("/admin/bookings");
   revalidatePath("/admin/payments");
   if (request?.customer_id) revalidatePath(`/admin/customers/${request.customer_id}`);
+}
+
+export async function updateAccountDeletionRequestAdminAction(formData: FormData) {
+  const auth = await requireAdmin("/admin/requests");
+  if (auth.status !== "ok") return;
+
+  const auditRequestId = createRequestId();
+  const deletionRequestId = cleanString(formData.get("deletionRequestId"), 80);
+  const status = pickEnum<AccountDeletionStatus>(
+    formData.get("status"),
+    ["pending", "approved", "declined", "cancelled", "completed"],
+    "pending",
+  );
+  const adminNote = cleanLongText(formData.get("adminNote"), 3000) || null;
+  const customerMessage =
+    cleanLongText(formData.get("customerVisibleAdminMessage"), 1500) || null;
+  const disablePortalAccess = formData.get("disablePortalAccess") === "on";
+
+  if (!deletionRequestId) return;
+
+  const admin = getSupabaseAdmin();
+  const { data: previousRequest } = await admin
+    .from("account_deletion_requests")
+    .select("*")
+    .eq("id", deletionRequestId)
+    .maybeSingle();
+
+  if (!previousRequest) return;
+
+  const now = new Date().toISOString();
+  const { data: deletionRequest } = await admin
+    .from("account_deletion_requests")
+    .update({
+      status,
+      admin_note: adminNote,
+      customer_visible_admin_message: customerMessage,
+      reviewed_by_user_id: auth.userId,
+      reviewed_at: ["approved", "declined", "cancelled", "completed"].includes(status)
+        ? now
+        : previousRequest.reviewed_at,
+      completed_at: status === "completed" ? now : previousRequest.completed_at,
+      updated_at: now,
+    })
+    .eq("id", deletionRequestId)
+    .select("*")
+    .single();
+
+  if (!deletionRequest) return;
+
+  let profile: Database["public"]["Tables"]["profiles"]["Row"] | null = null;
+  if (deletionRequest.customer_id) {
+    const { data } = await admin
+      .from("profiles")
+      .select("*")
+      .eq("id", deletionRequest.customer_id)
+      .maybeSingle();
+    profile = data ?? null;
+  }
+
+  if (profile) {
+    const shouldDisable =
+      disablePortalAccess || status === "approved" || status === "completed";
+    const profileUpdate =
+      status === "completed"
+        ? {
+            account_status: "deleted" as const,
+            portal_access_enabled: false,
+            deleted_at: now,
+            deletion_requested_at:
+              profile.deletion_requested_at ?? previousRequest.created_at,
+          }
+        : status === "approved"
+          ? {
+              account_status: "pending_deletion" as const,
+              portal_access_enabled: !shouldDisable ? true : false,
+              deletion_requested_at:
+                profile.deletion_requested_at ?? previousRequest.created_at,
+            }
+          : status === "declined" || status === "cancelled"
+            ? {
+                account_status: "active" as const,
+                portal_access_enabled: true,
+                deletion_requested_at: null,
+              }
+            : shouldDisable
+              ? {
+                  account_status: "portal_disabled" as const,
+                  portal_access_enabled: false,
+                }
+              : {};
+
+    await admin.from("profiles").update(profileUpdate).eq("id", profile.id);
+  }
+
+  await Promise.allSettled([
+    logActivity(admin, {
+      actor_profile_id: auth.userId,
+      customer_id: deletionRequest.customer_id,
+      event_type: "account_deletion_reviewed",
+      message: `Account deletion request marked ${status}.`,
+      metadata: { status, deletionRequestId: deletionRequest.id },
+    }),
+    writeAdminAuditLog({
+      action: `account_deletion_${status}`,
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "account_deletion_request",
+      target_id: deletionRequest.id,
+      customer_id: deletionRequest.customer_id,
+      before_summary: {
+        status: previousRequest.status,
+        completedAt: previousRequest.completed_at,
+      },
+      after_summary: {
+        status: deletionRequest.status,
+        completedAt: deletionRequest.completed_at,
+        portalDisabled: disablePortalAccess || status === "completed",
+      },
+      note: adminNote,
+      request_id: auditRequestId,
+      status: "success",
+    }),
+    createAdminNotification({
+      type: "account_deletion_reviewed",
+      title: "Account deletion request updated",
+      message: `Deletion request marked ${status}.`,
+      href: deletionRequest.customer_id
+        ? `/admin/customers/${deletionRequest.customer_id}`
+        : "/admin/requests",
+      customer_id: deletionRequest.customer_id,
+      account_deletion_request_id: deletionRequest.id,
+      severity: status === "completed" ? "warning" : "info",
+    }),
+    profile
+      ? sendAccountDeletionDecision(
+          deletionRequest,
+          profile,
+          humanizeStatus(status),
+        )
+      : Promise.resolve({ status: "skipped" as const, reason: "No profile." }),
+  ]);
+
+  logger.info("admin_account_deletion_request_updated", {
+    requestId: auditRequestId,
+    action: "account_deletion_reviewed",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: deletionRequest.customer_id,
+    metadata: { status },
+  });
+
+  revalidatePath("/admin/requests");
+  revalidatePath("/admin/customers");
+  if (deletionRequest.customer_id) {
+    revalidatePath(`/admin/customers/${deletionRequest.customer_id}`);
+  }
+}
+
+export async function processCustomerAccountAdminAction(formData: FormData) {
+  const auth = await requireAdmin("/admin/customers");
+  if (auth.status !== "ok") return;
+
+  const requestId = createRequestId();
+  const profileId = cleanString(formData.get("profileId"), 80);
+  const actionType = cleanString(formData.get("accountAction"), 40);
+  const confirmation = cleanString(formData.get("confirmation"), 20);
+  const adminNote = cleanLongText(formData.get("adminNote"), 3000);
+  const customerMessage =
+    cleanLongText(formData.get("customerVisibleAdminMessage"), 1500) || null;
+
+  if (!profileId || !adminNote) return;
+  if (actionType === "complete_deletion" && confirmation !== "DELETE") return;
+  if (actionType !== "complete_deletion" && confirmation !== "DISABLE") return;
+
+  const admin = getSupabaseAdmin();
+  const { data: profile } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  if (!profile) return;
+
+  const now = new Date().toISOString();
+  const status: AccountDeletionStatus =
+    actionType === "complete_deletion" ? "completed" : "approved";
+  const accountStatus =
+    actionType === "complete_deletion"
+      ? "deleted"
+      : actionType === "pending_deletion"
+        ? "pending_deletion"
+        : "portal_disabled";
+
+  const { data: deletionRequest } = await admin
+    .from("account_deletion_requests")
+    .insert({
+      customer_id: profile.id,
+      customer_email: profile.email,
+      status,
+      requested_by_user_id: auth.userId,
+      requested_by_role: "admin",
+      request_reason: `Admin ${actionType.replaceAll("_", " ")}`,
+      admin_note: adminNote,
+      customer_visible_admin_message: customerMessage,
+      reviewed_by_user_id: auth.userId,
+      reviewed_at: now,
+      completed_at: status === "completed" ? now : null,
+    })
+    .select("*")
+    .single();
+
+  await admin
+    .from("profiles")
+    .update({
+      account_status: accountStatus,
+      portal_access_enabled: false,
+      deletion_requested_at:
+        actionType === "pending_deletion" || actionType === "complete_deletion"
+          ? profile.deletion_requested_at ?? now
+          : profile.deletion_requested_at,
+      deleted_at: actionType === "complete_deletion" ? now : profile.deleted_at,
+    })
+    .eq("id", profile.id);
+
+  await Promise.allSettled([
+    logActivity(admin, {
+      actor_profile_id: auth.userId,
+      customer_id: profile.id,
+      event_type: "customer_account_admin_processed",
+      message: `Customer account action: ${actionType}.`,
+      metadata: { requestId, accountAction: actionType },
+    }),
+    writeAdminAuditLog({
+      action: `customer_account_${actionType}`,
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "profile",
+      target_id: profile.id,
+      customer_id: profile.id,
+      before_summary: {
+        accountStatus: profile.account_status,
+        portalAccessEnabled: profile.portal_access_enabled,
+      },
+      after_summary: {
+        accountStatus,
+        portalAccessEnabled: false,
+        deletionRequestId: deletionRequest?.id ?? null,
+      },
+      note: adminNote,
+      request_id: requestId,
+      status: "success",
+    }),
+    createAdminNotification({
+      type: "customer_account_admin_action",
+      title: "Customer account updated",
+      message: `Customer account action completed: ${actionType.replaceAll("_", " ")}.`,
+      href: `/admin/customers/${profile.id}`,
+      customer_id: profile.id,
+      account_deletion_request_id: deletionRequest?.id ?? null,
+      severity: actionType === "complete_deletion" ? "warning" : "info",
+    }),
+    deletionRequest
+      ? sendAccountDeletionDecision(
+          deletionRequest,
+          profile,
+          humanizeStatus(status),
+        )
+      : Promise.resolve({ status: "skipped" as const, reason: "No request." }),
+  ]);
+
+  logger.info("admin_customer_account_processed", {
+    requestId,
+    action: "customer_account_processed",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: profile.id,
+    metadata: { accountAction: actionType },
+  });
+
+  revalidatePath("/admin/customers");
+  revalidatePath(`/admin/customers/${profile.id}`);
+  revalidatePath("/admin/requests");
+}
+
+async function applyApprovedCustomerRequest(
+  admin: AdminClient,
+  booking: Database["public"]["Tables"]["bookings"]["Row"],
+  request: Database["public"]["Tables"]["customer_requests"]["Row"],
+) {
+  const update: Partial<BookingRow> = {
+    last_customer_change_request_at: new Date().toISOString(),
+    cancellation_policy_status: "none",
+  };
+
+  if (request.request_type === "cancel_service") {
+    update.status = "cancelled";
+  }
+
+  if (request.request_type === "pause_service") {
+    update.status = "needs_follow_up";
+    update.customer_visible_admin_message =
+      request.customer_visible_admin_message ?? null;
+  }
+
+  if (request.request_type === "reschedule_service" && request.requested_route_day) {
+    update.requested_date = request.requested_route_day;
+    update.confirmed_route_day = null;
+    update.status = "needs_follow_up";
+  }
+
+  if (request.request_type === "change_frequency" && request.requested_frequency) {
+    update.frequency = request.requested_frequency;
+    update.estimated_price = calculateBookingEstimate({
+      binCount: booking.bin_count,
+      frequency: request.requested_frequency,
+      addOns: booking.add_ons ?? [],
+      applyFoundingNeighborPromo: request.requested_frequency !== "one_time",
+    });
+  }
+
+  if (request.request_type === "add_service" || request.request_type === "drop_service") {
+    const addOns =
+      request.request_type === "add_service"
+        ? Array.from(new Set([...(booking.add_ons ?? []), ...request.requested_add_ons]))
+        : (booking.add_ons ?? []).filter(
+            (addOn) => !request.requested_removed_add_ons.includes(addOn),
+          );
+    update.add_ons = addOns;
+    update.estimated_price = calculateBookingEstimate({
+      binCount: booking.bin_count,
+      frequency: booking.frequency,
+      addOns,
+      applyFoundingNeighborPromo: booking.frequency !== "one_time",
+    });
+  }
+
+  await admin.from("bookings").update(update).eq("id", booking.id);
 }
 
 export async function updateReferralAdminAction(formData: FormData) {
@@ -1228,4 +1793,31 @@ export async function updateCareerApplicationAdminAction(formData: FormData) {
   });
 
   revalidatePath("/admin/careers");
+}
+
+export async function markAdminNotificationReadAction(formData: FormData) {
+  const auth = await requireAdmin("/admin");
+  if (auth.status !== "ok") return;
+
+  const notificationId = cleanString(formData.get("notificationId"), 80);
+  if (!notificationId) return;
+
+  await getSupabaseAdmin()
+    .from("admin_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .eq("id", notificationId);
+
+  revalidatePath("/admin");
+}
+
+export async function markAllAdminNotificationsReadAction() {
+  const auth = await requireAdmin("/admin");
+  if (auth.status !== "ok") return;
+
+  await getSupabaseAdmin()
+    .from("admin_notifications")
+    .update({ read_at: new Date().toISOString() })
+    .is("read_at", null);
+
+  revalidatePath("/admin");
 }

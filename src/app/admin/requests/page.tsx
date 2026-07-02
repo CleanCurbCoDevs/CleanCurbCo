@@ -1,6 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { updateCustomerRequestAdminAction } from "@/app/admin/actions";
+import {
+  updateAccountDeletionRequestAdminAction,
+  updateCustomerRequestAdminAction,
+} from "@/app/admin/actions";
 import { AdminFilterBar } from "@/components/admin-filter-bar";
 import { AdminShell } from "@/components/shells/admin-shell";
 import {
@@ -18,6 +21,7 @@ import {
 } from "@/lib/service-policy";
 import type {
   BookingRow,
+  AccountDeletionRequestRow,
   CustomerRequestRow,
   ProfileRow,
   ServiceAddressRow,
@@ -64,6 +68,11 @@ export default async function AdminRequestsPage({
     context.addresses,
     params,
   );
+  const deletionRequests = filterDeletionRequests(
+    context.deletionRequests,
+    context.profiles,
+    params,
+  );
   const routeDayOptions = getRouteDayOptions(context.requests, context.bookings);
 
   return (
@@ -78,7 +87,12 @@ export default async function AdminRequestsPage({
               possible charges are preserved here.
             </p>
           </div>
-          <span className="status-badge">{context.requests.length} total</span>
+          <div className="status-stack">
+            <span className="status-badge">{context.requests.length} service</span>
+            <span className="status-badge">
+              {context.deletionRequests.length} deletion
+            </span>
+          </div>
         </div>
 
         <AdminFilterBar
@@ -143,6 +157,132 @@ export default async function AdminRequestsPage({
             { name: "date", label: "Date", value: params.date, options: dateOptions },
           ]}
         />
+
+        <section className="form-section">
+          <div className="admin-page-heading">
+            <div>
+              <h2>Account deletion requests</h2>
+              <p className="muted">
+                Review, disable portal access, and preserve operational records
+                before marking a deletion request complete.
+              </p>
+            </div>
+            <span className="status-badge">{deletionRequests.length} shown</span>
+          </div>
+
+          {deletionRequests.length ? (
+            <div className="admin-card-list">
+              {deletionRequests.map((request) => {
+                const profile = context.profiles.find(
+                  (item) => item.id === request.customer_id,
+                );
+
+                return (
+                  <form
+                    action={updateAccountDeletionRequestAdminAction}
+                    className="admin-edit-card"
+                    key={request.id}
+                  >
+                    <input
+                      type="hidden"
+                      name="deletionRequestId"
+                      value={request.id}
+                    />
+                    <div className="admin-row-heading">
+                      <div>
+                        <h2>Account deletion</h2>
+                        <p className="muted">
+                          {profile ? fullName(profile) : "Unlinked customer"} |{" "}
+                          {profile?.email ?? request.customer_email ?? "No email"}
+                        </p>
+                        <p className="muted">
+                          Requested {formatDateTime(request.created_at)}
+                        </p>
+                      </div>
+                      <span className={`status-badge status-${request.status}`}>
+                        {humanizeStatus(request.status)}
+                      </span>
+                    </div>
+                    <p className="muted">
+                      Reason: {request.request_reason ?? "No reason provided."}
+                    </p>
+                    <div className="form-grid">
+                      <label className="field">
+                        <span>Deletion request status</span>
+                        <select name="status" defaultValue={request.status}>
+                          {[
+                            "pending",
+                            "approved",
+                            "declined",
+                            "cancelled",
+                            "completed",
+                          ].map((status) => (
+                            <option value={status} key={status}>
+                              {humanizeStatus(status)}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                      <label className="choice-card">
+                        <input
+                          type="checkbox"
+                          name="disablePortalAccess"
+                          defaultChecked={
+                            request.status === "approved" ||
+                            request.status === "completed"
+                          }
+                        />
+                        <span>Disable portal access as part of this action</span>
+                      </label>
+                    </div>
+                    <label className="field">
+                      <span>Internal admin note</span>
+                      <textarea
+                        name="adminNote"
+                        defaultValue={request.admin_note ?? ""}
+                        required
+                      />
+                    </label>
+                    <label className="field">
+                      <span>Customer-facing message</span>
+                      <textarea
+                        name="customerVisibleAdminMessage"
+                        defaultValue={request.customer_visible_admin_message ?? ""}
+                        placeholder="Shown in the customer email."
+                      />
+                    </label>
+                    <div className="action-row">
+                      <button className="button button-dark" type="submit">
+                        Save Deletion Review
+                      </button>
+                      {["approved", "declined", "completed"].map((status) => (
+                        <button
+                          className="button button-outline"
+                          key={status}
+                          name="status"
+                          type="submit"
+                          value={status}
+                        >
+                          Mark {humanizeStatus(status)}
+                        </button>
+                      ))}
+                      {profile ? (
+                        <Link
+                          className="button button-outline"
+                          href={`/admin/customers/${profile.id}`}
+                        >
+                          Open Customer
+                        </Link>
+                      ) : null}
+                    </div>
+                  </form>
+                );
+              })}
+            </div>
+          ) : (
+            <p className="muted">No account deletion requests match those filters.</p>
+          )}
+        </section>
 
         {requests.length ? (
           <div className="admin-card-list">
@@ -304,6 +444,14 @@ export default async function AdminRequestsPage({
                       defaultValue={request.admin_notes ?? ""}
                     />
                   </label>
+                  <label className="field">
+                    <span>Customer-facing message</span>
+                    <textarea
+                      name="customerVisibleAdminMessage"
+                      defaultValue={request.customer_visible_admin_message ?? ""}
+                      placeholder="Optional message included in customer updates."
+                    />
+                  </label>
 
                   <div className="action-row">
                     <button className="button button-dark" type="submit">
@@ -347,6 +495,28 @@ export default async function AdminRequestsPage({
       </section>
     </AdminShell>
   );
+}
+
+function filterDeletionRequests(
+  requests: AccountDeletionRequestRow[],
+  profiles: ProfileRow[],
+  params: Record<string, string | undefined>,
+) {
+  const query = params.q?.trim() ?? "";
+
+  return requests.filter((request) => {
+    const profile = profiles.find((item) => item.id === request.customer_id);
+    return includesSearch(
+      [
+        profile ? fullName(profile) : "",
+        profile?.email,
+        request.customer_email,
+        request.request_reason,
+        request.id,
+      ],
+      query,
+    );
+  });
 }
 
 function filterRequests(
@@ -434,4 +604,13 @@ function getScheduledDate(request: CustomerRequestRow, booking?: BookingRow) {
 
 function formatList(values: string[] | null) {
   return values?.length ? values.join(", ") : "None";
+}
+
+function formatDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }

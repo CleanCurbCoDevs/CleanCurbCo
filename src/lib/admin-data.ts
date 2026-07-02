@@ -5,7 +5,9 @@ import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 import type {
   BookingRow,
   AdminAuditLogRow,
+  AccountDeletionRequestRow,
   ActivityEventRow,
+  AdminNotificationRow,
   CareerApplicationRow,
   ContactMessageRow,
   CustomerRequestRow,
@@ -28,6 +30,8 @@ import type {
 export type AdminContext = {
   auth: AuthResult;
   bookings: BookingRow[];
+  deletionRequests: AccountDeletionRequestRow[];
+  adminNotifications: AdminNotificationRow[];
   contacts: ContactMessageRow[];
   requests: CustomerRequestRow[];
   referrals: ReferralRow[];
@@ -56,6 +60,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     return {
       auth,
       bookings: [],
+      deletionRequests: [],
+      adminNotifications: [],
       contacts: [],
       requests: [],
       referrals: [],
@@ -81,6 +87,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
   const admin = getSupabaseAdmin();
   const [
     bookingsResult,
+    deletionRequestsResult,
+    adminNotificationsResult,
     contactsResult,
     requestsResult,
     referralsResult,
@@ -106,6 +114,15 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .from("bookings")
         .select("*")
         .order("created_at", { ascending: false }),
+      admin
+        .from("account_deletion_requests")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("admin_notifications")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(100),
       admin
         .from("contact_messages")
         .select("*")
@@ -188,6 +205,8 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
   return {
     auth,
     bookings: bookingsResult.data ?? [],
+    deletionRequests: deletionRequestsResult.data ?? [],
+    adminNotifications: adminNotificationsResult.data ?? [],
     contacts: contactsResult.data ?? [],
     requests: requestsResult.data ?? [],
     referrals: referralsResult.data ?? [],

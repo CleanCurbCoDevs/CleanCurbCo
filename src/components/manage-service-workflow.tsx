@@ -231,7 +231,9 @@ export function ManageServiceWorkflow({
                   {policyWindowLabels[request.policy_window]}
                 </span>
                 <span>{formatDate(request.created_at)}</span>
-                <span>{request.admin_notes ?? "Review pending"}</span>
+                <span>
+                  {request.customer_visible_admin_message ?? "Review pending"}
+                </span>
               </article>
             ))}
           </div>

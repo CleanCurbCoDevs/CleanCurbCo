@@ -1,5 +1,10 @@
 import { NextResponse } from "next/server";
-import { createAccountSetupLink, createClaimToken, hashClaimToken } from "@/lib/booking-claims";
+import {
+  createAccountSetupLink,
+  createClaimToken,
+  createPaymentSetupLink,
+  hashClaimToken,
+} from "@/lib/booking-claims";
 import {
   bookingRowToRequest,
   validFrequencies,
@@ -12,6 +17,7 @@ import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
 import { calculateBookingEstimate } from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
 import { createRequestId, getClientIp, logger } from "@/lib/server/logger";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { verifyTurnstileToken } from "@/lib/server/turnstile";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -199,6 +205,9 @@ export async function POST(request: Request) {
   let customerId: string | null = null;
   let serviceAddressId: string | null = null;
   let referredByProfileId: string | null = null;
+  let existingStripeCustomerId: string | null = null;
+  let existingPaymentMethodOnFile = false;
+  let existingPaymentSetupCompletedAt: string | null = null;
 
   try {
     const supabase = await createServerSupabaseClient();
@@ -220,10 +229,14 @@ export async function POST(request: Request) {
           },
           { onConflict: "id" },
         )
-        .select("id")
+        .select("id, stripe_customer_id, payment_method_on_file, payment_setup_completed_at")
         .single();
 
       if (profile?.id) {
+        existingStripeCustomerId = profile.stripe_customer_id ?? null;
+        existingPaymentMethodOnFile = Boolean(profile.payment_method_on_file);
+        existingPaymentSetupCompletedAt = profile.payment_setup_completed_at ?? null;
+
         const { data: serviceAddress } = await admin
           .from("service_addresses")
           .insert({
@@ -291,6 +304,10 @@ export async function POST(request: Request) {
       agreement_photos: agreements.photos,
       agreement_payment: agreements.payment,
       payment_status: "not_sent",
+      payment_setup_status: existingPaymentMethodOnFile ? "completed" : "not_started",
+      stripe_customer_id: existingStripeCustomerId,
+      payment_method_on_file: existingPaymentMethodOnFile,
+      payment_setup_completed_at: existingPaymentSetupCompletedAt,
       referral_code: referralCode,
       referred_by_profile_id: referredByProfileId,
     })
@@ -340,9 +357,13 @@ export async function POST(request: Request) {
 
   let redirectTo: string | null = null;
   let setupLink: string | null = null;
+  let paymentSetupUrl: string | null = null;
+  let paymentSetupPath: string | null = null;
+  let guestClaimToken: string | null = null;
 
   if (!customerId) {
     const token = createClaimToken();
+    guestClaimToken = token;
     const tokenHash = hashClaimToken(token);
 
     await admin.from("booking_claims").insert({
@@ -353,11 +374,28 @@ export async function POST(request: Request) {
 
     redirectTo = `/account-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
     setupLink = createAccountSetupLink(booking.id, token);
+    paymentSetupUrl = createPaymentSetupLink(booking.id, token);
+    paymentSetupPath = `/payment-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
+  } else if (!existingPaymentMethodOnFile) {
+    paymentSetupUrl = createPaymentSetupLink(booking.id);
+    paymentSetupPath = `/payment-setup?booking=${booking.id}`;
   }
 
   const emailJobs = [
-    sendBookingConfirmation(booking),
+    sendBookingConfirmation(booking, {
+      accountSetupUrl: setupLink,
+      paymentSetupUrl,
+    }),
     sendAdminBookingNotification(booking),
+    createAdminNotification({
+      type: "new_booking_request",
+      title: "New booking request",
+      message: `${booking.first_name} ${booking.last_name} requested service.`,
+      href: `/admin/bookings?q=${booking.id}`,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      severity: "info",
+    }),
   ];
 
   if (setupLink) {
@@ -382,6 +420,11 @@ export async function POST(request: Request) {
     {
       booking: bookingRowToRequest(booking),
       redirectTo,
+      paymentSetupHref: paymentSetupPath,
+      paymentSetupContext: {
+        bookingId: booking.id,
+        token: guestClaimToken,
+      },
       message: bookingSuccessLaunchMessage,
       requestId,
     },

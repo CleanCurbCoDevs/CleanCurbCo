@@ -4,6 +4,7 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { requireAuth, type AuthResult } from "@/lib/supabase/auth";
 import type {
   ActivityEventRow,
+  AccountDeletionRequestRow,
   BookingRow,
   CustomerRequestRow,
   PaymentRow,
@@ -29,6 +30,7 @@ export type PortalContext = {
   checklistDocuments: ServiceChecklistDocumentRow[];
   photos: ServicePhotoRow[];
   payments: PaymentRow[];
+  deletionRequests: AccountDeletionRequestRow[];
 };
 
 export async function getPortalContext(nextPath = "/portal"): Promise<PortalContext> {
@@ -48,6 +50,7 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       checklistDocuments: [],
       photos: [],
       payments: [],
+      deletionRequests: [],
     };
   }
 
@@ -64,6 +67,7 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
     checklistDocumentsResult,
     photosResult,
     paymentsResult,
+    deletionRequestsResult,
   ] = await Promise.all([
     supabase
       .from("bookings")
@@ -109,6 +113,10 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
       .from("payments")
       .select("*")
       .order("created_at", { ascending: false }),
+    supabase
+      .from("account_deletion_requests")
+      .select("*")
+      .order("created_at", { ascending: false }),
   ]);
 
   return {
@@ -124,5 +132,6 @@ export async function getPortalContext(nextPath = "/portal"): Promise<PortalCont
     checklistDocuments: checklistDocumentsResult.data ?? [],
     photos: photosResult.data ?? [],
     payments: paymentsResult.data ?? [],
+    deletionRequests: deletionRequestsResult.data ?? [],
   };
 }

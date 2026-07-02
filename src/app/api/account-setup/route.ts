@@ -110,6 +110,9 @@ export async function POST(request: Request) {
       email,
       preferred_contact_method: "email",
       referred_by_profile_id: booking.referred_by_profile_id,
+      stripe_customer_id: booking.stripe_customer_id,
+      payment_method_on_file: booking.payment_method_on_file,
+      payment_setup_completed_at: booking.payment_setup_completed_at,
     },
     { onConflict: "id" },
   );

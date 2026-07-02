@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { PaymentSetupButton } from "@/components/payment-setup-button";
 import { PortalShell } from "@/components/shells/portal-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getPortalContext } from "@/lib/portal-data";
@@ -13,6 +14,14 @@ export const metadata: Metadata = {
 export default async function PortalPage() {
   const context = await getPortalContext("/portal");
   const latestBooking = context.bookings[0];
+  const profilePaymentMethodOnFile =
+    context.auth.status === "ok" && context.auth.profile.payment_method_on_file;
+  const paymentSetupBooking = context.bookings.find(
+    (booking) =>
+      !profilePaymentMethodOnFile &&
+      !booking.payment_method_on_file &&
+      booking.payment_setup_status !== "completed",
+  );
   const nextVisit = context.visits.find((visit) =>
     ["scheduled", "on_the_way", "arrived", "in_progress"].includes(
       visit.status,
@@ -22,6 +31,20 @@ export default async function PortalPage() {
   return (
     <PortalShell title="Customer portal" auth={context.auth}>
       <section className="dashboard-grid">
+        {paymentSetupBooking ? (
+          <article className="placeholder-panel dashboard-banner">
+            <p className="section-kicker">Payment setup</p>
+            <h2>Payment information not yet added.</h2>
+            <p>
+              Add a secure payment method through Stripe so your account is
+              ready once your route date is confirmed.
+            </p>
+            <PaymentSetupButton
+              bookingId={paymentSetupBooking.id}
+              returnPath="/portal"
+            />
+          </article>
+        ) : null}
         <article className="placeholder-panel">
           <p className="section-kicker">Overview</p>
           <h1>

@@ -17,3 +17,10 @@ export function createAccountSetupLink(bookingId: string, token: string) {
   url.searchParams.set("token", token);
   return url.toString();
 }
+
+export function createPaymentSetupLink(bookingId: string, token?: string | null) {
+  const url = new URL("/payment-setup", getSiteUrl());
+  url.searchParams.set("booking", bookingId);
+  if (token) url.searchParams.set("token", token);
+  return url.toString();
+}

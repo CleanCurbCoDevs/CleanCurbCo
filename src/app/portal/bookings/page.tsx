@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { respondToRouteDateOfferAction } from "@/app/portal/actions";
 import { PortalShell } from "@/components/shells/portal-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getPortalContext } from "@/lib/portal-data";
@@ -64,8 +65,47 @@ export default async function PortalBookingsPage() {
                         </a>
                       ) : null,
                     )}
+                    {booking.route_offer_status === "offered" &&
+                    booking.proposed_route_day ? (
+                      <div className="route-offer-panel">
+                        <strong>
+                          Route date offered: {booking.proposed_route_day}
+                        </strong>
+                        {booking.route_offer_message ? (
+                          <span>{booking.route_offer_message}</span>
+                        ) : (
+                          <span>Please confirm or decline this proposed route day.</span>
+                        )}
+                        <form
+                          action={respondToRouteDateOfferAction}
+                          className="action-row"
+                        >
+                          <input
+                            type="hidden"
+                            name="bookingId"
+                            value={booking.id}
+                          />
+                          <button
+                            className="button button-dark"
+                            name="response"
+                            type="submit"
+                            value="confirm"
+                          >
+                            Confirm Date
+                          </button>
+                          <button
+                            className="button button-outline"
+                            name="response"
+                            type="submit"
+                            value="decline"
+                          >
+                            Decline Date
+                          </button>
+                        </form>
+                      </div>
+                    ) : null}
                   </div>
-                  <span>{bookingStatusLabel(booking.status)}</span>
+                  <span>{bookingStatusLabel(booking)}</span>
                   <span>${booking.estimated_price}</span>
                   <span>
                     {booking.confirmed_route_day ??
@@ -101,7 +141,13 @@ async function createSignedDocuments(documents: ServiceChecklistDocumentRow[]) {
   );
 }
 
-function bookingStatusLabel(status: string) {
+function bookingStatusLabel(booking: { status: string; route_offer_status?: string }) {
+  if (booking.route_offer_status === "offered") return "Awaiting your confirmation";
+  if (booking.route_offer_status === "customer_confirmed") return "Route date confirmed";
+  if (booking.route_offer_status === "customer_declined") {
+    return "Declined - our team will contact you";
+  }
+  const { status } = booking;
   if (status === "new") return "Reserved / pending route confirmation";
   if (status === "confirmed") return "Confirmed";
   if (status === "scheduled") return "Scheduled";
