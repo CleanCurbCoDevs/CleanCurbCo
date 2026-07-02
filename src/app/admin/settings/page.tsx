@@ -37,6 +37,8 @@ export default async function AdminSettingsPage() {
               <br />$
               {pricingConfig.foundingNeighborRecurringTwoBinFirstCleanPrice} first
               2-bin recurring clean
+              <br />
+              {pricingConfig.foundingNeighborRouteLabel} before July 13, 2026
             </p>
           </article>
         </div>

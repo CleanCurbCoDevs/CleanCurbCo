@@ -15,9 +15,9 @@ export default function ServiceAreaPage() {
           <p className="section-kicker">Service Area</p>
           <h1>Now serving Cane Bay.</h1>
           <p>
-            We are starting with Cane Bay and nearby Summerville communities,
-            then expanding route by route. Close by but not sure? Use the
-            instant checker below for a quick yes or no before booking.
+            We are building routes neighborhood by neighborhood across Cane Bay
+            and nearby Summerville communities. Close by but not sure? The
+            checker below will help.
           </p>
         </div>
       </section>

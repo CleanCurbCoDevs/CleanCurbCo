@@ -30,7 +30,7 @@ export default async function EmployeeLoginPage() {
               Access Clean Curb Co. field tools, route operations, and admin
               resources.
             </p>
-            <Suspense fallback={<p className="muted">Loading login...</p>}>
+            <Suspense fallback={<p className="muted">Loading secure employee login...</p>}>
               <LoginForm buttonLabel="Sign In" nextPath="/field/today" />
             </Suspense>
             <div className="employee-login-links">

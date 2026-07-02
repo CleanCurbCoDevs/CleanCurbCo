@@ -26,7 +26,10 @@ import { sendReferralRewardEmail } from "@/lib/email/sendReferralReward";
 import { sendReviewRequest } from "@/lib/email/sendReviewRequest";
 import { sendRouteConfirmation } from "@/lib/email/sendRouteConfirmation";
 import { getSiteUrl, isStripeConfigured } from "@/lib/env";
-import { calculateBookingEstimate } from "@/lib/pricing";
+import {
+  calculateBookingEstimate,
+  shouldApplyFoundingNeighborSpecial,
+} from "@/lib/pricing";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { createRequestId, logger, maskEmail, maskPhone } from "@/lib/server/logger";
@@ -1435,7 +1438,13 @@ async function applyApprovedCustomerRequest(
       binCount: booking.bin_count,
       frequency: request.requested_frequency,
       addOns: booking.add_ons ?? [],
-      applyFoundingNeighborPromo: request.requested_frequency !== "one_time",
+      applyFoundingNeighborPromo: shouldApplyFoundingNeighborSpecial({
+        binCount: booking.bin_count,
+        frequency: request.requested_frequency,
+        addOns: booking.add_ons ?? [],
+        neighborhood: booking.neighborhood,
+        createdAt: booking.created_at,
+      }),
     });
   }
 
@@ -1451,7 +1460,13 @@ async function applyApprovedCustomerRequest(
       binCount: booking.bin_count,
       frequency: booking.frequency,
       addOns,
-      applyFoundingNeighborPromo: booking.frequency !== "one_time",
+      applyFoundingNeighborPromo: shouldApplyFoundingNeighborSpecial({
+        binCount: booking.bin_count,
+        frequency: booking.frequency,
+        addOns,
+        neighborhood: booking.neighborhood,
+        createdAt: booking.created_at,
+      }),
     });
   }
 

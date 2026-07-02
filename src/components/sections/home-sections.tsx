@@ -208,7 +208,7 @@ export function HowItWorksSection() {
   ];
 
   return (
-    <section className="section section-white">
+    <section className="section section-white how-it-works-section">
       <div className="container">
         <SectionHeader
           kicker="How it works"
@@ -344,10 +344,9 @@ export function ServiceAreaSection() {
     <section className="section section-dark">
       <div className="container service-area-panel">
         <div>
-          <SectionHeader kicker="Service area" title="Now Serving Cane Bay">
-            We are starting with Cane Bay and nearby Summerville communities,
-            then expanding route by route. Use the quick checker below for a
-            simple yes or no before you book.
+          <SectionHeader kicker="Instant checker" title="Check your route fit.">
+            Enter the basics before booking and we will help confirm whether
+            your address fits the current route or needs a quick follow-up.
           </SectionHeader>
           <ServiceAreaChecker />
         </div>
@@ -494,9 +493,8 @@ export function FAQSection() {
   return (
     <section className="section section-white" id="faq">
       <div className="container">
-        <SectionHeader kicker="FAQ" title="Quick answers before trash day.">
-          If your question is not here, send it over. We are building this to be
-          easy for real neighbors, not imaginary perfect customers.
+        <SectionHeader kicker="Support" title="Common questions">
+          Still wondering about something? Send us a note and we will help.
         </SectionHeader>
         <FAQAccordion />
       </div>

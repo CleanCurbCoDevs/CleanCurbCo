@@ -7,9 +7,14 @@ import {
   updateRouteDayAdminAction,
   updateRouteStopAdminAction,
 } from "@/app/admin/actions";
+import { AdminOptimoRouteControls } from "@/components/admin-optimoroute-controls";
 import { AdminShell } from "@/components/shells/admin-shell";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
 import { getAdminContext } from "@/lib/admin-data";
+import {
+  getRouteStopEligibility,
+  sortStopsForField,
+} from "@/lib/optimoroute/route-sync";
 
 export const metadata: Metadata = {
   title: "Admin Routes",
@@ -46,9 +51,9 @@ export default async function AdminRoutesPage() {
             <p className="section-kicker">Routes</p>
             <h1>Build field-ready route days.</h1>
             <p className="muted">
-              Create the day, add bookings, order the stops, then send techs to
-              the field app. No map optimization yet; manual ordering keeps
-              launch control simple.
+              Create the day, add bookings, confirm eligibility, then optimize
+              stop order with OptimoRoute when you want routing help. Clean
+              Curb Co still owns the service workflow.
             </p>
           </div>
           <Link className="button button-dark" href="/field/today">
@@ -105,10 +110,47 @@ export default async function AdminRoutesPage() {
           {context.routeDays.map((routeDay) => {
             const stops = context.routeStops
               .filter((stop) => stop.route_day_id === routeDay.id)
-              .sort((a, b) => a.stop_order - b.stop_order);
+              .sort(sortStopsForField);
             const assignedTech = context.profiles.find(
               (profile) => profile.id === routeDay.assigned_technician_id,
             );
+            const stopItems = stops.map((stop) => {
+              const booking = context.bookings.find((item) => item.id === stop.booking_id) ?? null;
+              const visit = context.visits.find((item) => item.id === stop.service_visit_id) ?? null;
+              const payment =
+                context.payments.find(
+                  (item) =>
+                    item.booking_id === booking?.id ||
+                    item.service_visit_id === visit?.id,
+                ) ?? null;
+              return {
+                stop,
+                booking,
+                visit,
+                payment,
+                eligibility: getRouteStopEligibility({
+                  routeDay,
+                  stop,
+                  booking,
+                  visit,
+                  payment,
+                }),
+              };
+            });
+            const eligibleCount = stopItems.filter((item) => item.eligibility.eligible).length;
+            const needsReviewCount = stopItems.length - eligibleCount;
+            const syncedCount = stopItems.filter((item) =>
+              [
+                "synced",
+                "planning_pending",
+                "scheduled",
+                "unscheduled",
+                "imported",
+              ].includes(item.stop.optimoroute_sync_status),
+            ).length;
+            const importedCount = stopItems.filter(
+              (item) => item.stop.optimoroute_sync_status === "imported",
+            ).length;
 
             return (
               <article className="detail-panel" key={routeDay.id}>
@@ -171,6 +213,65 @@ export default async function AdminRoutesPage() {
                   </button>
                 </form>
 
+                <section className="optimoroute-panel" aria-label="OptimoRoute routing tools">
+                  <div className="admin-row-heading">
+                    <div>
+                      <p className="section-kicker">OptimoRoute Supplement</p>
+                      <h2>Optimize this route day.</h2>
+                      <p className="muted">
+                        Sync eligible stops, start planning, then import the
+                        optimized stop order back into Clean Curb Co.
+                      </p>
+                    </div>
+                    <div className="status-stack">
+                      <span className={`status-badge status-${routeDay.optimoroute_planning_status ?? "not_sent"}`}>
+                        {routeDay.optimoroute_planning_status
+                          ? humanizeStatus(routeDay.optimoroute_planning_status)
+                          : "Not Sent"}
+                      </span>
+                      {routeDay.optimoroute_last_imported_at ? (
+                        <span className="status-badge status-imported">Imported</span>
+                      ) : null}
+                    </div>
+                  </div>
+
+                  <AdminOptimoRouteControls
+                    eligibleCount={eligibleCount}
+                    importedCount={importedCount}
+                    needsReviewCount={needsReviewCount}
+                    planningId={routeDay.optimoroute_planning_id}
+                    planningStatus={routeDay.optimoroute_planning_status}
+                    routeDate={routeDay.route_date}
+                    routeDayId={routeDay.id}
+                    syncedCount={syncedCount}
+                  />
+
+                  {routeDay.optimoroute_planning_error ? (
+                    <p className="optimoroute-message error">
+                      {routeDay.optimoroute_planning_error}
+                    </p>
+                  ) : null}
+
+                  {needsReviewCount ? (
+                    <div className="optimoroute-review-list">
+                      {stopItems
+                        .filter((item) => !item.eligibility.eligible)
+                        .map((item) => (
+                          <div key={item.stop.id}>
+                            <span className="status-badge status-warning">Needs Review</span>
+                            <strong>
+                              #{item.stop.stop_order}{" "}
+                              {item.booking
+                                ? `${item.booking.first_name} ${item.booking.last_name}`
+                                : "Missing booking"}
+                            </strong>
+                            <span>{item.eligibility.summary}</span>
+                          </div>
+                        ))}
+                    </div>
+                  ) : null}
+                </section>
+
                 <form action={addBookingToRouteAdminAction} className="filter-bar">
                   <input type="hidden" name="routeDayId" value={routeDay.id} />
                   <div className="form-grid">
@@ -197,13 +298,32 @@ export default async function AdminRoutesPage() {
                 </form>
 
                 <div className="admin-data-grid">
-                  {stops.map((stop) => {
-                    const booking = context.bookings.find((item) => item.id === stop.booking_id);
-                    const visit = context.visits.find((item) => item.id === stop.service_visit_id);
+                  {stopItems.map(({ stop, booking, visit, eligibility }) => {
                     return (
                       <div key={stop.id}>
                         <div className="admin-row-heading">
                           <div>
+                            <div className="status-stack">
+                              <span className={`status-badge status-${stop.optimoroute_sync_status}`}>
+                                OptimoRoute: {humanizeStatus(stop.optimoroute_sync_status)}
+                              </span>
+                              {stop.optimoroute_stop_sequence ? (
+                                <span className="status-badge status-imported">
+                                  Optimized #{stop.optimoroute_stop_sequence}
+                                </span>
+                              ) : (
+                                <span className="status-badge status-neutral">
+                                  Manual #{stop.stop_order}
+                                </span>
+                              )}
+                              <span
+                                className={`status-badge status-${
+                                  eligibility.eligible ? "eligible" : "warning"
+                                }`}
+                              >
+                                {eligibility.eligible ? "Eligible" : "Needs Review"}
+                              </span>
+                            </div>
                             <strong>
                               #{stop.stop_order}{" "}
                               {booking
@@ -214,6 +334,23 @@ export default async function AdminRoutesPage() {
                               {booking ? formatBookingAddress(booking) : "No address"} |{" "}
                               {humanizeStatus(stop.status)}
                             </span>
+                            {stop.optimoroute_scheduled_at ||
+                            stop.optimoroute_driver_name ||
+                            stop.optimoroute_sync_error ? (
+                              <span>
+                                {stop.optimoroute_scheduled_at
+                                  ? `Scheduled ${formatAdminDateTime(stop.optimoroute_scheduled_at)}`
+                                  : ""}
+                                {stop.optimoroute_driver_name
+                                  ? ` | Driver ${stop.optimoroute_driver_name}`
+                                  : ""}
+                                {stop.optimoroute_sync_error
+                                  ? ` | ${stop.optimoroute_sync_error}`
+                                  : ""}
+                              </span>
+                            ) : (
+                              <span>{eligibility.summary}</span>
+                            )}
                           </div>
                           {visit ? (
                             <div className="action-row">
@@ -297,4 +434,13 @@ function displayProfile(profile: {
     profile.email ||
     "Unnamed user"
   );
+}
+
+function formatAdminDateTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
 }

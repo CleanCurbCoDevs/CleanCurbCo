@@ -80,9 +80,9 @@ export default async function CareersPage({ searchParams }: CareersPageProps) {
           </p>
           <div className="hero-actions">
             <a className="button button-primary" href="#interest-form">
-              Apply / Join the Interest List
+              Join the Interest List
             </a>
-            <Link className="button button-outline" href="/employee-login">
+            <Link className="button button-secondary" href="/employee-login">
               Employee Login
             </Link>
           </div>
@@ -173,6 +173,10 @@ export default async function CareersPage({ searchParams }: CareersPageProps) {
               </p>
             ) : null}
             <form action={submitCareerApplicationAction} className="booking-form">
+              <label className="form-honeypot" aria-hidden="true">
+                <span>Website</span>
+                <input name="website" autoComplete="off" tabIndex={-1} />
+              </label>
               <div className="form-grid">
                 <label className="field">
                   <span>First name</span>

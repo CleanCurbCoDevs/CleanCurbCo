@@ -39,6 +39,9 @@ export function TurnstileWidget({
   const widgetIdRef = useRef<string | null>(null);
   const [scriptReady, setScriptReady] = useState(false);
   const [widgetRendered, setWidgetRendered] = useState(false);
+  const [statusMessage, setStatusMessage] = useState(
+    "Complete verification before submitting.",
+  );
 
   useEffect(() => {
     if (!siteKey || !scriptReady || !containerRef.current || !window.turnstile) {
@@ -47,6 +50,7 @@ export function TurnstileWidget({
 
     onTokenChange("");
     setWidgetRendered(false);
+    setStatusMessage("Complete verification before submitting.");
 
     if (widgetIdRef.current) {
       window.turnstile.remove(widgetIdRef.current);
@@ -57,23 +61,19 @@ export function TurnstileWidget({
       sitekey: siteKey,
       action,
       callback: (token) => {
-        console.info("Turnstile token received", {
-          hasToken: Boolean(token),
-          tokenLength: token.length,
-          action,
-        });
+        setStatusMessage("Verification complete.");
         onTokenChange(token);
       },
       "expired-callback": () => {
-        console.warn("Turnstile token expired");
+        setStatusMessage("Verification expired. Please verify again.");
         onTokenChange("");
       },
       "error-callback": () => {
-        console.warn("Turnstile widget error");
+        setStatusMessage("Verification could not load. Please refresh and try again.");
         onTokenChange("");
       },
       "timeout-callback": () => {
-        console.warn("Turnstile token timed out");
+        setStatusMessage("Verification timed out. Please verify again.");
         onTokenChange("");
       },
     });
@@ -104,11 +104,15 @@ export function TurnstileWidget({
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
       />
-      <span className="muted">Complete verification before submitting.</span>
+      <span className="muted">{statusMessage}</span>
       <div ref={containerRef} className="turnstile-widget" />
       {!widgetRendered ? (
-        <span className="muted">Loading verification...</span>
+        <span className="muted">Loading secure verification...</span>
       ) : null}
+      <noscript>
+        Verification requires JavaScript. Please enable JavaScript or contact
+        Clean Curb Co. to book directly.
+      </noscript>
     </div>
   );
 }

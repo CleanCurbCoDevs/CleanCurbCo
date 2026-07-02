@@ -55,7 +55,23 @@ const validBreakReasons: readonly BreakReason[] = [
   "tank_empty",
   "tank_refill",
   "equipment_issue",
+  "vehicle_issue",
+  "access_issue",
+  "safety_concern",
+  "customer_issue",
   "fuel_stop",
+  "hydration_rest",
+  "weather_pause",
+  "customer_delay",
+  "scheduled_break",
+  "other",
+];
+const breakReasonsRequiringNotes: readonly BreakReason[] = [
+  "equipment_issue",
+  "vehicle_issue",
+  "access_issue",
+  "safety_concern",
+  "customer_issue",
   "weather_pause",
   "customer_delay",
   "other",
@@ -520,6 +536,7 @@ export async function readyForNextStopAction(formData: FormData) {
 
 export async function startBreakAction(formData: FormData) {
   const routeDayId = cleanId(formData, "routeDayId");
+  const routeStopId = cleanId(formData, "routeStopId");
   const requestedReason = cleanId(formData, "reason") as BreakReason;
   const reason = validBreakReasons.includes(requestedReason)
     ? requestedReason
@@ -527,6 +544,15 @@ export async function startBreakAction(formData: FormData) {
   const notes = cleanText(formData, "notes", 600);
   const auth = await requireFieldUser();
   const admin = getSupabaseAdmin();
+
+  if (breakReasonsRequiringNotes.includes(reason) && !notes) {
+    const params = new URLSearchParams({
+      break_error: "notes_required",
+      reason,
+    });
+    if (routeStopId) params.set("routeStopId", routeStopId);
+    redirect(`/field/breaks?${params.toString()}`);
+  }
 
   await admin.from("route_breaks").insert({
     route_day_id: routeDayId || null,

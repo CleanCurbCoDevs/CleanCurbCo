@@ -2,11 +2,14 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl, getStripeEnv, isStripeConfigured } from "@/lib/env";
 import { formatBookingAddress } from "@/lib/booking-utils";
+import { getFoundingNeighborSpecialStatus } from "@/lib/pricing";
+import { rejectCrossOriginRequest } from "@/lib/server/request-guards";
 import { createRequestId, logger } from "@/lib/server/logger";
+import { safeRedirectForRole } from "@/lib/security/redirects";
 import { getStripe } from "@/lib/stripe";
 import { getCurrentProfile } from "@/lib/supabase/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { canRoleAccessPath, isFieldRole } from "@/lib/supabase/roles";
+import { isFieldRole } from "@/lib/supabase/roles";
 import type {
   BookingRow,
   PaymentRow,
@@ -93,9 +96,8 @@ function cleanPaymentType(payload: CheckoutPayload): PaymentType {
 }
 
 function safeReturnPath(value: unknown, role: ProfileRow["role"]) {
-  const requested = typeof value === "string" ? value.trim() : "";
-  if (requested && canRoleAccessPath(role, requested)) return requested;
-  return isFieldRole(role) ? "/field/today" : "/portal/billing";
+  const fallback = isFieldRole(role) ? "/field/today" : "/portal/billing";
+  return safeRedirectForRole(role, value, fallback) ?? fallback;
 }
 
 function recurringIntervalCount(frequency: ServiceFrequency | null) {
@@ -149,6 +151,12 @@ export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
   const route = "/api/stripe/create-checkout-session";
   const startedAt = performance.now();
+  const originRejection = rejectCrossOriginRequest(request, {
+    requestId,
+    route,
+    action: "stripe_checkout_create",
+  });
+  if (originRejection) return originRejection;
 
   if (!isStripeConfigured()) {
     logger.warn("stripe_checkout_unconfigured", { requestId, route });
@@ -395,7 +403,18 @@ export async function POST(request: Request) {
   const stripeMetadata = stringifyMetadata({
     ...paymentMetadata,
     payment_id: paymentRecord.id,
+    founding_neighbor_special: booking
+      ? getFoundingNeighborSpecialStatus({
+          binCount: booking.bin_count,
+          frequency: booking.frequency,
+          addOns: booking.add_ons,
+          neighborhood: booking.neighborhood,
+          createdAt: booking.created_at,
+          estimatedPrice: amount,
+        }).status
+      : "",
   });
+  const encodedReturnPath = encodeURIComponent(returnPath);
 
   let session: Stripe.Checkout.Session;
   try {
@@ -425,8 +444,8 @@ export async function POST(request: Request) {
           },
         },
       ],
-      success_url: `${siteUrl}${returnPath}?payment=success&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}${returnPath}?payment=cancelled`,
+      success_url: `${siteUrl}/billing/success?payment=success&returnPath=${encodedReturnPath}&session_id={CHECKOUT_SESSION_ID}`,
+      cancel_url: `${siteUrl}/billing/success?payment=cancelled&returnPath=${encodedReturnPath}`,
       metadata: stripeMetadata,
       ...(mode === "payment"
         ? {

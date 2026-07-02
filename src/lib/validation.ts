@@ -17,6 +17,11 @@ export function isValidEmail(value: string) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
 }
 
+export function isValidPhone(value: string) {
+  const digits = value.replace(/\D/g, "");
+  return digits.length >= 10 && digits.length <= 15;
+}
+
 export function cleanArray(value: unknown, maxItems = 12) {
   if (!Array.isArray(value)) return [];
 

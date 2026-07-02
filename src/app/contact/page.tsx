@@ -23,9 +23,9 @@ export default function ContactPage() {
           </p>
         </div>
       </section>
-      <section className="section section-cream">
-        <div className="container grid grid-3">
-          <article className="card">
+      <section className="section section-cream contact-section">
+        <div className="container contact-card-grid">
+          <article className="card contact-info-card">
             <Phone size={24} aria-hidden="true" />
             <h3>Phone</h3>
             <p>
@@ -34,7 +34,7 @@ export default function ContactPage() {
               </a>
             </p>
           </article>
-          <article className="card">
+          <article className="card contact-info-card">
             <Mail size={24} aria-hidden="true" />
             <h3>Email</h3>
             <p>
@@ -43,24 +43,24 @@ export default function ContactPage() {
               </a>
             </p>
           </article>
-          <article className="card">
+          <article className="card contact-info-card">
             <MapPin size={24} aria-hidden="true" />
             <h3>Route</h3>
             <p>{brand.area}</p>
           </article>
         </div>
-        <div className="container section-header" style={{ marginTop: 28 }}>
-          <div className="launch-info-card contact-launch-note">
+        <div className="container contact-body-grid">
+          <aside className="launch-info-card contact-launch-note">
             <p className="section-kicker">Launch timing</p>
             <h2>{launchNotice}</h2>
             <p>{launchReservationCopy}</p>
+            <Link className="button button-dark" href="/book">
+              Book Now
+            </Link>
+          </aside>
+          <div className="contact-form-wrap">
+            <ContactForm />
           </div>
-          <Link className="button button-dark" href="/book">
-            Book Now
-          </Link>
-        </div>
-        <div className="container contact-form-wrap">
-          <ContactForm />
         </div>
       </section>
     </main>

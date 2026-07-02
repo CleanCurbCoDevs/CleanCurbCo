@@ -4,6 +4,7 @@ import { PaymentLinkButton } from "@/components/payment-link-button";
 import { PortalShell } from "@/components/shells/portal-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getPortalContext } from "@/lib/portal-data";
+import { getFoundingNeighborSpecialStatus } from "@/lib/pricing";
 
 export const metadata: Metadata = {
   title: "Portal Billing",
@@ -50,6 +51,16 @@ export default async function PortalBillingPage() {
               const amount = payment?.amount ?? booking?.estimated_price ?? 0;
               const status = payment?.status ?? booking?.payment_status ?? "pending";
               const link = payment?.checkout_url ?? booking?.payment_link ?? "";
+              const foundingSpecial = booking
+                ? getFoundingNeighborSpecialStatus({
+                    binCount: booking.bin_count,
+                    frequency: booking.frequency,
+                    addOns: booking.add_ons,
+                    neighborhood: booking.neighborhood,
+                    createdAt: booking.created_at,
+                    estimatedPrice: booking.estimated_price,
+                  })
+                : null;
 
               return (
                 <article className="data-row billing-row" key={payment?.id ?? booking?.id}>
@@ -57,6 +68,9 @@ export default async function PortalBillingPage() {
                     <strong>${amount}</strong>
                     <span>{booking?.street_address ?? payment?.description ?? "Clean Curb Co. service"}</span>
                     <small>{payment?.provider ?? booking?.payment_provider ?? "Payment link"}</small>
+                    {foundingSpecial?.applied ? (
+                      <small>Founding Neighbor Special applied.</small>
+                    ) : null}
                   </div>
                   <span className={`status-badge status-${status}`}>
                     {paymentStatusLabel(status)}

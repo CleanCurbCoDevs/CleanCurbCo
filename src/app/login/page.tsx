@@ -24,7 +24,7 @@ export default function LoginPage() {
       </section>
       <section className="section section-cream">
         <div className="container auth-layout">
-          <Suspense fallback={<p className="muted">Loading login...</p>}>
+          <Suspense fallback={<p className="muted">Loading secure login...</p>}>
             <LoginForm />
           </Suspense>
           <section className="placeholder-panel">

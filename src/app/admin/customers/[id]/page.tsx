@@ -15,7 +15,11 @@ import {
   getPrimaryAddress,
   unpaidBalance,
 } from "@/lib/admin-operations";
-import { formatFrequency } from "@/lib/pricing";
+import {
+  formatFrequency,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
+import type { BookingRow } from "@/types/database";
 
 export const metadata: Metadata = {
   title: "Customer Detail",
@@ -248,14 +252,7 @@ export default async function CustomerDetailPage({
 
           <DetailPanel title="Bookings" empty="No bookings linked.">
             {bookings.map((booking) => (
-              <article className="mini-record" key={booking.id}>
-                <strong>{formatFrequency(booking.frequency)}</strong>
-                <span>
-                  {humanizeStatus(booking.status)} | ${booking.estimated_price}
-                </span>
-                <span>{booking.confirmed_route_day ?? "Route day pending"}</span>
-                <Link href={`/admin/bookings?q=${booking.id}`}>Open booking</Link>
-              </article>
+              <BookingMiniRecord booking={booking} key={booking.id} />
             ))}
           </DetailPanel>
 
@@ -437,6 +434,37 @@ function DetailPanel({
     <article className="detail-panel">
       <h2>{title}</h2>
       {hasChildren ? children : <p className="muted">{empty}</p>}
+    </article>
+  );
+}
+
+function BookingMiniRecord({ booking }: { booking: BookingRow }) {
+  const foundingSpecial = getFoundingNeighborSpecialStatus({
+    binCount: booking.bin_count,
+    frequency: booking.frequency,
+    addOns: booking.add_ons,
+    neighborhood: booking.neighborhood,
+    createdAt: booking.created_at,
+    estimatedPrice: booking.estimated_price,
+  });
+
+  return (
+    <article className="mini-record">
+      <strong>{formatFrequency(booking.frequency)}</strong>
+      <span>
+        {humanizeStatus(booking.status)} | ${booking.estimated_price}
+      </span>
+      <span>{booking.confirmed_route_day ?? "Route day pending"}</span>
+      <span>
+        Founding Neighbor Special:{" "}
+        {foundingSpecial.status === "applied"
+          ? "Applied"
+          : foundingSpecial.status === "eligible"
+            ? "Eligible"
+            : "Not eligible"}
+      </span>
+      <span>{foundingSpecial.reason}</span>
+      <Link href={`/admin/bookings?q=${booking.id}`}>Open booking</Link>
     </article>
   );
 }

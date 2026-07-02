@@ -13,7 +13,11 @@ import {
   launchPromo,
   neighborhoods,
 } from "@/lib/site";
-import { calculateEstimatedPrice, formatFrequency } from "@/lib/pricing";
+import {
+  calculateEstimatedPrice,
+  formatFrequency,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
 import type {
   BookingRequest,
   SchedulingPreference,
@@ -21,6 +25,7 @@ import type {
 } from "@/types/booking";
 
 type FormState = {
+  website: string;
   referralCode: string;
   customer: {
     firstName: string;
@@ -54,6 +59,7 @@ type FormState = {
 export type InitialBookingCustomer = Partial<FormState["customer"]>;
 
 const initialState: FormState = {
+  website: "",
   referralCode: "",
   customer: {
     firstName: "",
@@ -134,15 +140,37 @@ export function BookingForm({
     setTurnstileToken(token);
   }, []);
 
+  const foundingSpecial = useMemo(
+    () =>
+      getFoundingNeighborSpecialStatus({
+        binCount: form.service.binCount,
+        frequency: form.service.frequency,
+        addOns: form.service.addOns,
+        neighborhood: form.customer.neighborhood,
+        createdAt: new Date().toISOString(),
+      }),
+    [
+      form.customer.neighborhood,
+      form.service.addOns,
+      form.service.binCount,
+      form.service.frequency,
+    ],
+  );
+
   const estimatedPrice = useMemo(
     () =>
       calculateEstimatedPrice({
         binCount: form.service.binCount,
         frequency: form.service.frequency,
         addOns: form.service.addOns,
-        applyFoundingNeighborPromo: false,
+        applyFoundingNeighborPromo: foundingSpecial.eligible,
       }),
-    [form.service.addOns, form.service.binCount, form.service.frequency],
+    [
+      form.service.addOns,
+      form.service.binCount,
+      form.service.frequency,
+      foundingSpecial.eligible,
+    ],
   );
 
   function updateCustomer<K extends keyof FormState["customer"]>(
@@ -278,6 +306,17 @@ export function BookingForm({
   return (
     <div className="booking-shell">
       <form className="booking-form" onSubmit={handleSubmit}>
+        <label className="form-honeypot" aria-hidden="true">
+          <span>Website</span>
+          <input
+            autoComplete="off"
+            tabIndex={-1}
+            value={form.website}
+            onChange={(event) =>
+              setForm((current) => ({ ...current, website: event.target.value }))
+            }
+          />
+        </label>
         {serviceAreaChecked ? (
           <div className="booking-route-confirmation" role="status">
             <CheckCircle2 size={20} aria-hidden="true" />
@@ -656,38 +695,31 @@ export function BookingForm({
           Estimated visit for {form.service.binCount}
           {form.service.binCount === 1 ? " bin" : " bins"}.
         </p>
-        <p className="estimate-note">
-          Estimate shown until we confirm your route day, add-ons, and final
-          price.
-        </p>
         <div className="launch-reminder">
           <p className="section-kicker">Founding Neighbor Special</p>
-          <strong>{launchPromo}</strong>
-          <span>{launchBillingNote}</span>
+          <strong>
+            {foundingSpecial.eligible
+              ? `$${foundingSpecial.specialPrice} first 2-bin recurring clean`
+              : launchPromo}
+          </strong>
+          <span>
+            {foundingSpecial.eligible
+              ? `Eligible: ${foundingSpecial.reason}`
+              : `Not applied to this estimate: ${foundingSpecial.reason}`}
+          </span>
+          <small>{launchBillingNote}</small>
         </div>
         <div className="estimate-panel-section">
           <h3>What happens after you submit?</h3>
           <ol className="number-list">
-            <li>We text you to confirm your route day.</li>
-            <li>You get your final price before service.</li>
-            <li>No payment is collected before the July 13 launch confirmation.</li>
+            <li>We confirm your route day by text.</li>
+            <li>You approve the final price/payment link before service.</li>
             <li>We clean the bins and send completion photos.</li>
           </ol>
         </div>
-        <ul className="check-list">
-          <li>
-            <CheckCircle2 size={18} aria-hidden="true" />
-            We will confirm your route day by text.
-          </li>
-          <li>
-            <CheckCircle2 size={18} aria-hidden="true" />
-            Starting-at add-ons get final approval first.
-          </li>
-          <li>
-            <CheckCircle2 size={18} aria-hidden="true" />
-            Payment link can be sent after confirmation.
-          </li>
-        </ul>
+        <p className="estimate-note">
+          Estimate shown until route day, add-ons, and final price are confirmed.
+        </p>
       </aside>
     </div>
   );

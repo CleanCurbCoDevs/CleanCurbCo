@@ -22,11 +22,28 @@ const breakReasons = [
   ["tank_empty", "Tank Empty"],
   ["tank_refill", "Tank Refill"],
   ["equipment_issue", "Equipment Issue"],
+  ["vehicle_issue", "Vehicle Issue"],
+  ["access_issue", "Access Issue"],
+  ["safety_concern", "Safety Concern"],
+  ["customer_issue", "Customer Issue"],
   ["fuel_stop", "Fuel Stop"],
+  ["hydration_rest", "Hydration / Rest"],
   ["weather_pause", "Weather Pause"],
   ["customer_delay", "Customer Delay"],
+  ["scheduled_break", "Scheduled Break"],
   ["other", "Other"],
 ] as const;
+
+const noteRequiredReasons = new Set([
+  "equipment_issue",
+  "vehicle_issue",
+  "access_issue",
+  "safety_concern",
+  "customer_issue",
+  "weather_pause",
+  "customer_delay",
+  "other",
+]);
 
 export default async function FieldBreaksPage({
   searchParams,
@@ -34,6 +51,8 @@ export default async function FieldBreaksPage({
   const params = await searchParams;
   const context = await getFieldContext("/field/breaks");
   const routeStopId = params.routeStopId ?? "";
+  const notesRequiredError = params.break_error === "notes_required";
+  const failedReason = params.reason ?? "";
   const activeBreak = context.breaks.find(
     (routeBreak) =>
       !routeBreak.ended_at &&
@@ -88,6 +107,13 @@ export default async function FieldBreaksPage({
         <section className="field-card">
           <p className="section-kicker">Start Break</p>
           <h2>Choose a reason.</h2>
+          {notesRequiredError ? (
+            <p className="form-error" role="alert">
+              Notes are required for{" "}
+              <strong>{humanizeStatus(failedReason || "that break")}</strong>{" "}
+              because admin needs enough context to review the route pause.
+            </p>
+          ) : null}
           {!openRoutes.length ? (
             <p className="muted">
               No active route is available yet. Breaks can still be logged, but
@@ -109,19 +135,35 @@ export default async function FieldBreaksPage({
               </label>
               <label>
                 Notes
-                <input name="notes" placeholder="Optional internal note" />
+                <input
+                  name="notes"
+                  placeholder="Required for equipment, weather, customer delay, or other"
+                />
               </label>
             </div>
             <div className="break-reason-grid">
               {breakReasons.map(([value, label]) => (
                 <button
-                  className="break-reason-button"
+                  aria-label={
+                    noteRequiredReasons.has(value)
+                      ? `${label} - notes required`
+                      : label
+                  }
+                  className={`break-reason-button${
+                    noteRequiredReasons.has(value) ? " requires-note" : ""
+                  }`}
                   key={value}
                   name="reason"
                   type="submit"
                   value={value}
                 >
                   {label}
+                  {noteRequiredReasons.has(value) ? (
+                    <>
+                      {" "}
+                      <small>Notes required</small>
+                    </>
+                  ) : null}
                 </button>
               ))}
             </div>
@@ -153,6 +195,9 @@ export default async function FieldBreaksPage({
                     ? new Date(routeBreak.ended_at).toLocaleTimeString()
                     : "Still running"}
                 </p>
+                {routeBreak.notes ? (
+                  <p className="field-note">{routeBreak.notes}</p>
+                ) : null}
               </article>
             ))}
           </div>

@@ -4,11 +4,16 @@ import { hashClaimToken } from "@/lib/booking-claims";
 import { getSiteUrl, isStripeConfigured, getStripeEnv } from "@/lib/env";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
+import { rejectCrossOriginRequest } from "@/lib/server/request-guards";
 import { createRequestId, logger } from "@/lib/server/logger";
+import {
+  safeRedirectForRole,
+  sanitizeInternalRedirectPath,
+} from "@/lib/security/redirects";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { getCurrentProfile } from "@/lib/supabase/auth";
-import { canRoleAccessPath, isFieldRole } from "@/lib/supabase/roles";
+import { isFieldRole } from "@/lib/supabase/roles";
 import { cleanString } from "@/lib/validation";
 import type { ProfileRow } from "@/types/database";
 
@@ -19,13 +24,12 @@ type PaymentSetupPayload = {
 };
 
 function safeReturnPath(value: unknown, profile?: ProfileRow | null) {
+  if (profile) return safeRedirectForRole(profile.role, value, "/portal/billing") ?? "/portal/billing";
   const requested = typeof value === "string" ? value.trim() : "";
-  if (profile && requested && canRoleAccessPath(profile.role, requested)) {
-    return requested;
-  }
-  if (requested.startsWith("/payment-setup") || requested.startsWith("/account-setup")) {
-    return requested;
-  }
+  const guestReturnPath = sanitizeInternalRedirectPath(requested, {
+    allowedPrefixes: ["/payment-setup", "/account-setup"],
+  });
+  if (guestReturnPath) return guestReturnPath;
   return profile ? "/portal/billing" : "/payment-setup";
 }
 
@@ -70,6 +74,12 @@ export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
   const route = "/api/stripe/create-payment-setup-session";
   const startedAt = performance.now();
+  const originRejection = rejectCrossOriginRequest(request, {
+    requestId,
+    route,
+    action: "stripe_payment_setup_create",
+  });
+  if (originRejection) return originRejection;
 
   if (!isStripeConfigured()) {
     logger.warn("stripe_payment_setup_unconfigured", { requestId, route });
@@ -191,8 +201,9 @@ export async function POST(request: Request) {
 
   const returnPath = safeReturnPath(payload.returnPath, profile);
   const siteUrl = getSiteUrl();
-  const successUrl = `${siteUrl}${returnPath}${returnPath.includes("?") ? "&" : "?"}payment_setup=success&session_id={CHECKOUT_SESSION_ID}`;
-  const cancelUrl = `${siteUrl}${returnPath}${returnPath.includes("?") ? "&" : "?"}payment_setup=cancelled`;
+  const encodedReturnPath = encodeURIComponent(returnPath);
+  const successUrl = `${siteUrl}/payment-setup/success?payment_setup=success&booking=${encodeURIComponent(booking.id)}&returnPath=${encodedReturnPath}&session_id={CHECKOUT_SESSION_ID}`;
+  const cancelUrl = `${siteUrl}/payment-setup/success?payment_setup=cancelled&booking=${encodeURIComponent(booking.id)}&returnPath=${encodedReturnPath}`;
   const metadata = stringifyMetadata({
     customer_id: booking.customer_id ?? profile?.id ?? "",
     booking_id: booking.id,

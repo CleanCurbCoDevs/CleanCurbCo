@@ -5,10 +5,21 @@ import { LogoutButton } from "@/components/logout-button";
 import { FieldShell } from "@/components/shells/field-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { businessToday, getFieldContext } from "@/lib/field-data";
+import { sortStopsForField } from "@/lib/optimoroute/route-sync";
 import { isAdminRole } from "@/lib/supabase/roles";
 
 export const metadata: Metadata = {
   title: "Field Today",
+  applicationName: "CCC Field",
+  manifest: "/field/manifest.webmanifest",
+  appleWebApp: {
+    capable: true,
+    title: "CCC Field",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
 };
 
 const fieldTools = [
@@ -35,7 +46,7 @@ export default async function FieldTodayPage() {
   const routeDayIds = new Set(todaysRoutes.map((routeDay) => routeDay.id));
   const todaysStops = context.routeStops
     .filter((stop) => stop.route_day_id && routeDayIds.has(stop.route_day_id))
-    .sort((a, b) => a.stop_order - b.stop_order);
+    .sort(sortStopsForField);
   const activeRoute = todaysRoutes[0] ?? null;
   const completedCount = todaysStops.filter((stop) => stop.status === "completed").length;
   const followUpCount = todaysStops.filter((stop) => stop.status === "needs_follow_up").length;

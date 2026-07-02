@@ -8,6 +8,16 @@ const routes = [
   "/service-area",
   "/faq",
   "/contact",
+  "/careers",
+  "/privacy",
+  "/terms",
+  "/service-policy",
+  "/payment-policy",
+  "/cancellation-refund-policy",
+  "/cookie-analytics-policy",
+  "/communications-policy",
+  "/accessibility",
+  "/vulnerability-disclosure",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

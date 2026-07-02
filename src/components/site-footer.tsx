@@ -29,6 +29,11 @@ const footerGroups = [
       { label: "Contact", href: "/contact" },
       { label: "Privacy", href: "/privacy" },
       { label: "Terms", href: "/terms" },
+      { label: "Service Policy", href: "/service-policy" },
+      { label: "Payment Policy", href: "/payment-policy" },
+      { label: "Cancellation & Refunds", href: "/cancellation-refund-policy" },
+      { label: "Cookie & Analytics", href: "/cookie-analytics-policy" },
+      { label: "Security", href: "/vulnerability-disclosure" },
     ],
   },
 ];

@@ -101,6 +101,7 @@ export function ManageServiceWorkflow({
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
+  const [activeRequestType, setActiveRequestType] = useState<RequestType | null>(null);
   const defaultBooking = bookings.find((booking) => booking.frequency !== "one_time") ?? bookings[0];
 
   const currentServiceText = useMemo(() => {
@@ -191,27 +192,55 @@ export function ManageServiceWorkflow({
       {message ? <p className="confirmation-panel">{message}</p> : null}
       {error ? <p className="confirmation-panel">{error}</p> : null}
 
-      <div className="grid grid-2">
-        {requestCards.map((card) => (
-          <form className="form-section" key={card.type} onSubmit={handleSubmit}>
-            <input type="hidden" name="requestType" value={card.type} />
-            <h2>{card.title}</h2>
-            <p className="muted">{card.helper}</p>
-            <BookingSelect bookings={bookings} defaultBookingId={defaultBooking?.id} />
-            <RequestFields type={card.type} primaryAddress={primaryAddress} />
-            <label className="field">
-              <span>Message</span>
-              <textarea
-                name="message"
-                placeholder="Tell us what you need and any timing details."
-                required={["billing_question", "drop_service"].includes(card.type)}
-              />
-            </label>
-            <button className="button button-dark" type="submit">
-              Continue
-            </button>
-          </form>
-        ))}
+      <div className="service-action-accordion">
+        {requestCards.map((card) => {
+          const isOpen = activeRequestType === card.type;
+
+          return (
+            <article
+              className={`service-action-card${isOpen ? " is-open" : ""}`}
+              key={card.type}
+            >
+              <button
+                aria-expanded={isOpen}
+                className="service-action-summary"
+                type="button"
+                onClick={() =>
+                  setActiveRequestType((current) =>
+                    current === card.type ? null : card.type,
+                  )
+                }
+              >
+                <span>
+                  <strong>{card.title}</strong>
+                  <small>{card.helper}</small>
+                </span>
+                <span aria-hidden="true">{isOpen ? "Close" : "Open"}</span>
+              </button>
+              {isOpen ? (
+                <form className="service-action-form" onSubmit={handleSubmit}>
+                  <input type="hidden" name="requestType" value={card.type} />
+                  <BookingSelect
+                    bookings={bookings}
+                    defaultBookingId={defaultBooking?.id}
+                  />
+                  <RequestFields type={card.type} primaryAddress={primaryAddress} />
+                  <label className="field">
+                    <span>Message</span>
+                    <textarea
+                      name="message"
+                      placeholder="Tell us what you need and any timing details."
+                      required={["billing_question", "drop_service"].includes(card.type)}
+                    />
+                  </label>
+                  <button className="button button-dark" type="submit">
+                    Continue
+                  </button>
+                </form>
+              ) : null}
+            </article>
+          );
+        })}
       </div>
 
       <section className="detail-panel">

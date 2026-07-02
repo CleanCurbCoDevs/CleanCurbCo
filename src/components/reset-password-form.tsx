@@ -78,6 +78,7 @@ export function ResetPasswordForm({ mode, code }: ResetPasswordFormProps) {
           <span>Email</span>
           <input
             type="email"
+            autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
             required
@@ -89,6 +90,7 @@ export function ResetPasswordForm({ mode, code }: ResetPasswordFormProps) {
             <span>New password</span>
             <input
               type="password"
+              autoComplete="new-password"
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               minLength={8}
@@ -99,6 +101,7 @@ export function ResetPasswordForm({ mode, code }: ResetPasswordFormProps) {
             <span>Confirm new password</span>
             <input
               type="password"
+              autoComplete="new-password"
               value={confirmPassword}
               onChange={(event) => setConfirmPassword(event.target.value)}
               minLength={8}

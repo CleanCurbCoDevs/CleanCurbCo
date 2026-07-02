@@ -1,5 +1,6 @@
-import { redirect } from "next/navigation";
+import { forbidden, redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/env";
+import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAdminRole, isFieldRole } from "@/lib/supabase/roles";
@@ -127,10 +128,13 @@ export async function requireAdmin(nextPath = "/admin"): Promise<AuthResult> {
   }
 
   if (auth.status === "ok" && !isAdminRole(auth.profile.role)) {
-    return {
-      status: "forbidden",
-      message: "This area is reserved for Clean Curb Co. admins.",
-    };
+    logger.warn("admin_route_forbidden", {
+      action: "admin_route_access",
+      userId: auth.userId,
+      role: auth.profile.role,
+      metadata: { nextPath },
+    });
+    forbidden();
   }
 
   return auth;
@@ -146,10 +150,13 @@ export async function requireField(nextPath = "/field/today"): Promise<AuthResul
   }
 
   if (auth.status === "ok" && !isFieldRole(auth.profile.role)) {
-    return {
-      status: "forbidden",
-      message: "This field app is reserved for Clean Curb Co. technicians.",
-    };
+    logger.warn("field_route_forbidden", {
+      action: "field_route_access",
+      userId: auth.userId,
+      role: auth.profile.role,
+      metadata: { nextPath },
+    });
+    forbidden();
   }
 
   return auth;

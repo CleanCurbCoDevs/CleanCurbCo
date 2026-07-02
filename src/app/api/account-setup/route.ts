@@ -1,6 +1,11 @@
 import { NextResponse } from "next/server";
 import { hashClaimToken } from "@/lib/booking-claims";
 import { isSupabaseConfigured } from "@/lib/env";
+import {
+  rejectCrossOriginRequest,
+  rejectLimitedRequest,
+} from "@/lib/server/request-guards";
+import { createRequestId, logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleanString, isValidEmail } from "@/lib/validation";
@@ -13,9 +18,22 @@ type AccountSetupPayload = {
 };
 
 export async function POST(request: Request) {
+  const requestId = createRequestId(request.headers);
+  const route = "/api/account-setup";
+  const originRejection = rejectCrossOriginRequest(request, {
+    requestId,
+    route,
+    action: "account_setup",
+  });
+  if (originRejection) return originRejection;
+
   if (!isSupabaseConfigured()) {
+    logger.warn("account_setup_unconfigured", { requestId, route });
     return NextResponse.json(
-      { error: "Account setup is being connected. Please contact us directly." },
+      {
+        error: "Account setup is being connected. Please contact us directly.",
+        requestId,
+      },
       { status: 503 },
     );
   }
@@ -25,7 +43,11 @@ export async function POST(request: Request) {
   try {
     body = (await request.json()) as AccountSetupPayload;
   } catch {
-    return NextResponse.json({ error: "Invalid account setup request." }, { status: 400 });
+    logger.warn("account_setup_invalid_json", { requestId, route });
+    return NextResponse.json(
+      { error: "Invalid account setup request.", requestId },
+      { status: 400 },
+    );
   }
 
   const bookingId = cleanString(body.bookingId, 80);
@@ -33,9 +55,24 @@ export async function POST(request: Request) {
   const email = cleanString(body.email, 120).toLowerCase();
   const password = typeof body.password === "string" ? body.password : "";
 
+  const limited = rejectLimitedRequest(request, {
+    requestId,
+    route,
+    action: "account_setup",
+    scope: "account-setup",
+    subject: email || bookingId,
+    limit: 8,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (limited) return limited;
+
   if (!bookingId || !token || !isValidEmail(email) || password.length < 8) {
+    logger.warn("account_setup_invalid_payload", { requestId, route });
     return NextResponse.json(
-      { error: "Please use a valid setup link and an 8+ character password." },
+      {
+        error: "Please use a valid setup link and an 8+ character password.",
+        requestId,
+      },
       { status: 400 },
     );
   }
@@ -54,8 +91,13 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!claim || claim.email.toLowerCase() !== email) {
+    logger.warn("account_setup_invalid_claim", {
+      requestId,
+      route,
+      metadata: { bookingId, email },
+    });
     return NextResponse.json(
-      { error: "That setup link is expired or no longer valid." },
+      { error: "That setup link is expired or no longer valid.", requestId },
       { status: 400 },
     );
   }
@@ -67,8 +109,13 @@ export async function POST(request: Request) {
     .maybeSingle();
 
   if (!booking || booking.email.toLowerCase() !== email) {
+    logger.warn("account_setup_booking_not_found", {
+      requestId,
+      route,
+      metadata: { bookingId, email },
+    });
     return NextResponse.json(
-      { error: "We could not find the booking for that setup link." },
+      { error: "We could not find the booking for that setup link.", requestId },
       { status: 404 },
     );
   }
@@ -93,6 +140,7 @@ export async function POST(request: Request) {
         error: message.toLowerCase().includes("already")
           ? "An account already exists for this email. Please log in instead."
           : message,
+        requestId,
       },
       { status: message.toLowerCase().includes("already") ? 409 : 500 },
     );
@@ -156,5 +204,13 @@ export async function POST(request: Request) {
   const supabase = await createServerSupabaseClient();
   await supabase.auth.signInWithPassword({ email, password });
 
-  return NextResponse.json({ redirectTo: "/portal" });
+  logger.info("account_setup_completed", {
+    requestId,
+    route,
+    userId,
+    customerId: userId,
+    bookingId: booking.id,
+  });
+
+  return NextResponse.json({ redirectTo: "/portal", requestId });
 }

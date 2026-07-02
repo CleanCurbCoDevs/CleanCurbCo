@@ -14,9 +14,16 @@ import { isSupabaseConfigured } from "@/lib/env";
 import { sendAccountSetupEmail } from "@/lib/email/sendAccountSetupEmail";
 import { sendAdminBookingNotification } from "@/lib/email/sendAdminBookingNotification";
 import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
-import { calculateBookingEstimate } from "@/lib/pricing";
+import {
+  calculateBookingEstimate,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
 import { createRequestId, getClientIp, logger } from "@/lib/server/logger";
+import {
+  rejectCrossOriginRequest,
+  rejectLimitedRequest,
+} from "@/lib/server/request-guards";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { verifyTurnstileToken } from "@/lib/server/turnstile";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
@@ -27,6 +34,7 @@ import {
   cleanLongText,
   cleanString,
   isValidEmail,
+  isValidPhone,
   mustBeTrue,
   parsePositiveInt,
   pickEnum,
@@ -36,6 +44,8 @@ import type { SchedulingPreference, ServiceFrequency } from "@/types/booking";
 type IncomingBooking = {
   turnstileToken?: unknown;
   referralCode?: unknown;
+  website?: unknown;
+  company?: unknown;
   customer?: {
     firstName?: unknown;
     lastName?: unknown;
@@ -75,11 +85,28 @@ type IncomingBooking = {
 };
 
 const validWaterSpigotValues = ["yes", "no", "not_sure"] as const;
+const expectedTopLevelFields = new Set([
+  "turnstileToken",
+  "referralCode",
+  "website",
+  "company",
+  "customer",
+  "service",
+  "scheduling",
+  "instructions",
+  "agreements",
+]);
 
 export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
   const route = "/api/bookings";
   const startedAt = performance.now();
+  const originRejection = rejectCrossOriginRequest(request, {
+    requestId,
+    route,
+    action: "booking_submit",
+  });
+  if (originRejection) return originRejection;
 
   if (!isSupabaseConfigured()) {
     logger.warn("booking_submission_unconfigured", { requestId, route });
@@ -106,6 +133,33 @@ export async function POST(request: Request) {
     return NextResponse.json(
       { error: "Invalid booking request.", requestId },
       { status: 400 },
+    );
+  }
+
+  const unexpectedFields = Object.keys(body as Record<string, unknown>).filter(
+    (field) => !expectedTopLevelFields.has(field),
+  );
+  if (unexpectedFields.length) {
+    logger.warn("booking_submission_unexpected_fields", {
+      requestId,
+      route,
+      metadata: { unexpectedFields },
+    });
+    return NextResponse.json(
+      { error: "Invalid booking request.", requestId },
+      { status: 400 },
+    );
+  }
+
+  const honeypot = cleanString(body.website, 120) || cleanString(body.company, 120);
+  if (honeypot) {
+    logger.warn("booking_submission_honeypot_blocked", { requestId, route });
+    return NextResponse.json(
+      {
+        message: bookingSuccessLaunchMessage,
+        requestId,
+      },
+      { status: 202 },
     );
   }
 
@@ -160,6 +214,17 @@ export async function POST(request: Request) {
     "not_sure",
   );
 
+  const limited = rejectLimitedRequest(request, {
+    requestId,
+    route,
+    action: "booking_submit",
+    scope: "booking-submit",
+    subject: email,
+    limit: 4,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (limited) return limited;
+
   const agreements = {
     waterUse: mustBeTrue(body.agreements?.waterUse),
     binCondition: mustBeTrue(body.agreements?.binCondition),
@@ -174,6 +239,7 @@ export async function POST(request: Request) {
     !firstName && "first name",
     !lastName && "last name",
     !phone && "phone",
+    phone && !isValidPhone(phone) && "valid phone",
     !email && "email",
     !streetAddress && "street address",
     !city && "city",
@@ -194,11 +260,18 @@ export async function POST(request: Request) {
     );
   }
 
+  const foundingSpecial = getFoundingNeighborSpecialStatus({
+    binCount,
+    frequency,
+    addOns,
+    neighborhood,
+    createdAt: new Date().toISOString(),
+  });
   const estimatedPrice = calculateBookingEstimate({
     binCount,
     frequency,
     addOns,
-    applyFoundingNeighborPromo: false,
+    applyFoundingNeighborPromo: foundingSpecial.eligible,
   });
 
   const admin = getSupabaseAdmin();
@@ -341,6 +414,7 @@ export async function POST(request: Request) {
       binCount,
       addOnCount: addOns.length,
       hasReferralCode: Boolean(referralCode),
+      foundingNeighborSpecial: foundingSpecial.status,
     },
   });
 

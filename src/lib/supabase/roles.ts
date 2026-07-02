@@ -1,4 +1,5 @@
 import type { AppRole } from "@/types/database";
+import { canRoleSafelyAccessPath } from "@/lib/security/redirects";
 
 export function isAdminRole(role?: AppRole | null) {
   return role === "admin" || role === "owner";
@@ -19,8 +20,5 @@ export function defaultRouteForRole(role?: AppRole | null) {
 }
 
 export function canRoleAccessPath(role: AppRole | null | undefined, path: string) {
-  if (!path.startsWith("/") || path.startsWith("//")) return false;
-  if (isAdminRole(role)) return true;
-  if (role === "technician") return path.startsWith("/field");
-  return path.startsWith("/portal") || path.startsWith("/account-setup");
+  return canRoleSafelyAccessPath(role, path);
 }

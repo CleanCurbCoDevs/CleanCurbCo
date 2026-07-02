@@ -22,6 +22,8 @@ const geistMono = Geist_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(getSiteUrl()),
+  applicationName: "Clean Curb Co.",
+  manifest: "/manifest.webmanifest",
   title: {
     default: "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
     template: "%s | Clean Curb Co.",
@@ -59,6 +61,27 @@ export const metadata: Metadata = {
     description:
       "Professional garbage bin cleaning for Cane Bay and nearby Summerville communities.",
     images: ["/twitter-image.png"],
+  },
+  appleWebApp: {
+    capable: true,
+    title: "Clean Curb Co.",
+    statusBarStyle: "black-translucent",
+  },
+  other: {
+    "apple-mobile-web-app-capable": "yes",
+  },
+  icons: {
+    icon: [
+      { url: "/ccc-field-icon-192.png", sizes: "192x192", type: "image/png" },
+      { url: "/ccc-field-icon-512.png", sizes: "512x512", type: "image/png" },
+    ],
+    apple: [
+      {
+        url: "/ccc-field-apple-touch-icon.png",
+        sizes: "180x180",
+        type: "image/png",
+      },
+    ],
   },
 };
 

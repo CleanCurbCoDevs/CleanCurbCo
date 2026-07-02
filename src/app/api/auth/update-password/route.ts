@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
 import { isSupabaseConfigured } from "@/lib/env";
+import {
+  rejectCrossOriginRequest,
+  rejectLimitedRequest,
+} from "@/lib/server/request-guards";
 import { createRequestId, logger } from "@/lib/server/logger";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleanString } from "@/lib/validation";
@@ -12,6 +16,22 @@ type UpdatePayload = {
 export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
   const route = "/api/auth/update-password";
+  const originRejection = rejectCrossOriginRequest(request, {
+    requestId,
+    route,
+    action: "auth_update_password",
+  });
+  if (originRejection) return originRejection;
+
+  const limited = rejectLimitedRequest(request, {
+    requestId,
+    route,
+    action: "auth_update_password",
+    scope: "auth-update-password",
+    limit: 6,
+    windowMs: 15 * 60 * 1000,
+  });
+  if (limited) return limited;
 
   if (!isSupabaseConfigured()) {
     logger.warn("auth_update_password_unconfigured", { requestId, route });
@@ -21,7 +41,19 @@ export async function POST(request: Request) {
     );
   }
 
-  const body = (await request.json()) as UpdatePayload;
+  let body: UpdatePayload;
+  try {
+    body = (await request.json()) as UpdatePayload;
+  } catch {
+    logger.warn("auth_update_password_invalid_json", { requestId, route });
+    return NextResponse.json(
+      {
+        error: "Please use a valid reset link and an 8+ character password.",
+        requestId,
+      },
+      { status: 400 },
+    );
+  }
   const code = cleanString(body.code, 300);
   const password = typeof body.password === "string" ? body.password : "";
 

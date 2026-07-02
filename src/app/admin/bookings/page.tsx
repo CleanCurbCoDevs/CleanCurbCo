@@ -16,7 +16,10 @@ import {
 } from "@/lib/booking-utils";
 import { bookingCustomerName, includesSearch, uniqueValues } from "@/lib/admin-operations";
 import { getAdminContext } from "@/lib/admin-data";
-import { formatFrequency } from "@/lib/pricing";
+import {
+  formatFrequency,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
 import type { BookingRow } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -149,6 +152,14 @@ export default async function AdminBookingsPage({
               const visit = context.visits.find(
                 (item) => item.booking_id === booking.id,
               );
+              const foundingSpecial = getFoundingNeighborSpecialStatus({
+                binCount: booking.bin_count,
+                frequency: booking.frequency,
+                addOns: booking.add_ons,
+                neighborhood: booking.neighborhood,
+                createdAt: booking.created_at,
+                estimatedPrice: booking.estimated_price,
+              });
 
               return (
                 <form
@@ -189,6 +200,11 @@ export default async function AdminBookingsPage({
                     <div>
                       <span>Estimated price</span>
                       <strong>${booking.estimated_price}</strong>
+                    </div>
+                    <div>
+                      <span>Founding Neighbor Special</span>
+                      <strong>{foundingSpecialLabel(foundingSpecial.status)}</strong>
+                      <span>{foundingSpecial.reason}</span>
                     </div>
                     <div>
                       <span>Payment records</span>
@@ -492,6 +508,12 @@ function filterAndSortBookings(
       if (params.sort === "price_high") return b.estimated_price - a.estimated_price;
       return b.created_at.localeCompare(a.created_at);
     });
+}
+
+function foundingSpecialLabel(status: "eligible" | "applied" | "not_eligible") {
+  if (status === "applied") return "Applied";
+  if (status === "eligible") return "Eligible";
+  return "Not eligible";
 }
 
 function queryWith(

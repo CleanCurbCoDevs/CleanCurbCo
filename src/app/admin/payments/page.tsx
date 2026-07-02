@@ -17,7 +17,11 @@ import {
 } from "@/lib/booking-utils";
 import { bookingCustomerName, includesSearch, uniqueValues } from "@/lib/admin-operations";
 import { getAdminContext } from "@/lib/admin-data";
-import { formatFrequency } from "@/lib/pricing";
+import { getServiceClearanceStatus } from "@/lib/payment-clearance";
+import {
+  formatFrequency,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
 import type { BookingRow, PaymentRow } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -40,11 +44,22 @@ const sortOptions = [
   { label: "Newest first", value: "newest" },
   { label: "Oldest first", value: "oldest" },
   { label: "Highest estimated price", value: "price_high" },
-  { label: "Lowest estimated price", value: "price_low" },
+  { label: "Customer name", value: "customer_name" },
   { label: "Payment status", value: "payment_status" },
   { label: "Neighborhood", value: "neighborhood" },
-  { label: "Customer name", value: "customer_name" },
+  { label: "Lowest estimated price", value: "price_low" },
   { label: "Confirmed route day", value: "route_day" },
+];
+
+const paymentFilterOptions = [
+  { label: "Any payment status", value: "" },
+  { label: "Pending", value: "pending" },
+  { label: "Paid", value: "paid" },
+  { label: "Cancelled", value: "cancelled" },
+  { label: "Failed", value: "failed" },
+  { label: "Expired", value: "expired" },
+  { label: "Not sent", value: "not_sent" },
+  { label: "Refunded", value: "refunded" },
 ];
 
 export default async function AdminPaymentsPage({
@@ -85,13 +100,7 @@ export default async function AdminPaymentsPage({
               name: "payment",
               label: "Payment status",
               value: params.payment,
-              options: [
-                { label: "Any payment status", value: "" },
-                ...validPaymentStatuses.map((status) => ({
-                  label: humanizeStatus(status),
-                  value: status,
-                })),
-              ],
+              options: paymentFilterOptions,
             },
             {
               name: "frequency",
@@ -174,6 +183,15 @@ export default async function AdminPaymentsPage({
               );
               const latestPayment = bookingPayments[0] ?? null;
               const checkoutUrl = latestPayment?.checkout_url ?? booking.payment_link ?? "";
+              const paymentSummary = getServiceClearanceStatus(booking, latestPayment);
+              const foundingSpecial = getFoundingNeighborSpecialStatus({
+                binCount: booking.bin_count,
+                frequency: booking.frequency,
+                addOns: booking.add_ons,
+                neighborhood: booking.neighborhood,
+                createdAt: booking.created_at,
+                estimatedPrice: booking.estimated_price,
+              });
 
               return (
               <form
@@ -193,6 +211,29 @@ export default async function AdminPaymentsPage({
                   name="internalNotes"
                   value={booking.internal_notes ?? ""}
                 />
+                <details className="admin-payment-details">
+                  <summary className="admin-collapsible-summary">
+                    <div>
+                      <h2>{bookingCustomerName(booking)}</h2>
+                      <p className="muted">
+                        {booking.street_address}
+                        {booking.neighborhood ? ` | ${booking.neighborhood}` : ""}
+                      </p>
+                    </div>
+                    <div className="admin-collapsible-meta">
+                      <span className={`status-badge status-${paymentSummary.tone}`}>
+                        {paymentSummary.label}
+                      </span>
+                      <span className={`status-badge status-${booking.payment_status}`}>
+                        {humanizeStatus(booking.payment_status)}
+                      </span>
+                      <span className={`status-badge status-${foundingSpecial.status}`}>
+                        Special: {foundingSpecialLabel(foundingSpecial.status)}
+                      </span>
+                      <strong>${booking.estimated_price}</strong>
+                    </div>
+                  </summary>
+                  <div className="admin-payment-detail-body">
                 <div className="admin-row-heading">
                   <div>
                     <h2>{bookingCustomerName(booking)}</h2>
@@ -219,6 +260,16 @@ export default async function AdminPaymentsPage({
                   <div>
                     <span>Estimated price</span>
                     <strong>${booking.estimated_price}</strong>
+                  </div>
+                  <div>
+                    <span>Follow-up signal</span>
+                    <strong>{paymentSummary.label}</strong>
+                    <span>{paymentSummary.action}</span>
+                  </div>
+                  <div>
+                    <span>Founding Neighbor Special</span>
+                    <strong>{foundingSpecialLabel(foundingSpecial.status)}</strong>
+                    <span>{foundingSpecial.reason}</span>
                   </div>
                   <div>
                     <span>Created</span>
@@ -350,6 +401,8 @@ export default async function AdminPaymentsPage({
                     Open Booking
                   </Link>
                 </div>
+                  </div>
+                </details>
               </form>
               );
             })}
@@ -405,6 +458,14 @@ function filterAndSortBookings(
     .filter((booking) => {
       if (!params.payment) return true;
       const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+      if (params.payment === "expired") {
+        return linkedPayments.some(
+          (payment) => payment.metadata?.last_stripe_event === "checkout.session.expired",
+        );
+      }
+      if (params.payment === "cancelled") {
+        return linkedPayments.some((payment) => payment.status === "cancelled");
+      }
       return (
         booking.payment_status === params.payment ||
         linkedPayments.some((payment) => payment.status === params.payment)
@@ -474,4 +535,10 @@ function formatDate(value: string) {
     day: "numeric",
     year: "numeric",
   }).format(new Date(value));
+}
+
+function foundingSpecialLabel(status: "eligible" | "applied" | "not_eligible") {
+  if (status === "applied") return "Applied";
+  if (status === "eligible") return "Eligible";
+  return "Not eligible";
 }

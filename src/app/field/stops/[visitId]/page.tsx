@@ -16,6 +16,7 @@ import { ServiceChecklistPanel } from "@/components/service-checklist-panel";
 import { FieldShell } from "@/components/shells/field-shell";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
 import { getFieldContext } from "@/lib/field-data";
+import { getServiceClearanceStatus } from "@/lib/payment-clearance";
 import { ensureServiceChecklistBundle } from "@/lib/service-checklists";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isAdminRole } from "@/lib/supabase/roles";
@@ -105,12 +106,27 @@ export default async function FieldStopPage({
   );
   const currentPaymentLink = latestPayment?.checkout_url ?? booking.payment_link ?? "";
   const isPaid = (latestPayment?.status ?? booking.payment_status) === "paid";
+  const clearance = getServiceClearanceStatus(booking, latestPayment);
+  const displayStopNumber = stop.optimoroute_stop_sequence ?? stop.stop_order ?? 1;
+  const scheduledTime = stop.optimoroute_scheduled_at
+    ? formatFieldTime(stop.optimoroute_scheduled_at)
+    : null;
+  const eta = stop.optimoroute_eta ? formatFieldTime(stop.optimoroute_eta) : null;
 
   return (
-    <FieldShell title={`Stop #${stop.stop_order || 1}`} auth={context.auth}>
+    <FieldShell title={`Stop #${displayStopNumber}`} auth={context.auth}>
       <section className="field-card field-summary-card">
         <div className="field-card-top">
           <div className="status-stack">
+            {stop.optimoroute_stop_sequence ? (
+              <span className="status-badge status-imported">
+                Optimized #{stop.optimoroute_stop_sequence}
+              </span>
+            ) : (
+              <span className="status-badge status-neutral">
+                Manual #{stop.stop_order || 1}
+              </span>
+            )}
             <span className={`status-badge status-${stop.status}`}>
               {humanizeStatus(stop.status)}
             </span>
@@ -149,6 +165,28 @@ export default async function FieldStopPage({
           <span>Arrival: {formatArrivalWindow(visit.arrival_window_start, visit.arrival_window_end)}</span>
           <span>Gate: {address?.gate_code ?? "None"}</span>
           <span>Water: {booking.water_spigot_available ?? "not sure"}</span>
+          <span>
+            OptimoRoute:{" "}
+            {stop.optimoroute_stop_sequence
+              ? `Stop ${stop.optimoroute_stop_sequence}`
+              : "not imported"}
+          </span>
+          <span>
+            Schedule:{" "}
+            {scheduledTime
+              ? `${scheduledTime}${eta && eta !== scheduledTime ? ` ETA ${eta}` : ""}`
+              : "not imported"}
+          </span>
+          <span>
+            Travel:{" "}
+            {stop.optimoroute_travel_time_seconds
+              ? formatDuration(stop.optimoroute_travel_time_seconds)
+              : "not imported"}
+            {stop.optimoroute_distance_meters
+              ? ` / ${formatDistance(stop.optimoroute_distance_meters)}`
+              : ""}
+          </span>
+          <span>Driver: {stop.optimoroute_driver_name ?? "not assigned"}</span>
         </div>
         {booking.customer_notes || address?.notes || stop.technician_notes ? (
           <div className="field-note">
@@ -243,10 +281,20 @@ export default async function FieldStopPage({
       </section>
 
       <section className="field-card">
-        <p className="section-kicker">Payment / Invoice</p>
-        <h2>{humanizeStatus(latestPayment?.status ?? booking.payment_status)}</h2>
+        <p className="section-kicker">Service Clearance</p>
+        <div className={`field-payment-clearance clearance-${clearance.tone}`}>
+          <div>
+            <h2>{clearance.label}</h2>
+            <p>{clearance.detail}</p>
+          </div>
+          <p>
+            <strong>Field action:</strong> {clearance.action}
+          </p>
+        </div>
         <p>
-          Estimated service price: <strong>${booking.estimated_price}</strong>
+          Estimated service price: <strong>${booking.estimated_price}</strong>{" "}
+          | Raw payment status:{" "}
+          <strong>{humanizeStatus(latestPayment?.status ?? booking.payment_status)}</strong>
         </p>
         {currentPaymentLink ? (
           <a className="button button-outline" href={currentPaymentLink} target="_blank" rel="noreferrer">
@@ -324,6 +372,7 @@ export default async function FieldStopPage({
                 <summary className="button button-outline">Take a Break</summary>
                 <form action={startBreakAction} className="field-form">
                   <input type="hidden" name="routeDayId" value={stop.route_day_id ?? ""} />
+                  <input type="hidden" name="routeStopId" value={stop.id} />
                   <label>
                     Reason
                     <select name="reason" defaultValue="lunch">
@@ -336,7 +385,10 @@ export default async function FieldStopPage({
                   </label>
                   <label>
                     Notes
-                    <textarea name="notes" placeholder="Optional break note" />
+                    <textarea
+                      name="notes"
+                      placeholder="Required for equipment issue, weather pause, customer delay, or other"
+                    />
                   </label>
                   <button className="button button-dark" type="submit">
                     Start Break
@@ -468,4 +520,22 @@ async function createSignedChecklistDocuments(
 function formatArrivalWindow(start: string | null, end: string | null) {
   if (!start && !end) return "Not set";
   return [start, end].filter(Boolean).join(" - ");
+}
+
+function formatFieldTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDuration(seconds: number) {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `${minutes} min`;
+}
+
+function formatDistance(meters: number) {
+  const miles = meters / 1609.344;
+  if (miles < 0.1) return `${meters} m`;
+  return `${miles.toFixed(1)} mi`;
 }

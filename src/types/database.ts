@@ -59,6 +59,16 @@ export type ReferralStatus =
   | "cancelled";
 
 export type RouteDayStatus = "planned" | "active" | "completed" | "cancelled";
+export type OptimoRouteSyncStatus =
+  | "not_synced"
+  | "syncing"
+  | "synced"
+  | "sync_failed"
+  | "planning_pending"
+  | "planning_failed"
+  | "scheduled"
+  | "unscheduled"
+  | "imported";
 export type FieldStopStatus =
   | "scheduled"
   | "on_the_way"
@@ -76,9 +86,15 @@ export type BreakReason =
   | "tank_empty"
   | "tank_refill"
   | "equipment_issue"
+  | "vehicle_issue"
+  | "access_issue"
+  | "safety_concern"
+  | "customer_issue"
   | "fuel_stop"
+  | "hydration_rest"
   | "weather_pause"
   | "customer_delay"
+  | "scheduled_break"
   | "other";
 export type PaymentStatus =
   | "not_sent"
@@ -243,6 +259,11 @@ export type RouteDayRow = {
   status: RouteDayStatus;
   assigned_technician_id: string | null;
   notes: string | null;
+  optimoroute_planning_id: number | null;
+  optimoroute_planning_status: string | null;
+  optimoroute_planning_error: string | null;
+  optimoroute_last_planned_at: string | null;
+  optimoroute_last_imported_at: string | null;
 };
 
 export type RouteStopRow = {
@@ -258,6 +279,19 @@ export type RouteStopRow = {
   completed_at: string | null;
   technician_notes: string | null;
   issue_flags: string[];
+  optimoroute_order_no: string | null;
+  optimoroute_order_id: string | null;
+  optimoroute_sync_status: OptimoRouteSyncStatus;
+  optimoroute_sync_error: string | null;
+  optimoroute_last_synced_at: string | null;
+  optimoroute_planning_status: string | null;
+  optimoroute_scheduled_at: string | null;
+  optimoroute_stop_sequence: number | null;
+  optimoroute_route_id: string | null;
+  optimoroute_driver_name: string | null;
+  optimoroute_eta: string | null;
+  optimoroute_travel_time_seconds: number | null;
+  optimoroute_distance_meters: number | null;
 };
 
 export type ServiceChecklistRow = {

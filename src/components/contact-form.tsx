@@ -16,6 +16,7 @@ type ContactRequest = {
   location: string;
   reason: ContactReason;
   message: string;
+  website: string;
 };
 
 const initialContactRequest: ContactRequest = {
@@ -25,6 +26,7 @@ const initialContactRequest: ContactRequest = {
   location: "",
   reason: "Booking question",
   message: "",
+  website: "",
 };
 
 export function ContactForm() {
@@ -94,6 +96,15 @@ export function ContactForm() {
       ) : null}
 
       <form className="booking-form" onSubmit={handleSubmit}>
+        <label className="form-honeypot" aria-hidden="true">
+          <span>Website</span>
+          <input
+            autoComplete="off"
+            tabIndex={-1}
+            value={request.website}
+            onChange={(event) => updateField("website", event.target.value)}
+          />
+        </label>
         <div className="form-grid">
           <label className="field">
             <span>Name <span className="required-mark">*</span></span>

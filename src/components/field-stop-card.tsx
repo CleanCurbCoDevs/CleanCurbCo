@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { updateStopStatusAction } from "@/app/field/actions";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
+import { getServiceClearanceStatus } from "@/lib/payment-clearance";
 import { formatFrequency } from "@/lib/pricing";
 import type {
   BookingRow,
@@ -44,12 +45,19 @@ export function FieldStopCard({
   const googleMaps = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
   const addOns = booking.add_ons.length ? booking.add_ons.join(", ") : "None";
   const paymentStatus = payment?.status ?? booking.payment_status;
+  const clearance = getServiceClearanceStatus(booking, payment);
   const actionLabel = getStopActionLabel(stop.status);
+  const displayStopNumber = stop.optimoroute_stop_sequence ?? stop.stop_order ?? 1;
+  const isOptimized = Boolean(stop.optimoroute_stop_sequence);
+  const scheduledTime = stop.optimoroute_scheduled_at
+    ? formatFieldTime(stop.optimoroute_scheduled_at)
+    : null;
+  const eta = stop.optimoroute_eta ? formatFieldTime(stop.optimoroute_eta) : null;
 
   return (
     <article className="field-card">
       <div className="field-card-top">
-        <span className="field-stop-number">#{stop.stop_order || 1}</span>
+        <span className="field-stop-number">#{displayStopNumber}</span>
         <div className="status-stack">
           <span className={`status-badge status-${stop.status}`}>
             {humanizeStatus(stop.status)}
@@ -57,6 +65,11 @@ export function FieldStopCard({
           <span className={`status-badge status-${paymentStatus}`}>
             {humanizeStatus(paymentStatus)}
           </span>
+          {isOptimized ? (
+            <span className="status-badge status-imported">Optimized by OptimoRoute</span>
+          ) : (
+            <span className="status-badge status-neutral">Clean Curb Order</span>
+          )}
         </div>
       </div>
       <h2>
@@ -72,6 +85,22 @@ export function FieldStopCard({
         <span>Water: {booking.water_spigot_available ?? "not sure"}</span>
         <span>Gate: {address?.gate_code ?? "none"}</span>
         <span>Route: {routeDay?.route_name ?? routeDay?.route_date ?? "not assigned"}</span>
+        <span>
+          Schedule:{" "}
+          {scheduledTime
+            ? `${scheduledTime}${eta && eta !== scheduledTime ? ` ETA ${eta}` : ""}`
+            : "not imported"}
+        </span>
+        <span>
+          Travel:{" "}
+          {stop.optimoroute_travel_time_seconds
+            ? formatDuration(stop.optimoroute_travel_time_seconds)
+            : "not imported"}
+          {stop.optimoroute_distance_meters
+            ? ` / ${formatDistance(stop.optimoroute_distance_meters)}`
+            : ""}
+        </span>
+        <span>Driver: {stop.optimoroute_driver_name ?? "not assigned"}</span>
       </div>
       {stop.issue_flags.length ? (
         <div className="status-stack">
@@ -87,6 +116,16 @@ export function FieldStopCard({
           {booking.customer_notes ?? address?.notes ?? stop.technician_notes}
         </p>
       ) : null}
+      <div className={`field-payment-clearance clearance-${clearance.tone}`}>
+        <div>
+          <p className="section-kicker">Service Clearance</p>
+          <h3>{clearance.label}</h3>
+          <p>{clearance.detail}</p>
+        </div>
+        <p>
+          <strong>Field action:</strong> {clearance.action}
+        </p>
+      </div>
       <div className="field-actions">
         <a className="button button-outline" href={appleMaps} target="_blank" rel="noreferrer">
           Apple Maps
@@ -113,6 +152,24 @@ export function FieldStopCard({
       </div>
     </article>
   );
+}
+
+function formatFieldTime(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function formatDuration(seconds: number) {
+  const minutes = Math.max(1, Math.round(seconds / 60));
+  return `${minutes} min`;
+}
+
+function formatDistance(meters: number) {
+  const miles = meters / 1609.344;
+  if (miles < 0.1) return `${meters} m`;
+  return `${miles.toFixed(1)} mi`;
 }
 
 function getStopActionLabel(status: RouteStopRow["status"]) {
