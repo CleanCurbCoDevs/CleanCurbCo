@@ -281,7 +281,7 @@ export default async function AdminPaymentsPage({
                   </label>
                   <label className="field">
                     <span>Payment link</span>
-                    <input name="paymentLink" defaultValue={checkoutUrl} />
+                    <textarea name="paymentLink" defaultValue={checkoutUrl} rows={2} />
                   </label>
                   <label className="field">
                     <span>Payment method</span>
@@ -313,37 +313,29 @@ export default async function AdminPaymentsPage({
                   <CopyButton value={checkoutUrl} label="Copy Link" />
                   <button
                     className="button button-outline"
-                    formAction={updatePaymentStatusAction}
-                    name="quickPaymentStatus"
+                    formAction={updatePaymentStatusAction.bind(null, "pending")}
                     type="submit"
-                    value="pending"
                   >
                     Mark Pending
                   </button>
                   <button
                     className="button button-outline"
-                    formAction={updatePaymentStatusAction}
-                    name="quickPaymentStatus"
+                    formAction={updatePaymentStatusAction.bind(null, "paid")}
                     type="submit"
-                    value="paid"
                   >
                     Mark Paid
                   </button>
                   <button
                     className="button button-outline"
-                    formAction={updatePaymentStatusAction}
-                    name="quickPaymentStatus"
+                    formAction={updatePaymentStatusAction.bind(null, "failed")}
                     type="submit"
-                    value="failed"
                   >
                     Mark Failed
                   </button>
                   <button
                     className="button button-outline"
-                    formAction={updatePaymentStatusAction}
-                    name="quickPaymentStatus"
+                    formAction={updatePaymentStatusAction.bind(null, "refunded")}
                     type="submit"
-                    value="refunded"
                   >
                     Mark Refunded
                   </button>

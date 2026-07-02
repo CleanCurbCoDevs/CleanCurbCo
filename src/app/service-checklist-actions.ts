@@ -8,6 +8,8 @@ import {
   generateChecklistPdf,
   unresolvedChecklistItems,
 } from "@/lib/service-checklists";
+import { writeAdminAuditLog } from "@/lib/server/admin-audit";
+import { createRequestId, logger, maskEmail } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin, requireField } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, pickEnum } from "@/lib/validation";
@@ -115,6 +117,7 @@ export async function saveServiceChecklistDraftAction(formData: FormData) {
 }
 
 export async function submitServiceChecklistAction(formData: FormData) {
+  const requestId = createRequestId();
   const visitId = cleanString(formData.get("visitId"), 80);
   const returnTo = returnToFrom(formData, visitId ? `/field/stops/${visitId}` : "/field/today");
   const auth = await requireField(returnTo);
@@ -225,18 +228,54 @@ export async function submitServiceChecklistAction(formData: FormData) {
       metadata: { storagePath },
     });
 
+    await writeAdminAuditLog({
+      action: "checklist_submitted",
+      actor_user_id: auth.userId,
+      actor_email: maskEmail(auth.email),
+      actor_role: auth.profile.role,
+      target_type: "service_checklist",
+      target_id: bundle.checklist.id,
+      customer_id: bundle.booking.customer_id,
+      booking_id: bundle.booking.id,
+      before_summary: { status: bundle.checklist.status },
+      after_summary: {
+        status: "submitted",
+        serviceVisitId: bundle.visit.id,
+        documentType: "checklist_pdf",
+      },
+      request_id: requestId,
+      status: "success",
+    });
+
+    logger.info("service_checklist_submitted", {
+      requestId,
+      action: "checklist_submitted",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: bundle.booking.customer_id,
+      bookingId: bundle.booking.id,
+      metadata: {
+        checklistId: bundle.checklist.id,
+        visitId: bundle.visit.id,
+      },
+    });
+
     revalidateChecklistPaths(bundle.visit.id, bundle.booking.customer_id);
     redirectWithStatus(returnTo, "submitted");
   } catch (error) {
-    console.error(
-      JSON.stringify({
-        service: "service_checklist_pdf",
-        message: "checklist_pdf_generation_or_upload_failed",
+    logger.error("checklist_pdf_generation_or_upload_failed", {
+      requestId,
+      action: "checklist_submitted",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: bundle.booking.customer_id,
+      bookingId: bundle.booking.id,
+      error,
+      metadata: {
         visitId: bundle.visit.id,
         checklistId: bundle.checklist.id,
-        errorMessage: error instanceof Error ? error.message : "Unknown error",
-      }),
-    );
+      },
+    });
     redirectWithStatus(returnTo, "pdf_failed");
   }
 }

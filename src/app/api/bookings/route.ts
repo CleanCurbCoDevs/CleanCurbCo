@@ -11,6 +11,8 @@ import { sendAdminBookingNotification } from "@/lib/email/sendAdminBookingNotifi
 import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
 import { calculateBookingEstimate } from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
+import { createRequestId, getClientIp, logger } from "@/lib/server/logger";
+import { verifyTurnstileToken } from "@/lib/server/turnstile";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -26,6 +28,7 @@ import {
 import type { SchedulingPreference, ServiceFrequency } from "@/types/booking";
 
 type IncomingBooking = {
+  turnstileToken?: unknown;
   referralCode?: unknown;
   customer?: {
     firstName?: unknown;
@@ -68,11 +71,17 @@ type IncomingBooking = {
 const validWaterSpigotValues = ["yes", "no", "not_sure"] as const;
 
 export async function POST(request: Request) {
+  const requestId = createRequestId(request.headers);
+  const route = "/api/bookings";
+  const startedAt = performance.now();
+
   if (!isSupabaseConfigured()) {
+    logger.warn("booking_submission_unconfigured", { requestId, route });
     return NextResponse.json(
       {
         error:
           "Online booking is being connected. Please call or email Clean Curb Co. and we will get your route request handled.",
+        requestId,
       },
       { status: 503 },
     );
@@ -82,8 +91,34 @@ export async function POST(request: Request) {
 
   try {
     body = (await request.json()) as IncomingBooking;
-  } catch {
-    return NextResponse.json({ error: "Invalid booking request." }, { status: 400 });
+  } catch (error) {
+    logger.warn("booking_submission_invalid_json", {
+      requestId,
+      route,
+      error,
+    });
+    return NextResponse.json(
+      { error: "Invalid booking request.", requestId },
+      { status: 400 },
+    );
+  }
+
+  const turnstileResult = await verifyTurnstileToken({
+    token: cleanString(body.turnstileToken, 4096),
+    remoteIp: getClientIp(request.headers),
+    requestId,
+    route,
+    expectedAction: "booking_submit",
+  });
+
+  if (!turnstileResult.success) {
+    return NextResponse.json(
+      {
+        error: turnstileResult.error,
+        requestId: turnstileResult.requestId,
+      },
+      { status: turnstileResult.status },
+    );
   }
 
   const firstName = cleanString(body.customer?.firstName, 80);
@@ -141,8 +176,13 @@ export async function POST(request: Request) {
   ].filter(Boolean);
 
   if (missingRequired.length) {
+    logger.warn("booking_submission_validation_failed", {
+      requestId,
+      route,
+      metadata: { missingRequired },
+    });
     return NextResponse.json(
-      { error: `Please complete: ${missingRequired.join(", ")}.` },
+      { error: `Please complete: ${missingRequired.join(", ")}.`, requestId },
       { status: 400 },
     );
   }
@@ -201,7 +241,12 @@ export async function POST(request: Request) {
         serviceAddressId = serviceAddress?.id ?? null;
       }
     }
-  } catch {
+  } catch (error) {
+    logger.warn("booking_submission_session_profile_lookup_failed", {
+      requestId,
+      route,
+      error,
+    });
     customerId = null;
     serviceAddressId = null;
   }
@@ -252,11 +297,34 @@ export async function POST(request: Request) {
     .single();
 
   if (error || !booking) {
+    logger.error("booking_submission_insert_failed", {
+      requestId,
+      route,
+      customerId,
+      error,
+    });
     return NextResponse.json(
-      { error: "We could not save that booking request. Please try again." },
+      {
+        error: "We could not save that booking request. Please try again.",
+        requestId,
+      },
       { status: 500 },
     );
   }
+
+  logger.info("booking_submission_created", {
+    requestId,
+    route,
+    customerId,
+    bookingId: booking.id,
+    durationMs: Math.round(performance.now() - startedAt),
+    metadata: {
+      frequency,
+      binCount,
+      addOnCount: addOns.length,
+      hasReferralCode: Boolean(referralCode),
+    },
+  });
 
   if (referralCode && referredByProfileId) {
     await admin.from("referrals").insert({
@@ -295,13 +363,26 @@ export async function POST(request: Request) {
     emailJobs.push(sendAccountSetupEmail(booking, setupLink));
   }
 
-  await Promise.allSettled(emailJobs);
+  const emailResults = await Promise.allSettled(emailJobs);
+
+  logger.info("booking_submission_email_jobs_settled", {
+    requestId,
+    route,
+    customerId,
+    bookingId: booking.id,
+    metadata: {
+      fulfilled: emailResults.filter((result) => result.status === "fulfilled").length,
+      rejected: emailResults.filter((result) => result.status === "rejected").length,
+      total: emailResults.length,
+    },
+  });
 
   return NextResponse.json(
     {
       booking: bookingRowToRequest(booking),
       redirectTo,
       message: bookingSuccessLaunchMessage,
+      requestId,
     },
     { status: 201 },
   );

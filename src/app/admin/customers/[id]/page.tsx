@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import type { ReactNode } from "react";
 import { updateCustomerProfileAdminAction } from "@/app/admin/actions";
+import { AdminCustomerEmailForm } from "@/components/admin-customer-email-form";
 import { AdminShell } from "@/components/shells/admin-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getAdminContext } from "@/lib/admin-data";
@@ -71,6 +72,11 @@ export default async function CustomerDetailPage({
       event.customer_id === profile.id ||
       bookings.some((booking) => booking.id === event.booking_id),
   );
+  const auditLogs = context.auditLogs.filter(
+    (event) =>
+      event.customer_id === profile.id ||
+      bookings.some((booking) => booking.id === event.booking_id),
+  );
 
   return (
     <AdminShell title="Customer detail" auth={context.auth}>
@@ -116,7 +122,9 @@ export default async function CustomerDetailPage({
             </label>
             <label className="field">
               <span>Email</span>
-              <input value={profile.email ?? "No email"} readOnly />
+              <span className="readonly-field-value">
+                {profile.email ?? "No email"}
+              </span>
             </label>
             <label className="field">
               <span>Preferred contact</span>
@@ -203,6 +211,12 @@ export default async function CustomerDetailPage({
             Save Customer
           </button>
         </form>
+
+        <AdminCustomerEmailForm
+          profileId={profile.id}
+          currentEmail={profile.email}
+          stripeCustomerId={profile.stripe_customer_id}
+        />
 
         <section className="detail-grid">
           <DetailPanel title="Service addresses" empty="No addresses linked.">
@@ -330,6 +344,18 @@ export default async function CustomerDetailPage({
                 <strong>{humanizeStatus(event.event_type)}</strong>
                 <span>{event.message}</span>
                 <span>{formatDateTime(event.created_at)}</span>
+              </article>
+            ))}
+          </DetailPanel>
+
+          <DetailPanel title="Admin audit history" empty="No admin audit records yet.">
+            {auditLogs.slice(0, 12).map((event) => (
+              <article className="mini-record" key={event.id}>
+                <strong>{humanizeStatus(event.action)}</strong>
+                <span>{humanizeStatus(event.status)}</span>
+                <span>{formatDateTime(event.created_at)}</span>
+                {event.request_id ? <span>Request {event.request_id}</span> : null}
+                {event.note ? <span>{event.note}</span> : null}
               </article>
             ))}
           </DetailPanel>

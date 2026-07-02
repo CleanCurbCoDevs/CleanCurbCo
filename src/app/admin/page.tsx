@@ -32,9 +32,14 @@ export default async function AdminPage() {
             Booking requests, route grouping, customer records, payment status,
             and review follow-up all live behind this protected area.
           </p>
-          <Link className="button button-dark" href="/admin/bookings">
-            Review Bookings
-          </Link>
+          <div className="action-row">
+            <Link className="button button-dark" href="/admin/bookings">
+              Review Bookings
+            </Link>
+            <Link className="button button-outline" href="/field">
+              Open Field App
+            </Link>
+          </div>
         </article>
         <StatCard label="New requests" value={newBookings} />
         <StatCard label="Needs follow-up" value={needsFollowUp} />

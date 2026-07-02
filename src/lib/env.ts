@@ -66,3 +66,10 @@ export function isStripeConfigured() {
   const { secretKey, publishableKey } = getStripeEnv();
   return Boolean(secretKey && publishableKey);
 }
+
+export function getTurnstileEnv() {
+  return {
+    siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
+    secretKey: process.env.TURNSTILE_SECRET_KEY ?? "",
+  };
+}

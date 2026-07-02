@@ -64,6 +64,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
             initialFrequency={parseFrequencyParam(params.frequency)}
             initialReferralCode={params.ref ?? ""}
             serviceAreaChecked={params.serviceAreaChecked === "yes"}
+            turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""}
           />
         </div>
       </section>

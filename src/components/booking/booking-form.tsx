@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
+import { TurnstileWidget } from "@/components/turnstile-widget";
 import {
   addOns,
   binTypes,
@@ -95,11 +96,13 @@ export function BookingForm({
   initialFrequency,
   initialReferralCode = "",
   serviceAreaChecked = false,
+  turnstileSiteKey,
 }: {
   initialCustomer?: InitialBookingCustomer;
   initialFrequency?: ServiceFrequency;
   initialReferralCode?: string;
   serviceAreaChecked?: boolean;
+  turnstileSiteKey: string;
 }) {
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
@@ -118,6 +121,12 @@ export function BookingForm({
   const [setupHref, setSetupHref] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
+  const [turnstileToken, setTurnstileToken] = useState("");
+  const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+
+  const handleTurnstileToken = useCallback((token: string) => {
+    setTurnstileToken(token);
+  }, []);
 
   const estimatedPrice = useMemo(
     () =>
@@ -177,13 +186,14 @@ export function BookingForm({
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ ...form, turnstileToken }),
       });
 
       const data = (await response.json()) as {
         booking?: BookingRequest;
         redirectTo?: string | null;
         error?: string;
+        requestId?: string;
       };
 
       if (!response.ok || !data.booking) {
@@ -193,6 +203,8 @@ export function BookingForm({
       setSubmittedBooking(data.booking);
       setSetupHref(data.redirectTo ?? null);
     } catch (error) {
+      setTurnstileToken("");
+      setTurnstileResetKey((current) => current + 1);
       setError(
         error instanceof Error
           ? error.message
@@ -575,7 +587,17 @@ export function BookingForm({
         ) : null}
 
         <div className="submit-area">
-          <button className="button button-dark" type="submit" disabled={isSubmitting}>
+          <TurnstileWidget
+            siteKey={turnstileSiteKey}
+            action="booking_submit"
+            resetKey={turnstileResetKey}
+            onTokenChange={handleTurnstileToken}
+          />
+          <button
+            className="button button-dark"
+            type="submit"
+            disabled={isSubmitting || !turnstileToken}
+          >
             <Send size={20} aria-hidden="true" />
             {isSubmitting ? "Sending Request..." : "Request My Cleaning"}
           </button>

@@ -4,6 +4,7 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 import type {
   BookingRow,
+  AdminAuditLogRow,
   ActivityEventRow,
   CareerApplicationRow,
   ContactMessageRow,
@@ -31,6 +32,7 @@ export type AdminContext = {
   requests: CustomerRequestRow[];
   referrals: ReferralRow[];
   activity: ActivityEventRow[];
+  auditLogs: AdminAuditLogRow[];
   profiles: ProfileRow[];
   addresses: ServiceAddressRow[];
   visits: ServiceVisitRow[];
@@ -58,6 +60,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
       requests: [],
       referrals: [],
       activity: [],
+      auditLogs: [],
       profiles: [],
       addresses: [],
       visits: [],
@@ -82,6 +85,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     requestsResult,
     referralsResult,
     activityResult,
+    auditLogsResult,
     profilesResult,
     addressesResult,
     visitsResult,
@@ -118,6 +122,11 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .from("activity_events")
         .select("*")
         .order("created_at", { ascending: false }),
+      admin
+        .from("admin_audit_logs")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(250),
       admin
         .from("profiles")
         .select("*")
@@ -183,6 +192,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     requests: requestsResult.data ?? [],
     referrals: referralsResult.data ?? [],
     activity: activityResult.data ?? [],
+    auditLogs: auditLogsResult.data ?? [],
     profiles: profilesResult.data ?? [],
     addresses: addressesResult.data ?? [],
     visits: visitsResult.data ?? [],

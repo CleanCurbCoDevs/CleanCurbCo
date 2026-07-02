@@ -49,7 +49,7 @@ export default async function PortalAccountPage() {
               <label className="field">
                 <span>Email</span>
                 <input value={profile.email ?? "No email on file"} readOnly />
-                <small className="muted">Contact us to change your login email.</small>
+                <small className="muted">Contact us to change your email.</small>
               </label>
               <label className="field">
                 <span>Preferred contact method</span>

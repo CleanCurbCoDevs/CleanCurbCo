@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getSiteUrl, getStripeEnv, isStripeConfigured } from "@/lib/env";
 import { formatBookingAddress } from "@/lib/booking-utils";
+import { createRequestId, logger } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getCurrentProfile } from "@/lib/supabase/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -113,29 +114,59 @@ function stringifyMetadata(metadata: Record<string, unknown>) {
   );
 }
 
-function stripePermissionError(resource: string, error: unknown) {
+function stripePermissionError(
+  resource: string,
+  error: unknown,
+  context?: {
+    requestId?: string;
+    userId?: string | null;
+    role?: string | null;
+    customerId?: string | null;
+    bookingId?: string | null;
+  },
+) {
   const message = error instanceof Error ? error.message : "Unknown Stripe error.";
-  console.error(`Stripe ${resource} permission/configuration error:`, error);
+  logger.error("stripe_checkout_permission_error", {
+    requestId: context?.requestId,
+    action: "stripe_checkout_create",
+    userId: context?.userId,
+    role: context?.role,
+    customerId: context?.customerId,
+    bookingId: context?.bookingId,
+    error,
+    metadata: { resource },
+  });
   return NextResponse.json(
     {
       error: `Stripe could not access ${resource}. Check restricted key permissions for ${resource}. ${message}`,
+      requestId: context?.requestId,
     },
     { status: 502 },
   );
 }
 
 export async function POST(request: Request) {
+  const requestId = createRequestId(request.headers);
+  const route = "/api/stripe/create-checkout-session";
+  const startedAt = performance.now();
+
   if (!isStripeConfigured()) {
+    logger.warn("stripe_checkout_unconfigured", { requestId, route });
     return NextResponse.json(
-      { error: "Stripe is not configured yet." },
+      { error: "Stripe is not configured yet.", requestId },
       { status: 503 },
     );
   }
 
   const auth = await getCurrentProfile();
   if (auth.status !== "ok") {
+    logger.warn("stripe_checkout_auth_failed", {
+      requestId,
+      route,
+      status: auth.status,
+    });
     return NextResponse.json(
-      { error: auth.message },
+      { error: auth.message, requestId },
       { status: auth.status === "unconfigured" ? 503 : 401 },
     );
   }
@@ -290,7 +321,13 @@ export async function POST(request: Request) {
       });
       stripeCustomerId = customer.id;
     } catch (error) {
-      return stripePermissionError("customers.write", error);
+      return stripePermissionError("customers.write", error, {
+        requestId,
+        userId: auth.userId,
+        role: auth.profile.role,
+        customerId: effectiveCustomerId,
+        bookingId: booking?.id ?? null,
+      });
     }
 
     await admin
@@ -409,6 +446,13 @@ export async function POST(request: Request) {
         ? "checkout.sessions.write/subscriptions.write/prices.write"
         : "checkout.sessions.write/payment_intents.write/prices.write",
       error,
+      {
+        requestId,
+        userId: auth.userId,
+        role: auth.profile.role,
+        customerId: effectiveCustomerId,
+        bookingId: booking?.id ?? null,
+      },
     );
   }
 
@@ -454,10 +498,29 @@ export async function POST(request: Request) {
       .eq("id", booking.id);
   }
 
+  logger.info("stripe_checkout_session_created", {
+    requestId,
+    route,
+    action: "stripe_checkout_create",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: effectiveCustomerId,
+    bookingId: booking?.id ?? null,
+    durationMs: Math.round(performance.now() - startedAt),
+    metadata: {
+      paymentId: paymentRecord.id,
+      mode,
+      paymentType,
+      amount,
+      currency,
+    },
+  });
+
   return NextResponse.json({
     checkoutUrl,
     paymentId: paymentRecord.id,
     stripeCheckoutSessionId: session.id,
     mode,
+    requestId,
   });
 }

@@ -471,6 +471,25 @@ export type ActivityEventRow = {
   metadata: Record<string, unknown>;
 };
 
+export type AdminAuditLogRow = {
+  id: string;
+  created_at: string;
+  action: string;
+  actor_user_id: string | null;
+  actor_email: string | null;
+  actor_role: string | null;
+  target_type: string;
+  target_id: string;
+  customer_id: string | null;
+  booking_id: string | null;
+  before_summary: Record<string, unknown>;
+  after_summary: Record<string, unknown>;
+  note: string | null;
+  request_id: string | null;
+  status: "success" | "failure";
+  metadata: Record<string, unknown>;
+};
+
 export type Database = {
   public: {
     Tables: {
@@ -523,7 +542,12 @@ export type Database = {
           token_hash: string;
           expires_at?: string;
         };
-        Update: { used_at?: string | null };
+        Update: Partial<{
+          email: string;
+          expires_at: string;
+          token_hash: string;
+          used_at: string | null;
+        }>;
         Relationships: [];
       };
       service_visits: {
@@ -593,6 +617,13 @@ export type Database = {
         Insert: Partial<ActivityEventRow> &
           Pick<ActivityEventRow, "event_type" | "message">;
         Update: Partial<ActivityEventRow>;
+        Relationships: [];
+      };
+      admin_audit_logs: {
+        Row: AdminAuditLogRow;
+        Insert: Partial<AdminAuditLogRow> &
+          Pick<AdminAuditLogRow, "action" | "target_type" | "target_id">;
+        Update: Partial<AdminAuditLogRow>;
         Relationships: [];
       };
       route_days: {

@@ -10,6 +10,7 @@ import {
   sendCustomerRequestReceived,
 } from "@/lib/email/sendCustomerRequestEmail";
 import { calculateBookingEstimate } from "@/lib/pricing";
+import { createRequestId, logger } from "@/lib/server/logger";
 import {
   evaluatePolicyWindow,
   getBookingServiceDate,
@@ -90,8 +91,14 @@ export async function updatePortalAccountAction(formData: FormData) {
 }
 
 export async function createCustomerRequestAction(formData: FormData) {
+  const requestId = createRequestId();
   const auth = await requireAuth("/portal/manage-service");
   if (auth.status !== "ok") {
+    logger.warn("customer_service_request_auth_failed", {
+      requestId,
+      action: "customer_service_request_submit",
+      status: auth.status,
+    });
     return { ok: false, error: "Please log in to manage service." };
   }
 
@@ -145,6 +152,15 @@ export async function createCustomerRequestAction(formData: FormData) {
   ].filter(Boolean);
 
   if (typedAcknowledgmentRequired && !namesMatch(typedName, validNames)) {
+    logger.warn("customer_service_request_policy_ack_failed", {
+      requestId,
+      action: "customer_service_request_submit",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: auth.userId,
+      bookingId,
+      metadata: { requestType, policyWindow },
+    });
     return {
       ok: false,
       error:
@@ -219,6 +235,22 @@ export async function createCustomerRequestAction(formData: FormData) {
       sendCustomerRequestReceived(request, auth.profile, booking, serviceDate),
       sendAdminCustomerRequestAlert(request, auth.profile, booking, serviceDate),
     ]);
+
+    logger.info("customer_service_request_submitted", {
+      requestId,
+      action: "customer_service_request_submit",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: auth.userId,
+      bookingId,
+      metadata: {
+        requestType,
+        status: request.status,
+        policyWindow,
+        policyAcknowledged,
+        selfServiceApplied: ["approved", "completed"].includes(request.status),
+      },
+    });
   }
 
   revalidatePath("/portal");

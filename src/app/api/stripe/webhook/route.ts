@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getStripeEnv } from "@/lib/env";
 import { sendPaymentReceived } from "@/lib/email/sendPaymentReceived";
+import { createRequestId, logger } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { BookingRow, PaymentRow, PaymentStatus } from "@/types/database";
@@ -169,11 +170,13 @@ async function updatePaymentState(input: {
 }
 
 export async function POST(request: Request) {
+  const requestId = createRequestId(request.headers);
+  const route = "/api/stripe/webhook";
   const { webhookSecret } = getStripeEnv();
   if (!webhookSecret) {
-    console.error("STRIPE_WEBHOOK_SECRET is not configured.");
+    logger.error("stripe_webhook_secret_missing", { requestId, route });
     return NextResponse.json(
-      { error: "Stripe webhook secret is not configured." },
+      { error: "Stripe webhook secret is not configured.", requestId },
       { status: 503 },
     );
   }
@@ -181,8 +184,9 @@ export async function POST(request: Request) {
   const stripe = getStripe();
   const signature = request.headers.get("stripe-signature");
   if (!signature) {
+    logger.warn("stripe_webhook_signature_missing", { requestId, route });
     return NextResponse.json(
-      { error: "Missing Stripe signature." },
+      { error: "Missing Stripe signature.", requestId },
       { status: 400 },
     );
   }
@@ -193,140 +197,164 @@ export async function POST(request: Request) {
     event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Invalid webhook.";
-    return NextResponse.json({ error: message }, { status: 400 });
+    logger.warn("stripe_webhook_signature_invalid", {
+      requestId,
+      route,
+      error,
+    });
+    return NextResponse.json({ error: message, requestId }, { status: 400 });
   }
 
-  switch (event.type) {
-    case "checkout.session.completed": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      const paymentStatus: PaymentStatus =
-        session.payment_status === "paid" ? "paid" : "pending";
-      const bookingStatus: BookingPaymentStatus =
-        session.payment_status === "paid" ? "paid" : "pending";
-      await updatePaymentState({
-        paymentId: session.metadata?.payment_id ?? null,
-        bookingId: session.metadata?.booking_id ?? null,
-        checkoutSessionId: session.id,
-        paymentIntentId: getStringId(session.payment_intent),
-        subscriptionId: getStringId(session.subscription),
-        paymentStatus,
-        bookingPaymentStatus: bookingStatus,
-        sendReceipt: paymentStatus === "paid",
-        eventType: event.type,
-        metadata: session.metadata ?? {},
-      });
-      break;
+  try {
+    switch (event.type) {
+      case "checkout.session.completed": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        const paymentStatus: PaymentStatus =
+          session.payment_status === "paid" ? "paid" : "pending";
+        const bookingStatus: BookingPaymentStatus =
+          session.payment_status === "paid" ? "paid" : "pending";
+        await updatePaymentState({
+          paymentId: session.metadata?.payment_id ?? null,
+          bookingId: session.metadata?.booking_id ?? null,
+          checkoutSessionId: session.id,
+          paymentIntentId: getStringId(session.payment_intent),
+          subscriptionId: getStringId(session.subscription),
+          paymentStatus,
+          bookingPaymentStatus: bookingStatus,
+          sendReceipt: paymentStatus === "paid",
+          eventType: event.type,
+          metadata: session.metadata ?? {},
+        });
+        break;
+      }
+      case "checkout.session.expired": {
+        const session = event.data.object as Stripe.Checkout.Session;
+        await updatePaymentState({
+          paymentId: session.metadata?.payment_id ?? null,
+          bookingId: session.metadata?.booking_id ?? null,
+          checkoutSessionId: session.id,
+          paymentIntentId: getStringId(session.payment_intent),
+          subscriptionId: getStringId(session.subscription),
+          paymentStatus: "cancelled",
+          bookingPaymentStatus: "failed",
+          eventType: event.type,
+          metadata: session.metadata ?? {},
+        });
+        break;
+      }
+      case "payment_intent.succeeded": {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        await updatePaymentState({
+          paymentId: intent.metadata?.payment_id ?? null,
+          bookingId: intent.metadata?.booking_id ?? null,
+          paymentIntentId: intent.id,
+          paymentStatus: "paid",
+          bookingPaymentStatus: "paid",
+          eventType: event.type,
+          metadata: intent.metadata ?? {},
+        });
+        break;
+      }
+      case "payment_intent.payment_failed": {
+        const intent = event.data.object as Stripe.PaymentIntent;
+        await updatePaymentState({
+          paymentId: intent.metadata?.payment_id ?? null,
+          bookingId: intent.metadata?.booking_id ?? null,
+          paymentIntentId: intent.id,
+          paymentStatus: "failed",
+          bookingPaymentStatus: "failed",
+          eventType: event.type,
+          metadata: intent.metadata ?? {},
+        });
+        break;
+      }
+      case "customer.subscription.created":
+      case "customer.subscription.updated": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await updatePaymentState({
+          paymentId: subscription.metadata?.payment_id ?? null,
+          bookingId: subscription.metadata?.booking_id ?? null,
+          subscriptionId: subscription.id,
+          paymentStatus:
+            subscription.status === "active" || subscription.status === "trialing"
+              ? "paid"
+              : "pending",
+          bookingPaymentStatus:
+            subscription.status === "active" || subscription.status === "trialing"
+              ? "paid"
+              : "pending",
+          eventType: event.type,
+          metadata: subscription.metadata ?? {},
+        });
+        break;
+      }
+      case "customer.subscription.deleted": {
+        const subscription = event.data.object as Stripe.Subscription;
+        await updatePaymentState({
+          paymentId: subscription.metadata?.payment_id ?? null,
+          bookingId: subscription.metadata?.booking_id ?? null,
+          subscriptionId: subscription.id,
+          paymentStatus: "cancelled",
+          bookingPaymentStatus: "failed",
+          eventType: event.type,
+          metadata: subscription.metadata ?? {},
+        });
+        break;
+      }
+      case "invoice.payment_succeeded": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await updatePaymentState({
+          subscriptionId: getInvoiceSubscriptionId(invoice),
+          paymentStatus: "paid",
+          bookingPaymentStatus: "paid",
+          eventType: event.type,
+          metadata: invoice.metadata ?? {},
+        });
+        break;
+      }
+      case "invoice.payment_failed": {
+        const invoice = event.data.object as Stripe.Invoice;
+        await updatePaymentState({
+          subscriptionId: getInvoiceSubscriptionId(invoice),
+          paymentStatus: "failed",
+          bookingPaymentStatus: "failed",
+          eventType: event.type,
+          metadata: invoice.metadata ?? {},
+        });
+        break;
+      }
+      case "charge.refunded": {
+        const charge = event.data.object as Stripe.Charge;
+        await updatePaymentState({
+          paymentIntentId: getStringId(charge.payment_intent),
+          paymentStatus: "refunded",
+          bookingPaymentStatus: "refunded",
+          eventType: event.type,
+          metadata: charge.metadata ?? {},
+        });
+        break;
+      }
+      default:
+        break;
     }
-    case "checkout.session.expired": {
-      const session = event.data.object as Stripe.Checkout.Session;
-      await updatePaymentState({
-        paymentId: session.metadata?.payment_id ?? null,
-        bookingId: session.metadata?.booking_id ?? null,
-        checkoutSessionId: session.id,
-        paymentIntentId: getStringId(session.payment_intent),
-        subscriptionId: getStringId(session.subscription),
-        paymentStatus: "cancelled",
-        bookingPaymentStatus: "failed",
-        eventType: event.type,
-        metadata: session.metadata ?? {},
-      });
-      break;
-    }
-    case "payment_intent.succeeded": {
-      const intent = event.data.object as Stripe.PaymentIntent;
-      await updatePaymentState({
-        paymentId: intent.metadata?.payment_id ?? null,
-        bookingId: intent.metadata?.booking_id ?? null,
-        paymentIntentId: intent.id,
-        paymentStatus: "paid",
-        bookingPaymentStatus: "paid",
-        eventType: event.type,
-        metadata: intent.metadata ?? {},
-      });
-      break;
-    }
-    case "payment_intent.payment_failed": {
-      const intent = event.data.object as Stripe.PaymentIntent;
-      await updatePaymentState({
-        paymentId: intent.metadata?.payment_id ?? null,
-        bookingId: intent.metadata?.booking_id ?? null,
-        paymentIntentId: intent.id,
-        paymentStatus: "failed",
-        bookingPaymentStatus: "failed",
-        eventType: event.type,
-        metadata: intent.metadata ?? {},
-      });
-      break;
-    }
-    case "customer.subscription.created":
-    case "customer.subscription.updated": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await updatePaymentState({
-        paymentId: subscription.metadata?.payment_id ?? null,
-        bookingId: subscription.metadata?.booking_id ?? null,
-        subscriptionId: subscription.id,
-        paymentStatus:
-          subscription.status === "active" || subscription.status === "trialing"
-            ? "paid"
-            : "pending",
-        bookingPaymentStatus:
-          subscription.status === "active" || subscription.status === "trialing"
-            ? "paid"
-            : "pending",
-        eventType: event.type,
-        metadata: subscription.metadata ?? {},
-      });
-      break;
-    }
-    case "customer.subscription.deleted": {
-      const subscription = event.data.object as Stripe.Subscription;
-      await updatePaymentState({
-        paymentId: subscription.metadata?.payment_id ?? null,
-        bookingId: subscription.metadata?.booking_id ?? null,
-        subscriptionId: subscription.id,
-        paymentStatus: "cancelled",
-        bookingPaymentStatus: "failed",
-        eventType: event.type,
-        metadata: subscription.metadata ?? {},
-      });
-      break;
-    }
-    case "invoice.payment_succeeded": {
-      const invoice = event.data.object as Stripe.Invoice;
-      await updatePaymentState({
-        subscriptionId: getInvoiceSubscriptionId(invoice),
-        paymentStatus: "paid",
-        bookingPaymentStatus: "paid",
-        eventType: event.type,
-        metadata: invoice.metadata ?? {},
-      });
-      break;
-    }
-    case "invoice.payment_failed": {
-      const invoice = event.data.object as Stripe.Invoice;
-      await updatePaymentState({
-        subscriptionId: getInvoiceSubscriptionId(invoice),
-        paymentStatus: "failed",
-        bookingPaymentStatus: "failed",
-        eventType: event.type,
-        metadata: invoice.metadata ?? {},
-      });
-      break;
-    }
-    case "charge.refunded": {
-      const charge = event.data.object as Stripe.Charge;
-      await updatePaymentState({
-        paymentIntentId: getStringId(charge.payment_intent),
-        paymentStatus: "refunded",
-        bookingPaymentStatus: "refunded",
-        eventType: event.type,
-        metadata: charge.metadata ?? {},
-      });
-      break;
-    }
-    default:
-      break;
+  } catch (error) {
+    logger.error("stripe_webhook_processing_failed", {
+      requestId,
+      route,
+      error,
+      metadata: { eventId: event.id, eventType: event.type },
+    });
+    return NextResponse.json(
+      { error: "Stripe webhook processing failed.", requestId },
+      { status: 500 },
+    );
   }
+
+  logger.info("stripe_webhook_processed", {
+    requestId,
+    route,
+    metadata: { eventId: event.id, eventType: event.type },
+  });
 
   return NextResponse.json({ received: true });
 }

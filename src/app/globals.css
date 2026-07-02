@@ -4,6 +4,7 @@
   --background: #f5f4ef;
   --foreground: #111111;
   --ink: #050505;
+  --black: #050505;
   --ink-soft: #171717;
   --panel: #ffffff;
   --panel-dark: #111111;
@@ -17,6 +18,7 @@
   --water: #28b9ff;
   --cream: #f5f4ef;
   --radius: 8px;
+  --radius-lg: 18px;
   --shadow: 0 22px 60px rgba(0, 0, 0, 0.18);
 }
 
@@ -40,6 +42,7 @@ body {
   color: var(--foreground);
   font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   margin: 0;
+  min-width: 0;
 }
 
 body::selection {
@@ -49,6 +52,7 @@ body::selection {
 
 a {
   color: inherit;
+  overflow-wrap: anywhere;
   text-decoration: none;
 }
 
@@ -57,6 +61,73 @@ input,
 select,
 textarea {
   font: inherit;
+  max-width: 100%;
+}
+
+main,
+section,
+article,
+form,
+nav,
+fieldset,
+label,
+li,
+p,
+h1,
+h2,
+h3,
+h4,
+span,
+strong,
+small,
+.container,
+.grid,
+.card,
+.form-section,
+.placeholder-panel,
+.admin-edit-card,
+.data-row,
+.field-card,
+.field-route-card,
+.field-dashboard-hero,
+.field-empty-state,
+.field-tools-card,
+.field-break-active,
+.service-checklist-section,
+.service-checklist-item,
+.policy-modal {
+  min-width: 0;
+}
+
+h1,
+h2,
+h3,
+h4,
+p,
+li,
+span,
+strong,
+small,
+label,
+legend,
+.button,
+.status-badge,
+.plan-badge,
+.field-note,
+.mini-record,
+.admin-data-grid > div,
+.field-meta-grid span {
+  overflow-wrap: anywhere;
+  word-break: normal;
+}
+
+h1,
+h2,
+h3,
+.section-header p,
+.page-hero p,
+.card p {
+  text-wrap: pretty;
 }
 
 .container {
@@ -187,6 +258,7 @@ textarea {
   align-items: center;
   display: inline-flex;
   gap: 10px;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -231,6 +303,8 @@ textarea {
   font-size: 1rem;
   font-weight: 950;
   line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -238,6 +312,8 @@ textarea {
   color: rgba(255, 255, 255, 0.74);
   font-size: 0.72rem;
   font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
@@ -298,6 +374,7 @@ textarea {
   box-shadow: var(--shadow);
   display: grid;
   gap: 6px;
+  max-width: calc(100vw - 32px);
   min-width: 220px;
   padding: 10px;
   position: absolute;
@@ -321,16 +398,22 @@ textarea {
   border-radius: var(--radius);
   cursor: pointer;
   display: inline-flex;
+  flex: 0 1 auto;
   font-weight: 950;
   gap: 10px;
   justify-content: center;
+  line-height: 1.15;
+  max-width: 100%;
   min-height: 48px;
-  padding: 0 18px;
+  min-width: 0;
+  padding: 10px 18px;
+  text-align: center;
   transition:
     background 160ms ease,
     border-color 160ms ease,
     color 160ms ease,
     transform 160ms ease;
+  white-space: normal;
 }
 
 .button:hover {
@@ -505,6 +588,7 @@ textarea {
 .grid {
   display: grid;
   gap: 18px;
+  min-width: 0;
 }
 
 .grid-2,
@@ -520,6 +604,8 @@ textarea {
   color: var(--foreground);
   display: grid;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
   padding: 22px;
 }
 
@@ -576,6 +662,7 @@ textarea {
   display: flex;
   gap: 10px;
   font-weight: 850;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -630,6 +717,7 @@ textarea {
   display: flex;
   font-weight: 950;
   min-height: 54px;
+  min-width: 0;
   padding: 13px 15px;
 }
 
@@ -740,6 +828,7 @@ textarea {
   display: grid;
   gap: 14px;
   margin-bottom: 22px;
+  min-width: 0;
   padding: 22px;
 }
 
@@ -762,6 +851,7 @@ textarea {
   box-shadow: var(--shadow);
   display: grid;
   gap: 9px;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -796,6 +886,7 @@ textarea {
   display: grid;
   gap: 18px;
   margin: 0 0 22px;
+  min-width: 0;
   padding: 20px;
 }
 
@@ -818,6 +909,7 @@ textarea {
   color: white;
   display: grid;
   gap: 20px;
+  min-width: 0;
   overflow: hidden;
   padding: 24px;
 }
@@ -829,6 +921,7 @@ textarea {
   display: grid;
   gap: 18px;
   margin-top: 22px;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -836,6 +929,7 @@ textarea {
   align-items: flex-start;
   display: flex;
   gap: 12px;
+  min-width: 0;
 }
 
 .address-checker-heading svg {
@@ -876,6 +970,7 @@ textarea {
   display: grid;
   gap: 12px;
   grid-template-columns: 1fr;
+  min-width: 0;
 }
 
 .address-result {
@@ -883,6 +978,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 16px;
 }
 
@@ -942,6 +1038,7 @@ textarea {
   display: flex;
   font-weight: 850;
   gap: 10px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -958,6 +1055,7 @@ textarea {
   color: var(--ink);
   display: flex;
   gap: 10px;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -1096,6 +1194,7 @@ textarea {
   display: grid;
   gap: 18px;
   padding: 22px;
+  max-width: 100%;
 }
 
 .contact-form-wrap {
@@ -1111,12 +1210,22 @@ textarea {
 .form-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: 1fr;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
+  min-width: 0;
 }
 
 .field {
   display: grid;
   gap: 7px;
+  min-width: 0;
+}
+
+.filter-bar label,
+.field-form > label,
+form.data-row label {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
 }
 
 .field label,
@@ -1133,11 +1242,108 @@ textarea {
   border-radius: var(--radius);
   min-height: 46px;
   padding: 10px 12px;
+  width: 100%;
+}
+
+.filter-bar label input:not([type="checkbox"]):not([type="radio"]),
+.filter-bar label select,
+.filter-bar label textarea,
+.field-form > label input:not([type="checkbox"]):not([type="radio"]),
+.field-form > label select,
+.field-form > label textarea,
+form.data-row label input:not([type="checkbox"]):not([type="radio"]),
+form.data-row label select,
+form.data-row label textarea,
+.field-form > input:not([type="checkbox"]):not([type="radio"]):not([type="file"]),
+.inline-payment-form > input:not([type="checkbox"]):not([type="radio"]) {
+  background: #fbfbf8;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: var(--radius);
+  min-height: 46px;
+  min-width: 0;
+  padding: 10px 12px;
+  width: 100%;
 }
 
 .field textarea {
   min-height: 112px;
   resize: vertical;
+}
+
+.field textarea[rows="2"] {
+  min-height: 74px;
+}
+
+.choice-fieldset,
+.booking-choice-group {
+  border: 0;
+  margin: 0;
+  max-width: 100%;
+  min-inline-size: 0;
+  min-width: 0;
+  padding: 0;
+}
+
+.choice-fieldset legend,
+.booking-choice-group legend {
+  font-size: 0.92rem;
+  font-weight: 900;
+  margin: 0 0 7px;
+  padding: 0;
+}
+
+.booking-choice-grid {
+  grid-template-columns: 1fr;
+}
+
+.booking-choice-card span {
+  overflow-wrap: break-word;
+}
+
+.readonly-field-value {
+  align-items: center;
+  background: #fbfbf8;
+  border: 1px solid rgba(17, 17, 17, 0.18);
+  border-radius: var(--radius);
+  color: var(--ink-soft);
+  display: flex;
+  min-height: 46px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+  padding: 10px 12px;
+  white-space: normal;
+  width: 100%;
+}
+
+.admin-email-change-section {
+  border-color: rgba(225, 52, 47, 0.22);
+}
+
+.admin-email-change-form {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.form-status-message {
+  border-radius: var(--radius);
+  font-weight: 850;
+  line-height: 1.45;
+  margin: 0;
+  overflow-wrap: anywhere;
+  padding: 12px 14px;
+}
+
+.form-status-success {
+  background: rgba(0, 255, 56, 0.12);
+  border: 1px solid rgba(0, 150, 0, 0.22);
+  color: #075c1b;
+}
+
+.form-status-error {
+  background: rgba(225, 52, 47, 0.1);
+  border: 1px solid rgba(225, 52, 47, 0.26);
+  color: #8c130f;
 }
 
 .choice-grid {
@@ -1153,16 +1359,31 @@ textarea {
   border-radius: var(--radius);
   display: flex;
   gap: 10px;
+  min-width: 0;
   padding: 12px;
 }
 
-.choice-card input {
-  margin-top: 3px;
+.choice-card input[type="checkbox"],
+.choice-card input[type="radio"] {
+  background: initial;
+  border: initial;
+  border-radius: initial;
+  flex: 0 0 auto;
+  margin: 3px 0 0;
+  max-width: none;
+  min-height: 0;
+  padding: 0;
+  width: auto;
 }
 
 .choice-card span {
   display: block;
+  flex: 1 1 auto;
   font-weight: 900;
+  min-width: 0;
+  overflow-wrap: break-word;
+  white-space: normal;
+  word-break: normal;
 }
 
 .choice-card small {
@@ -1185,6 +1406,24 @@ textarea {
   font-size: 0.95rem;
   line-height: 1.5;
   margin: 0;
+}
+
+.turnstile-panel {
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  justify-items: start;
+  max-width: 100%;
+  min-height: 78px;
+  min-width: 0;
+  overflow-x: auto;
+  padding: 12px;
+}
+
+.turnstile-widget {
+  max-width: 100%;
+  min-width: 0;
 }
 
 .estimate-panel {
@@ -1281,12 +1520,18 @@ textarea {
 .shell-layout {
   display: grid;
   gap: 20px;
+  min-width: 0;
 }
 
 .shell-topbar {
   align-items: center;
   display: grid;
   gap: 12px;
+  min-width: 0;
+}
+
+.shell-topbar > * {
+  min-width: 0;
 }
 
 .shell-nav {
@@ -1296,7 +1541,16 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  max-width: 100%;
+  min-width: 0;
   padding: 10px;
+}
+
+.shell-nav a {
+  display: inline-flex;
+  justify-content: center;
+  min-width: 0;
+  text-align: center;
 }
 
 .auth-layout {
@@ -1312,6 +1566,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 16px;
+  max-width: 100%;
   padding: 24px;
 }
 
@@ -1342,6 +1597,12 @@ textarea {
   align-items: start;
   display: grid;
   gap: 14px;
+  min-width: 0;
+}
+
+.admin-page-heading > *,
+.admin-row-heading > * {
+  min-width: 0;
 }
 
 .admin-page-heading h1,
@@ -1355,7 +1616,20 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 12px;
+  max-width: 100%;
+  min-width: 0;
   padding: 14px;
+}
+
+.filter-bar > .form-grid,
+.filter-bar > label:not(.field) {
+  grid-column: 1 / -1;
+}
+
+.filter-bar > .button {
+  grid-column: 1 / -1;
+  justify-self: start;
+  width: min(100%, 260px);
 }
 
 .filter-search {
@@ -1368,6 +1642,12 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 10px;
+  min-width: 0;
+}
+
+.filter-actions > *,
+.action-row > * {
+  min-width: 0;
 }
 
 .compact-actions {
@@ -1385,6 +1665,7 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .status-badge.status-paid,
@@ -1439,6 +1720,11 @@ textarea {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr;
+  min-width: 0;
+}
+
+.detail-panel > .admin-data-grid {
+  grid-template-columns: 1fr;
 }
 
 .admin-data-grid > div {
@@ -1447,6 +1733,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 4px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -1460,6 +1747,7 @@ textarea {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  min-width: 0;
 }
 
 .status-tabs a {
@@ -1483,6 +1771,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -1497,6 +1786,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 5px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -1538,6 +1828,7 @@ textarea {
   display: flex;
   inset: 0;
   justify-content: center;
+  overflow-y: auto;
   padding: 18px;
   position: fixed;
   z-index: 80;
@@ -1550,8 +1841,10 @@ textarea {
   box-shadow: var(--shadow);
   display: grid;
   gap: 16px;
+  margin: auto;
   max-height: calc(100svh - 36px);
   max-width: 620px;
+  min-width: 0;
   overflow: auto;
   padding: 24px;
   width: min(100%, 620px);
@@ -1574,6 +1867,7 @@ textarea {
 .admin-card-list {
   display: grid;
   gap: 10px;
+  min-width: 0;
 }
 
 .data-row {
@@ -1584,7 +1878,12 @@ textarea {
   display: grid;
   gap: 10px;
   grid-template-columns: 1fr;
+  min-width: 0;
   padding: 14px;
+}
+
+.data-row > * {
+  min-width: 0;
 }
 
 .data-row strong,
@@ -1603,6 +1902,8 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -1644,6 +1945,8 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 16px;
+  max-width: 100%;
+  min-width: 0;
   padding: 26px;
 }
 
@@ -1660,6 +1963,7 @@ textarea {
   gap: 18px;
   margin: 0 auto;
   max-width: 1200px;
+  min-width: 0;
   padding: 0 clamp(0px, 1vw, 12px);
 }
 
@@ -1674,6 +1978,7 @@ textarea {
   display: grid;
   gap: 18px;
   justify-content: space-between;
+  min-width: 0;
   padding: 20px;
   position: relative;
   overflow: hidden;
@@ -1697,6 +2002,15 @@ textarea {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
+  min-width: 0;
+}
+
+.field-header-main > *,
+.field-header-actions > *,
+.field-card-top > *,
+.field-page-heading > *,
+.field-section-heading > * {
+  min-width: 0;
 }
 
 .field-header-meta {
@@ -1727,7 +2041,10 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: space-between;
+  min-width: 0;
   padding: 14px 16px;
 }
 
@@ -1740,6 +2057,7 @@ textarea {
   display: grid;
   gap: 8px;
   grid-template-columns: repeat(4, minmax(0, 1fr));
+  min-width: 0;
   z-index: 20;
 }
 
@@ -1767,6 +2085,7 @@ textarea {
   box-shadow: 0 14px 36px rgba(5, 5, 5, 0.08);
   display: grid;
   gap: 14px;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -1783,6 +2102,7 @@ textarea {
   box-shadow: 0 18px 42px rgba(5, 5, 5, 0.09);
   display: grid;
   gap: 16px;
+  min-width: 0;
   padding: clamp(20px, 4vw, 30px);
 }
 
@@ -1835,6 +2155,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 6px;
+  min-width: 0;
   padding: 16px;
 }
 
@@ -1911,6 +2232,7 @@ textarea {
   border: 1px solid var(--line);
   border-radius: var(--radius);
   font-weight: 950;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -1944,6 +2266,7 @@ textarea {
   flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
+  min-width: 0;
 }
 
 .field-page-heading h2,
@@ -1988,6 +2311,7 @@ textarea {
   border-radius: var(--radius);
   color: var(--muted);
   font-weight: 800;
+  min-width: 0;
   padding: 10px;
 }
 
@@ -1996,6 +2320,12 @@ textarea {
   align-items: stretch;
   display: grid;
   gap: 8px;
+  min-width: 0;
+}
+
+.field-actions > *,
+.payment-link-control > * {
+  min-width: 0;
 }
 
 .field-actions .button,
@@ -2036,13 +2366,21 @@ textarea {
   display: flex;
   gap: 10px;
   min-height: 48px;
+  min-width: 0;
   padding: 10px;
 }
 
 .field-checklist input,
 .inline-check input {
+  flex: 0 0 auto;
   height: 22px;
   width: 22px;
+}
+
+.field-checklist span,
+.inline-check span,
+.checklist-status-options span {
+  min-width: 0;
 }
 
 .field-checklist.compact {
@@ -2105,6 +2443,7 @@ textarea {
   flex-wrap: wrap;
   gap: 16px;
   justify-content: space-between;
+  min-width: 0;
   padding: 18px;
 }
 
@@ -2139,6 +2478,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 4px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -2156,6 +2496,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 10px;
+  min-width: 0;
   padding: 14px;
 }
 
@@ -2191,9 +2532,11 @@ textarea {
   align-items: center;
   cursor: pointer;
   display: flex;
+  flex-wrap: wrap;
   gap: 12px;
   justify-content: space-between;
   list-style: none;
+  min-width: 0;
   padding: 14px 16px;
 }
 
@@ -2224,6 +2567,7 @@ textarea {
   border-radius: var(--radius);
   display: grid;
   gap: 12px;
+  min-width: 0;
   padding: 12px;
 }
 
@@ -2258,10 +2602,12 @@ textarea {
   font-weight: 900;
   gap: 8px;
   min-height: 46px;
+  min-width: 0;
   padding: 8px 10px;
 }
 
 .checklist-status-options input {
+  flex: 0 0 auto;
   height: 20px;
   width: 20px;
 }
@@ -2566,11 +2912,15 @@ textarea {
   }
 
   .form-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 220px), 1fr));
   }
 
   .choice-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .booking-choice-grid {
+    grid-template-columns: 1fr;
   }
 
   .billing-note-grid,
@@ -2579,7 +2929,7 @@ textarea {
   }
 
   .address-checker-grid {
-    grid-template-columns: 1.2fr 0.65fr 0.75fr;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
 
   .proof-gallery {
@@ -2625,11 +2975,15 @@ textarea {
 
   .data-row {
     align-items: center;
-    grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .customer-row {
-    grid-template-columns: 1.3fr 1.35fr 1fr 0.8fr 1fr;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .customer-row .action-row {
+    grid-column: 1 / -1;
   }
 
   .admin-page-heading,
@@ -2639,7 +2993,7 @@ textarea {
 
   .filter-bar {
     align-items: end;
-    grid-template-columns: repeat(4, minmax(0, 1fr));
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .filter-search {
@@ -2651,15 +3005,19 @@ textarea {
   }
 
   .admin-data-grid {
-    grid-template-columns: repeat(4, minmax(0, 1fr));
-  }
-
-  .detail-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
+  .detail-grid {
+    grid-template-columns: 1fr;
+  }
+
   form.data-row {
-    grid-template-columns: 1.4fr 0.7fr auto;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  form.data-row .button {
+    width: 100%;
   }
 
   .field-meta-grid {
@@ -2762,6 +3120,30 @@ textarea {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 
+  .data-row {
+    grid-template-columns: 1.4fr 0.8fr 0.8fr 0.8fr;
+  }
+
+  .filter-bar {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .admin-data-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+
+  .detail-panel > .admin-data-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .detail-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  form.data-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
   .footer-grid {
     grid-template-columns:
       minmax(250px, 1.15fr)
@@ -2773,6 +3155,16 @@ textarea {
   .service-area-panel {
     grid-template-columns: 1fr 1fr;
     padding: 34px;
+  }
+}
+
+@media (min-width: 1180px) {
+  .customer-row {
+    grid-template-columns: 1.3fr 1.35fr 1fr 0.8fr 1fr;
+  }
+
+  .customer-row .action-row {
+    grid-column: auto;
   }
 }
 
@@ -2789,14 +3181,24 @@ textarea {
     font-size: 2.55rem;
   }
 
-  .button {
-    width: 100%;
-  }
-
   .action-row,
   .filter-actions {
     align-items: stretch;
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .action-row .button,
+  .filter-actions .button,
+  .hero-actions .button,
+  .submit-area .button,
+  .auth-form .button,
+  .form-section > .button,
+  .address-checker-form > .button,
+  .confirmation-panel .button,
+  .field-actions .button,
+  .payment-link-control .button,
+  .employee-login-card .button {
+    width: 100%;
   }
 }

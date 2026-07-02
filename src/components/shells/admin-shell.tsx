@@ -4,6 +4,7 @@ import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 
 const adminLinks = [
   { label: "Dashboard", href: "/admin" },
+  { label: "Field App", href: "/field" },
   { label: "Bookings", href: "/admin/bookings" },
   { label: "Routes", href: "/admin/routes" },
   { label: "Checklists", href: "/admin/checklists" },

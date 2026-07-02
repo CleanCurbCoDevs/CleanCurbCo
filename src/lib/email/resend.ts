@@ -2,6 +2,7 @@ import "server-only";
 
 import { Resend } from "resend";
 import { getResendEnv, isResendConfigured } from "@/lib/env";
+import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
 type SendEmailInput = {
@@ -46,7 +47,7 @@ function getSafeErrorMessage(error: unknown) {
 
 function logEmailResult(
   level: "info" | "warn" | "error",
-  message: string,
+  event: string,
   input: {
     templateKey: string;
     recipientCount: number;
@@ -57,19 +58,18 @@ function logEmailResult(
     errorMessage?: string | null;
   },
 ) {
-  const payload = {
-    service: "email",
-    message,
-    templateKey: input.templateKey,
-    recipientCount: input.recipientCount,
+  logger[level](event, {
+    route: "email",
+    bookingId: input.relatedBookingId ?? null,
     status: input.status,
-    relatedBookingId: input.relatedBookingId ?? null,
-    relatedVisitId: input.relatedVisitId ?? null,
-    resendId: input.resendId ?? null,
-    errorMessage: input.errorMessage ?? null,
-  };
-
-  console[level](JSON.stringify(payload));
+    metadata: {
+      templateKey: input.templateKey,
+      recipientCount: input.recipientCount,
+      relatedVisitId: input.relatedVisitId ?? null,
+      resendId: input.resendId ?? null,
+      errorMessage: input.errorMessage ?? null,
+    },
+  });
 }
 
 export async function sendTransactionalEmail(input: SendEmailInput) {

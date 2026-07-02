@@ -250,7 +250,11 @@ export default async function AdminBookingsPage({
                     </label>
                     <label className="field">
                       <span>Payment link</span>
-                      <input name="paymentLink" defaultValue={booking.payment_link ?? ""} />
+                      <textarea
+                        name="paymentLink"
+                        defaultValue={booking.payment_link ?? ""}
+                        rows={2}
+                      />
                     </label>
                     <label className="field">
                       <span>Payment method</span>

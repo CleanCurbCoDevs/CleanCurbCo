@@ -296,17 +296,28 @@ function BookingSelect({
     return <input type="hidden" name="bookingId" value="" />;
   }
 
+  const selectedBookingId = defaultBookingId ?? bookings[0]?.id;
+
   return (
-    <label className="field">
-      <span>Linked booking</span>
-      <select name="bookingId" defaultValue={defaultBookingId}>
+    <fieldset className="field choice-fieldset booking-choice-group">
+      <legend>Linked booking</legend>
+      <div className="choice-grid booking-choice-grid">
         {bookings.map((booking) => (
-          <option value={booking.id} key={booking.id}>
-            {formatFrequency(booking.frequency)} - {booking.street_address}
-          </option>
+          <label className="choice-card booking-choice-card" key={booking.id}>
+            <input
+              defaultChecked={booking.id === selectedBookingId}
+              name="bookingId"
+              required
+              type="radio"
+              value={booking.id}
+            />
+            <span>
+              {formatFrequency(booking.frequency)} - {booking.street_address}
+            </span>
+          </label>
         ))}
-      </select>
-    </label>
+      </div>
+    </fieldset>
   );
 }
 
@@ -343,18 +354,25 @@ function RequestFields({
 
   if (type === "change_frequency") {
     return (
-      <label className="field">
-        <span>Requested frequency</span>
-        <select name="requestedFrequency" defaultValue="every_other_month">
+      <fieldset className="field choice-fieldset">
+        <legend>Requested frequency</legend>
+        <div className="choice-grid booking-choice-grid">
           {validFrequencies
             .filter((frequency) => frequency !== "one_time")
             .map((frequency) => (
-              <option value={frequency} key={frequency}>
-                {formatFrequency(frequency)}
-              </option>
+              <label className="choice-card" key={frequency}>
+                <input
+                  defaultChecked={frequency === "every_other_month"}
+                  name="requestedFrequency"
+                  required
+                  type="radio"
+                  value={frequency}
+                />
+                <span>{formatFrequency(frequency)}</span>
+              </label>
             ))}
-        </select>
-      </label>
+        </div>
+      </fieldset>
     );
   }
 

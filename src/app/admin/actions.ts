@@ -12,9 +12,13 @@ import { sendPaymentLink } from "@/lib/email/sendPaymentLink";
 import { sendReferralRewardEmail } from "@/lib/email/sendReferralReward";
 import { sendReviewRequest } from "@/lib/email/sendReviewRequest";
 import { sendRouteConfirmation } from "@/lib/email/sendRouteConfirmation";
+import { isStripeConfigured } from "@/lib/env";
+import { writeAdminAuditLog } from "@/lib/server/admin-audit";
+import { createRequestId, logger, maskEmail, maskPhone } from "@/lib/server/logger";
+import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/auth";
-import { cleanLongText, cleanString, pickEnum } from "@/lib/validation";
+import { cleanLongText, cleanString, isValidEmail, pickEnum } from "@/lib/validation";
 import type { BookingStatus, PaymentStatus } from "@/types/booking";
 import type {
   CareerApplicationStatus,
@@ -26,6 +30,12 @@ import type {
 } from "@/types/database";
 
 type AdminClient = ReturnType<typeof getSupabaseAdmin>;
+export type AdminEmailChangeState = {
+  status: "idle" | "success" | "error";
+  message: string;
+  requestId?: string;
+};
+
 const preferredContactMethods = ["email", "phone", "sms"] as const;
 const careerApplicationStatuses: readonly CareerApplicationStatus[] = [
   "new",
@@ -87,10 +97,52 @@ async function advanceReferralForBooking(admin: AdminClient, bookingId: string) 
     .in("status", nextStatus === "reward_ready" ? ["pending", "qualified"] : ["pending"]);
 }
 
+function actorEmail(auth: Awaited<ReturnType<typeof requireAdmin>>) {
+  return auth.status === "ok" ? maskEmail(auth.email) : null;
+}
+
+async function rollbackCustomerEmailChange(input: {
+  admin: AdminClient;
+  profileId: string;
+  previousEmail: string | null;
+  stripeCustomerId: string | null;
+  requestId: string;
+}) {
+  if (!input.previousEmail) return;
+
+  try {
+    await input.admin.auth.admin.updateUserById(input.profileId, {
+      email: input.previousEmail,
+      email_confirm: true,
+    });
+  } catch (error) {
+    logger.error("admin_customer_email_auth_rollback_failed", {
+      requestId: input.requestId,
+      customerId: input.profileId,
+      error,
+    });
+  }
+
+  if (input.stripeCustomerId && isStripeConfigured()) {
+    try {
+      await getStripe().customers.update(input.stripeCustomerId, {
+        email: input.previousEmail,
+      });
+    } catch (error) {
+      logger.error("admin_customer_email_stripe_rollback_failed", {
+        requestId: input.requestId,
+        customerId: input.profileId,
+        error,
+      });
+    }
+  }
+}
+
 export async function updateBookingAdminAction(formData: FormData) {
   const auth = await requireAdmin("/admin/bookings");
   if (auth.status !== "ok") return;
 
+  const requestId = createRequestId();
   const bookingId = cleanString(formData.get("bookingId"), 80);
   if (!bookingId) return;
 
@@ -152,6 +204,38 @@ export async function updateBookingAdminAction(formData: FormData) {
       },
     });
 
+    await writeAdminAuditLog({
+      action: "booking_updated",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "booking",
+      target_id: updatedBooking.id,
+      customer_id: updatedBooking.customer_id,
+      booking_id: updatedBooking.id,
+      before_summary: {
+        status: previousBooking?.status ?? null,
+        paymentStatus: previousBooking?.payment_status ?? null,
+        confirmedRouteDay: previousBooking?.confirmed_route_day ?? null,
+      },
+      after_summary: {
+        status: updatedBooking.status,
+        paymentStatus: updatedBooking.payment_status,
+        confirmedRouteDay: updatedBooking.confirmed_route_day,
+      },
+      request_id: requestId,
+      status: "success",
+    });
+
+    logger.info("admin_booking_updated", {
+      requestId,
+      action: "booking_updated",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: updatedBooking.customer_id,
+      bookingId: updatedBooking.id,
+    });
+
     await advanceReferralForBooking(admin, updatedBooking.id);
   }
 
@@ -170,19 +254,28 @@ export async function updateBookingAdminAction(formData: FormData) {
   revalidatePath("/admin/referrals");
 }
 
-export async function updatePaymentStatusAction(formData: FormData) {
+export async function updatePaymentStatusAction(
+  quickPaymentStatus: PaymentStatus,
+  formData: FormData,
+) {
   const auth = await requireAdmin("/admin/payments");
   if (auth.status !== "ok") return;
 
+  const requestId = createRequestId();
   const bookingId = cleanString(formData.get("bookingId"), 80);
   const paymentStatus = pickEnum<PaymentStatus>(
-    formData.get("quickPaymentStatus") ?? formData.get("paymentStatus"),
+    quickPaymentStatus ?? formData.get("paymentStatus"),
     validPaymentStatuses,
     "not_sent",
   );
   if (!bookingId) return;
 
   const admin = getSupabaseAdmin();
+  const { data: previousBooking } = await admin
+    .from("bookings")
+    .select("*")
+    .eq("id", bookingId)
+    .maybeSingle();
   const { data: booking } = await admin
     .from("bookings")
     .update({ payment_status: paymentStatus })
@@ -210,6 +303,36 @@ export async function updatePaymentStatusAction(formData: FormData) {
       booking_id: booking.id,
       event_type: "payment_status_changed",
       message: `Payment status changed to ${paymentStatus}.`,
+      metadata: { paymentStatus },
+    });
+
+    await writeAdminAuditLog({
+      action: "booking_updated",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "booking",
+      target_id: booking.id,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      before_summary: {
+        paymentStatus: previousBooking?.payment_status ?? null,
+      },
+      after_summary: {
+        paymentStatus: booking.payment_status,
+      },
+      request_id: requestId,
+      status: "success",
+      metadata: { source: "admin_payment_status_action" },
+    });
+
+    logger.info("admin_payment_status_changed", {
+      requestId,
+      action: "payment_status_changed",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: booking.customer_id,
+      bookingId: booking.id,
       metadata: { paymentStatus },
     });
     await advanceReferralForBooking(admin, booking.id);
@@ -257,7 +380,13 @@ export async function updateCustomerProfileAdminAction(formData: FormData) {
   const profileId = cleanString(formData.get("profileId"), 80);
   if (!profileId) return;
 
+  const requestId = createRequestId();
   const admin = getSupabaseAdmin();
+  const { data: previousProfile } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", profileId)
+    .maybeSingle();
   const preferredContactMethod = pickEnum(
     formData.get("preferredContactMethod"),
     preferredContactMethods,
@@ -314,14 +443,351 @@ export async function updateCustomerProfileAdminAction(formData: FormData) {
     message: "Customer profile updated by admin.",
   });
 
+  await writeAdminAuditLog({
+    action: "customer_profile_updated",
+    actor_user_id: auth.userId,
+    actor_email: actorEmail(auth),
+    actor_role: auth.profile.role,
+    target_type: "profile",
+    target_id: profileId,
+    customer_id: profileId,
+    before_summary: {
+      firstName: previousProfile?.first_name ?? null,
+      lastName: previousProfile?.last_name ?? null,
+      phone: maskPhone(previousProfile?.phone),
+      preferredContactMethod: previousProfile?.preferred_contact_method ?? null,
+      marketingOptIn: previousProfile?.marketing_opt_in ?? null,
+      smsOptIn: previousProfile?.sms_opt_in ?? null,
+    },
+    after_summary: {
+      firstName: profileUpdate.first_name,
+      lastName: profileUpdate.last_name,
+      phone: maskPhone(profileUpdate.phone),
+      preferredContactMethod,
+      marketingOptIn: profileUpdate.marketing_opt_in,
+      smsOptIn: profileUpdate.sms_opt_in,
+    },
+    request_id: requestId,
+    status: "success",
+  });
+
+  logger.info("admin_customer_profile_updated", {
+    requestId,
+    action: "customer_profile_updated",
+    userId: auth.userId,
+    role: auth.profile.role,
+    customerId: profileId,
+  });
+
   revalidatePath("/admin/customers");
   revalidatePath(`/admin/customers/${profileId}`);
+}
+
+export async function changeCustomerEmailAdminAction(
+  _previousState: AdminEmailChangeState,
+  formData: FormData,
+): Promise<AdminEmailChangeState> {
+  const requestId = createRequestId();
+  const auth = await requireAdmin("/admin/customers");
+
+  if (auth.status !== "ok") {
+    return {
+      status: "error",
+      message: "Only authorized admins can change customer email.",
+      requestId,
+    };
+  }
+
+  const profileId = cleanString(formData.get("profileId"), 80);
+  const newEmail = cleanString(formData.get("email"), 120).toLowerCase();
+  const confirmEmail = cleanString(formData.get("confirmEmail"), 120).toLowerCase();
+  const note = cleanLongText(formData.get("note"), 500) || null;
+
+  if (!profileId || !isValidEmail(newEmail)) {
+    return {
+      status: "error",
+      message: "Enter a valid customer email before saving.",
+      requestId,
+    };
+  }
+
+  if (newEmail !== confirmEmail) {
+    return {
+      status: "error",
+      message: "The email fields do not match.",
+      requestId,
+    };
+  }
+
+  const admin = getSupabaseAdmin();
+  const { data: profile, error: profileError } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  if (profileError || !profile) {
+    return {
+      status: "error",
+      message: "Customer profile was not found.",
+      requestId,
+    };
+  }
+
+  const previousEmail = profile.email?.trim().toLowerCase() || null;
+  const beforeSummary = {
+    email: maskEmail(previousEmail),
+    hasStripeCustomer: Boolean(profile.stripe_customer_id),
+  };
+  const afterSummary = {
+    email: maskEmail(newEmail),
+    hasStripeCustomer: Boolean(profile.stripe_customer_id),
+  };
+
+  if (previousEmail === newEmail) {
+    return {
+      status: "success",
+      message: "That email is already on this customer.",
+      requestId,
+    };
+  }
+
+  const { data: duplicateProfiles } = await admin
+    .from("profiles")
+    .select("id")
+    .eq("email", newEmail)
+    .neq("id", profileId)
+    .limit(1);
+
+  if (duplicateProfiles?.length) {
+    await writeAdminAuditLog({
+      action: "customer_email_changed",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "profile",
+      target_id: profileId,
+      customer_id: profileId,
+      before_summary: beforeSummary,
+      after_summary: afterSummary,
+      note,
+      request_id: requestId,
+      status: "failure",
+      metadata: { reason: "duplicate_profile_email" },
+    });
+    return {
+      status: "error",
+      message: "Another Clean Curb Co. profile already uses that email.",
+      requestId,
+    };
+  }
+
+  const { data: authUsers, error: authUsersError } =
+    await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+  if (authUsersError) {
+    logger.error("admin_customer_email_duplicate_auth_lookup_failed", {
+      requestId,
+      action: "customer_email_changed",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: profileId,
+      error: authUsersError,
+    });
+    return {
+      status: "error",
+      message: "Could not verify whether another login already uses that email.",
+      requestId,
+    };
+  }
+
+  const duplicateAuthUser = authUsers.users.find(
+    (user) => user.id !== profileId && user.email?.toLowerCase() === newEmail,
+  );
+  if (duplicateAuthUser) {
+    await writeAdminAuditLog({
+      action: "customer_email_changed",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "profile",
+      target_id: profileId,
+      customer_id: profileId,
+      before_summary: beforeSummary,
+      after_summary: afterSummary,
+      note,
+      request_id: requestId,
+      status: "failure",
+      metadata: { reason: "duplicate_auth_email" },
+    });
+    return {
+      status: "error",
+      message: "Another Supabase Auth user already uses that email.",
+      requestId,
+    };
+  }
+
+  const { data: customerBookings } = await admin
+    .from("bookings")
+    .select("id")
+    .eq("customer_id", profileId);
+  const bookingIds = customerBookings?.map((booking) => booking.id) ?? [];
+
+  if (profile.stripe_customer_id && !isStripeConfigured()) {
+    return {
+      status: "error",
+      message:
+        "This customer is linked to Stripe, but Stripe is not configured for email sync.",
+      requestId,
+    };
+  }
+
+  try {
+    if (profile.stripe_customer_id) {
+      await getStripe().customers.update(profile.stripe_customer_id, {
+        email: newEmail,
+      });
+    }
+
+    const { error: authUpdateError } = await admin.auth.admin.updateUserById(
+      profileId,
+      {
+        email: newEmail,
+        email_confirm: true,
+      },
+    );
+    if (authUpdateError) throw authUpdateError;
+
+    const { error: profileUpdateError } = await admin
+      .from("profiles")
+      .update({ email: newEmail })
+      .eq("id", profileId);
+    const { error: bookingUpdateError } = await admin
+      .from("bookings")
+      .update({ email: newEmail })
+      .eq("customer_id", profileId);
+    const { error: referralUpdateError } = await admin
+      .from("referrals")
+      .update({ referred_email: newEmail })
+      .eq("referred_profile_id", profileId);
+    const { error: claimUpdateError } = bookingIds.length
+      ? await admin
+          .from("booking_claims")
+          .update({ email: newEmail })
+          .in("booking_id", bookingIds)
+      : { error: null };
+
+    const appError =
+      profileUpdateError ||
+      bookingUpdateError ||
+      referralUpdateError ||
+      claimUpdateError;
+    if (appError) {
+      await rollbackCustomerEmailChange({
+        admin,
+        profileId,
+        previousEmail,
+        stripeCustomerId: profile.stripe_customer_id,
+        requestId,
+      });
+      throw appError;
+    }
+
+    await logActivity(admin, {
+      actor_profile_id: auth.userId,
+      customer_id: profileId,
+      event_type: "customer_email_changed",
+      message: "Customer login email changed by admin.",
+      metadata: {
+        previousEmail: maskEmail(previousEmail),
+        newEmail: maskEmail(newEmail),
+        stripeCustomerSynced: Boolean(profile.stripe_customer_id),
+      },
+    });
+
+    await writeAdminAuditLog({
+      action: "customer_email_changed",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "profile",
+      target_id: profileId,
+      customer_id: profileId,
+      before_summary: beforeSummary,
+      after_summary: {
+        ...afterSummary,
+        supabaseAuthUpdated: true,
+        profileUpdated: true,
+        bookingRecordsUpdated: bookingIds.length,
+        stripeCustomerUpdated: Boolean(profile.stripe_customer_id),
+      },
+      note,
+      request_id: requestId,
+      status: "success",
+    });
+
+    logger.info("admin_customer_email_changed", {
+      requestId,
+      action: "customer_email_changed",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: profileId,
+      metadata: {
+        bookingRecordsUpdated: bookingIds.length,
+        stripeCustomerUpdated: Boolean(profile.stripe_customer_id),
+      },
+    });
+
+    revalidatePath("/admin/customers");
+    revalidatePath(`/admin/customers/${profileId}`);
+    revalidatePath("/portal");
+    revalidatePath("/portal/account");
+
+    return {
+      status: "success",
+      message:
+        "Customer login email updated in Supabase Auth, app records, and Stripe when linked.",
+      requestId,
+    };
+  } catch (error) {
+    logger.error("admin_customer_email_change_failed", {
+      requestId,
+      action: "customer_email_changed",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: profileId,
+      error,
+    });
+    await writeAdminAuditLog({
+      action: "customer_email_changed",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "profile",
+      target_id: profileId,
+      customer_id: profileId,
+      before_summary: beforeSummary,
+      after_summary: afterSummary,
+      note,
+      request_id: requestId,
+      status: "failure",
+      metadata: {
+        reason: error instanceof Error ? error.message : "unknown_error",
+      },
+    });
+
+    return {
+      status: "error",
+      message: "Customer email could not be changed. Check logs for the request ID.",
+      requestId,
+    };
+  }
 }
 
 export async function updateCustomerRequestAdminAction(formData: FormData) {
   const auth = await requireAdmin("/admin/requests");
   if (auth.status !== "ok") return;
 
+  const auditRequestId = createRequestId();
   const requestId = cleanString(formData.get("requestId"), 80);
   const status = pickEnum<CustomerRequestStatus>(
     formData.get("status"),
@@ -376,6 +842,36 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
       request_id: request.id,
       event_type: "customer_request_updated",
       message: `Customer request marked ${status}.`,
+      metadata: { status },
+    });
+
+    await writeAdminAuditLog({
+      action: "service_request_handled",
+      actor_user_id: auth.userId,
+      actor_email: actorEmail(auth),
+      actor_role: auth.profile.role,
+      target_type: "customer_request",
+      target_id: request.id,
+      customer_id: request.customer_id,
+      booking_id: request.booking_id,
+      before_summary: {},
+      after_summary: {
+        status: request.status,
+        bookingStatus: bookingStatusInput || null,
+        paymentStatus: paymentStatusInput || null,
+      },
+      note: request.admin_notes,
+      request_id: auditRequestId,
+      status: "success",
+    });
+
+    logger.info("admin_customer_request_updated", {
+      requestId: auditRequestId,
+      action: "service_request_handled",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: request.customer_id,
+      bookingId: request.booking_id,
       metadata: { status },
     });
 
