@@ -73,7 +73,7 @@ export async function verifyTurnstileToken({
     const form = new FormData();
     form.set("secret", secretKey);
     form.set("response", cleanToken);
-    form.set("idempotency_key", requestId);
+    form.set("idempotency_key", crypto.randomUUID());
     if (remoteIp) form.set("remoteip", remoteIp);
 
     const response = await fetch(SITEVERIFY_URL, {
@@ -88,7 +88,10 @@ export async function verifyTurnstileToken({
     const actionMismatch =
       Boolean(expectedAction) &&
       !isTestingSecret &&
+      Boolean(result.action) &&
       result.action !== expectedAction;
+    const actionMissing =
+      Boolean(expectedAction) && !isTestingSecret && !result.action;
 
     if (!response.ok || !result.success || actionMismatch) {
       logger.warn("turnstile_validation_failed", {
@@ -102,6 +105,7 @@ export async function verifyTurnstileToken({
           action: result.action ?? null,
           expectedAction: expectedAction ?? null,
           actionMismatch,
+          actionMissing,
         },
       });
       return {
