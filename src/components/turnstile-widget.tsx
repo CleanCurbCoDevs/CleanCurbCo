@@ -8,13 +8,14 @@ declare global {
     turnstile?: {
       render: (
         container: HTMLElement,
-        options: {
-          sitekey: string;
-          action?: string;
-          callback: (token: string) => void;
-          "expired-callback": () => void;
-          "error-callback": () => void;
-        },
+          options: {
+            sitekey: string;
+            action?: string;
+            callback: (token: string) => void;
+            "expired-callback": () => void;
+            "error-callback": () => void;
+            "timeout-callback"?: () => void;
+          },
       ) => string;
       remove: (widgetId: string) => void;
     };
@@ -55,9 +56,26 @@ export function TurnstileWidget({
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
       action,
-      callback: (token) => onTokenChange(token),
-      "expired-callback": () => onTokenChange(""),
-      "error-callback": () => onTokenChange(""),
+      callback: (token) => {
+        console.info("Turnstile token received", {
+          hasToken: Boolean(token),
+          tokenLength: token.length,
+          action,
+        });
+        onTokenChange(token);
+      },
+      "expired-callback": () => {
+        console.warn("Turnstile token expired");
+        onTokenChange("");
+      },
+      "error-callback": () => {
+        console.warn("Turnstile widget error");
+        onTokenChange("");
+      },
+      "timeout-callback": () => {
+        console.warn("Turnstile token timed out");
+        onTokenChange("");
+      },
     });
     setWidgetRendered(true);
 
