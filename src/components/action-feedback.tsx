@@ -137,7 +137,12 @@ export function FeedbackForm({
     event.preventDefault();
     if (confirmMessage && !window.confirm(confirmMessage)) return;
     const form = event.currentTarget;
-    const formData = new FormData(form);
+    const nativeEvent = event.nativeEvent as SubmitEvent;
+    const submitter =
+      nativeEvent.submitter instanceof HTMLButtonElement
+        ? nativeEvent.submitter
+        : null;
+    const formData = submitter ? new FormData(form, submitter) : new FormData(form);
     setStatus("pending");
     setMessage(pendingMessage);
 

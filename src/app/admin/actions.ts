@@ -82,6 +82,19 @@ const routeStopStatuses: readonly FieldStopStatus[] = [
   "rescheduled",
   "cancelled",
 ];
+const customerRequestDecisionStatuses: readonly CustomerRequestStatus[] = [
+  "approved",
+  "completed",
+  "denied",
+  "cancelled",
+];
+
+const accountDeletionDecisionStatuses: readonly AccountDeletionStatus[] = [
+  "approved",
+  "declined",
+  "completed",
+  "cancelled",
+];
 
 async function logActivity(
   admin: AdminClient,
@@ -1104,14 +1117,31 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
       metadata: { status },
     });
 
-    if (request.customer_id && formData.get("sendUpdateEmail") === "on") {
+    const decisionWasMade =
+      previousRequest?.status !== request.status &&
+      customerRequestDecisionStatuses.includes(request.status);
+
+    if (request.customer_id && decisionWasMade) {
       const { data: profile } = await admin
         .from("profiles")
         .select("*")
         .eq("id", request.customer_id)
         .maybeSingle();
+
       if (profile) {
-        await sendCustomerRequestUpdate(request, profile);
+        try {
+          await sendCustomerRequestUpdate(request, profile);
+        } catch (error) {
+          logger.error("admin_customer_request_decision_email_failed", {
+            requestId: auditRequestId,
+            action: "service_request_decision_email",
+            userId: auth.userId,
+            role: auth.profile.role,
+            customerId: request.customer_id,
+            bookingId: request.booking_id,
+            error,
+          });
+        }
       }
     }
   }
@@ -1178,6 +1208,10 @@ export async function updateAccountDeletionRequestAdminAction(formData: FormData
       .maybeSingle();
     profile = data ?? null;
   }
+
+  const deletionDecisionWasMade =
+    previousRequest.status !== deletionRequest.status &&
+    accountDeletionDecisionStatuses.includes(deletionRequest.status);
 
   if (profile) {
     const shouldDisable =
@@ -1254,13 +1288,16 @@ export async function updateAccountDeletionRequestAdminAction(formData: FormData
       account_deletion_request_id: deletionRequest.id,
       severity: status === "completed" ? "warning" : "info",
     }),
-    profile
+    profile && deletionDecisionWasMade
       ? sendAccountDeletionDecision(
           deletionRequest,
           profile,
           humanizeStatus(status),
         )
-      : Promise.resolve({ status: "skipped" as const, reason: "No profile." }),
+      : Promise.resolve({
+          status: "skipped" as const,
+          reason: "No new deletion decision email needed.",
+        }),
   ]);
 
   logger.info("admin_account_deletion_request_updated", {
@@ -1621,6 +1658,146 @@ export async function updateRouteDayAdminAction(formData: FormData) {
   revalidatePath("/admin/routes");
   revalidatePath("/field/today");
   revalidatePath("/field/routes");
+}
+
+export async function deleteRouteDayAdminAction(formData: FormData) {
+  const auth = await requireAdmin("/admin/routes");
+  if (auth.status !== "ok") return;
+
+  const routeDayId = cleanString(formData.get("routeDayId"), 80);
+  const confirmation = cleanString(formData.get("deleteConfirmation"), 20);
+
+  if (!routeDayId) {
+    return { ok: false, error: "Missing route day." };
+  }
+
+  if (confirmation !== "DELETE") {
+    return {
+      ok: false,
+      error: "Type DELETE to confirm route deletion.",
+    };
+  }
+
+  const admin = getSupabaseAdmin();
+
+  const { data: routeDay } = await admin
+    .from("route_days")
+    .select("*")
+    .eq("id", routeDayId)
+    .maybeSingle();
+
+  if (!routeDay) {
+    return { ok: false, error: "Route day was not found." };
+  }
+
+  const { data: stops } = await admin
+    .from("route_stops")
+    .select("*")
+    .eq("route_day_id", routeDayId);
+
+  const routeStops = stops ?? [];
+  const protectedStops = routeStops.filter((stop) =>
+    ["on_the_way", "arrived", "in_progress", "completed"].includes(stop.status),
+  );
+
+  if (protectedStops.length) {
+    return {
+      ok: false,
+      error:
+        "This route has stops that already started or completed. Remove/correct those stops individually instead of deleting the entire route.",
+    };
+  }
+
+  const bookingIds = Array.from(
+    new Set(
+      routeStops
+        .map((stop) => stop.booking_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  const visitIds = Array.from(
+    new Set(
+      routeStops
+        .map((stop) => stop.service_visit_id)
+        .filter((id): id is string => Boolean(id)),
+    ),
+  );
+
+  if (routeStops.length) {
+    await admin.from("route_stops").delete().eq("route_day_id", routeDayId);
+  }
+
+  if (visitIds.length) {
+    await admin.from("service_visits").delete().in("id", visitIds);
+  }
+
+  if (bookingIds.length) {
+    await admin
+      .from("bookings")
+      .update({
+        status: "confirmed",
+        confirmed_route_day: null,
+      })
+      .in("id", bookingIds)
+      .eq("status", "scheduled")
+      .eq("confirmed_route_day", routeDay.route_date);
+
+    await admin
+      .from("bookings")
+      .update({
+        confirmed_route_day: null,
+      })
+      .in("id", bookingIds)
+      .eq("confirmed_route_day", routeDay.route_date)
+      .neq("status", "scheduled");
+  }
+
+  await admin.from("route_days").delete().eq("id", routeDayId);
+
+  await logActivity(admin, {
+    actor_profile_id: auth.userId,
+    event_type: "route_day_deleted",
+    message: `Route day deleted: ${routeDay.route_name ?? routeDay.route_date}.`,
+    metadata: {
+      routeDayId,
+      routeDate: routeDay.route_date,
+      deletedStopCount: routeStops.length,
+      releasedBookingCount: bookingIds.length,
+    },
+  });
+
+  await writeAdminAuditLog({
+    action: "route_day_deleted",
+    actor_user_id: auth.userId,
+    actor_email: actorEmail(auth),
+    actor_role: auth.profile.role,
+    target_type: "route_day",
+    target_id: routeDay.id,
+    before_summary: {
+      routeDate: routeDay.route_date,
+      routeName: routeDay.route_name,
+      stopCount: routeStops.length,
+      releasedBookingCount: bookingIds.length,
+    },
+    after_summary: {
+      deleted: true,
+      bookingsPreserved: true,
+    },
+    request_id: createRequestId(),
+    status: "success",
+  });
+
+  revalidatePath("/admin/routes");
+  revalidatePath("/admin/bookings");
+  revalidatePath("/admin/payments");
+  revalidatePath("/field/today");
+  revalidatePath("/field/routes");
+
+  return {
+    ok: true,
+    message: `Route deleted. ${bookingIds.length} booking(s) were preserved and released for rescheduling.`,
+  };
 }
 
 export async function addBookingToRouteAdminAction(formData: FormData) {

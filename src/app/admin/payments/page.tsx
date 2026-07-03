@@ -5,6 +5,10 @@ import {
   updateBookingAdminAction,
   updatePaymentStatusAction,
 } from "@/app/admin/actions";
+import {
+  ActionSubmitButton,
+  FeedbackForm,
+} from "@/components/action-feedback";
 import { AdminFilterBar } from "@/components/admin-filter-bar";
 import { AdminPaymentCreator } from "@/components/admin-payment-creator";
 import { CopyButton } from "@/components/copy-button";
@@ -15,13 +19,18 @@ import {
   validFrequencies,
   validPaymentStatuses,
 } from "@/lib/booking-utils";
-import { bookingCustomerName, includesSearch, uniqueValues } from "@/lib/admin-operations";
+import {
+  bookingCustomerName,
+  includesSearch,
+  uniqueValues,
+} from "@/lib/admin-operations";
 import { getAdminContext } from "@/lib/admin-data";
 import { getServiceClearanceStatus } from "@/lib/payment-clearance";
 import {
   formatFrequency,
   getFoundingNeighborSpecialStatus,
 } from "@/lib/pricing";
+import type { ActionResult } from "@/lib/action-result";
 import type { BookingRow, PaymentRow } from "@/types/database";
 
 export const metadata: Metadata = {
@@ -41,6 +50,7 @@ const dateRangeOptions = [
 ];
 
 const sortOptions = [
+  { label: "Needs action first", value: "needs_action" },
   { label: "Newest first", value: "newest" },
   { label: "Oldest first", value: "oldest" },
   { label: "Highest estimated price", value: "price_high" },
@@ -62,27 +72,39 @@ const paymentFilterOptions = [
   { label: "Refunded", value: "refunded" },
 ];
 
+const focusOptions = [
+  { label: "Any payment need", value: "" },
+  { label: "Needs payment link", value: "needs_link" },
+  { label: "Payment link sent", value: "link_sent" },
+  { label: "Payment failed", value: "failed" },
+  { label: "Cleared for service", value: "cleared" },
+  { label: "Completed but unpaid", value: "completed_unpaid" },
+];
+
 export default async function AdminPaymentsPage({
   searchParams,
 }: AdminPaymentsPageProps) {
   const params = await searchParams;
   const context = await getAdminContext("/admin/payments");
+
   const filteredBookings = filterAndSortBookings(
     context.bookings,
     context.payments,
     params,
   );
 
+  const stats = getPaymentStats(context.bookings, context.payments);
+
   return (
     <AdminShell title="Payments" auth={context.auth}>
-      <section className="placeholder-panel">
+      <section className="placeholder-panel admin-command-panel">
         <div className="admin-page-heading">
           <div>
             <p className="section-kicker">Payments</p>
-            <h1>Payment links and status.</h1>
+            <h1>Payment command center.</h1>
             <p className="muted">
-              Manage manual payment links, Stripe Checkout records, payment
-              emails, and unpaid completed service.
+              Start with the needs-action queue. Open a customer only when you
+              need links, manual status changes, or Stripe details.
             </p>
           </div>
           <span className="status-badge">
@@ -90,12 +112,52 @@ export default async function AdminPaymentsPage({
           </span>
         </div>
 
+        <div className="admin-command-grid">
+          <DashboardStat
+            label="Needs link"
+            value={stats.needsLink}
+            href="/admin/payments?focus=needs_link"
+          />
+          <DashboardStat
+            label="Link sent"
+            value={stats.linkSent}
+            href="/admin/payments?focus=link_sent"
+          />
+          <DashboardStat
+            label="Failed"
+            value={stats.failed}
+            href="/admin/payments?focus=failed"
+          />
+          <DashboardStat
+            label="Cleared"
+            value={stats.cleared}
+            href="/admin/payments?focus=cleared"
+          />
+        </div>
+
+        <nav className="status-tabs" aria-label="Payment quick filters">
+          <Link href="/admin/payments">All</Link>
+          <Link href="/admin/payments?focus=needs_link">Needs payment link</Link>
+          <Link href="/admin/payments?focus=link_sent">Link sent</Link>
+          <Link href="/admin/payments?focus=failed">Failed</Link>
+          <Link href="/admin/payments?focus=cleared">Cleared</Link>
+          <Link href="/admin/payments?focus=completed_unpaid">
+            Completed unpaid
+          </Link>
+        </nav>
+
         <AdminFilterBar
           searchValue={params.q}
           searchPlaceholder="Name, email, phone, address, payment link, booking ID"
           resultCount={filteredBookings.length}
           resetHref="/admin/payments"
           selects={[
+            {
+              name: "focus",
+              label: "Payment need",
+              value: params.focus,
+              options: focusOptions,
+            },
             {
               name: "payment",
               label: "Payment status",
@@ -120,9 +182,9 @@ export default async function AdminPaymentsPage({
               value: params.neighborhood,
               options: [
                 { label: "Any neighborhood", value: "" },
-                ...uniqueValues(context.bookings.map((booking) => booking.neighborhood)).map(
-                  (neighborhood) => ({ label: neighborhood, value: neighborhood }),
-                ),
+                ...uniqueValues(
+                  context.bookings.map((booking) => booking.neighborhood),
+                ).map((neighborhood) => ({ label: neighborhood, value: neighborhood })),
               ],
             },
             {
@@ -176,13 +238,14 @@ export default async function AdminPaymentsPage({
         />
 
         {filteredBookings.length ? (
-          <div className="admin-card-list">
+          <div className="admin-queue-list">
             {filteredBookings.map((booking) => {
               const bookingPayments = context.payments.filter(
                 (payment) => payment.booking_id === booking.id,
               );
               const latestPayment = bookingPayments[0] ?? null;
-              const checkoutUrl = latestPayment?.checkout_url ?? booking.payment_link ?? "";
+              const checkoutUrl =
+                latestPayment?.checkout_url ?? booking.payment_link ?? "";
               const paymentSummary = getServiceClearanceStatus(booking, latestPayment);
               const foundingSpecial = getFoundingNeighborSpecialStatus({
                 binCount: booking.bin_count,
@@ -192,227 +255,432 @@ export default async function AdminPaymentsPage({
                 createdAt: booking.created_at,
                 estimatedPrice: booking.estimated_price,
               });
+              const nextAction = getPaymentNextAction(
+                booking,
+                latestPayment,
+                checkoutUrl,
+              );
 
               return (
-              <form
-                action={updateBookingAdminAction}
-                className="admin-edit-card"
-                key={booking.id}
-              >
-                <input type="hidden" name="bookingId" value={booking.id} />
-                <input type="hidden" name="status" value={booking.status} />
-                <input
-                  type="hidden"
-                  name="confirmedRouteDay"
-                  value={booking.confirmed_route_day ?? ""}
-                />
-                <input
-                  type="hidden"
-                  name="internalNotes"
-                  value={booking.internal_notes ?? ""}
-                />
-                <details className="admin-payment-details">
-                  <summary className="admin-collapsible-summary">
-                    <div>
-                      <h2>{bookingCustomerName(booking)}</h2>
-                      <p className="muted">
-                        {booking.street_address}
-                        {booking.neighborhood ? ` | ${booking.neighborhood}` : ""}
-                      </p>
+                <details className="admin-queue-card" key={booking.id}>
+                  <summary className="admin-queue-summary">
+                    <div className="admin-queue-main">
+                      <span className={`needs-dot needs-dot-${nextAction.tone}`} />
+                      <div>
+                        <h2>{bookingCustomerName(booking)}</h2>
+                        <p>
+                          {booking.street_address}
+                          {booking.neighborhood
+                            ? ` | ${booking.neighborhood}`
+                            : ""}
+                        </p>
+                      </div>
                     </div>
-                    <div className="admin-collapsible-meta">
-                      <span className={`status-badge status-${paymentSummary.tone}`}>
+
+                    <div className="admin-queue-meta">
+                      <span
+                        className={`status-badge status-${clearanceStatusClass(
+                          paymentSummary.tone,
+                        )}`}
+                      >
                         {paymentSummary.label}
                       </span>
-                      <span className={`status-badge status-${booking.payment_status}`}>
+                      <span
+                        className={`status-badge status-${booking.payment_status}`}
+                      >
                         {humanizeStatus(booking.payment_status)}
                       </span>
-                      <span className={`status-badge status-${foundingSpecial.status}`}>
+                      <span
+                        className={`status-badge status-${foundingSpecial.status}`}
+                      >
                         Special: {foundingSpecialLabel(foundingSpecial.status)}
                       </span>
                       <strong>${booking.estimated_price}</strong>
                     </div>
+
+                    <div className="admin-queue-next">
+                      <strong>{nextAction.label}</strong>
+                      <span>Open</span>
+                    </div>
                   </summary>
-                  <div className="admin-payment-detail-body">
-                <div className="admin-row-heading">
-                  <div>
-                    <h2>{bookingCustomerName(booking)}</h2>
-                    <p className="muted">
-                      {booking.street_address}
-                      {booking.neighborhood ? ` | ${booking.neighborhood}` : ""}
-                    </p>
-                  </div>
-                  <div className="status-stack">
-                    <span className={`status-badge status-${booking.payment_status}`}>
-                      {humanizeStatus(booking.payment_status)}
-                    </span>
-                    <span className={`status-badge status-${booking.status}`}>
-                      {humanizeStatus(booking.status)}
-                    </span>
-                  </div>
-                </div>
 
-                <div className="admin-data-grid">
-                  <div>
-                    <span>Frequency</span>
-                    <strong>{formatFrequency(booking.frequency)}</strong>
-                  </div>
-                  <div>
-                    <span>Estimated price</span>
-                    <strong>${booking.estimated_price}</strong>
-                  </div>
-                  <div>
-                    <span>Follow-up signal</span>
-                    <strong>{paymentSummary.label}</strong>
-                    <span>{paymentSummary.action}</span>
-                  </div>
-                  <div>
-                    <span>Founding Neighbor Special</span>
-                    <strong>{foundingSpecialLabel(foundingSpecial.status)}</strong>
-                    <span>{foundingSpecial.reason}</span>
-                  </div>
-                  <div>
-                    <span>Created</span>
-                    <strong>{formatDate(booking.created_at)}</strong>
-                  </div>
-                  <div>
-                    <span>Route day</span>
-                    <strong>{booking.confirmed_route_day ?? "Pending"}</strong>
-                  </div>
-                  <div>
-                    <span>Stripe checkout</span>
-                    <strong>
-                      {latestPayment?.stripe_checkout_session_id ??
-                        booking.stripe_checkout_session_id ??
-                        "None"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Stripe payment intent</span>
-                    <strong>
-                      {latestPayment?.stripe_payment_intent_id ??
-                        booking.stripe_payment_intent_id ??
-                        "None"}
-                    </strong>
-                  </div>
-                  <div>
-                    <span>Stripe subscription</span>
-                    <strong>
-                      {latestPayment?.stripe_subscription_id ??
-                        booking.stripe_subscription_id ??
-                        "None"}
-                    </strong>
-                  </div>
-                </div>
+                  <div className="admin-queue-detail">
+                    <div className="admin-record-overview">
+                      <InfoTile label="Customer" value={bookingCustomerName(booking)} />
+                      <InfoTile label="Amount" value={`$${booking.estimated_price}`} />
+                      <InfoTile label="Payment" value={paymentSummary.label} />
+                      <InfoTile label="Next step" value={paymentSummary.action} />
+                      <InfoTile
+                        label="Payment link"
+                        value={checkoutUrl ? "Attached" : "Missing"}
+                      />
+                      <InfoTile
+                        label="Route day"
+                        value={booking.confirmed_route_day ?? "Not assigned"}
+                      />
+                      <InfoTile
+                        label="Frequency"
+                        value={formatFrequency(booking.frequency)}
+                      />
+                      <InfoTile
+                        label="Special"
+                        value={foundingSpecialLabel(foundingSpecial.status)}
+                      />
+                    </div>
 
-                <AdminPaymentCreator
-                  addOns={booking.add_ons}
-                  binCount={booking.bin_count}
-                  bookingId={booking.id}
-                  customerId={booking.customer_id}
-                  defaultAmount={booking.estimated_price}
-                  defaultDescription={`Clean Curb Co. service at ${booking.street_address}`}
-                  frequency={booking.frequency}
-                  paymentId={latestPayment?.id}
-                  serviceVisitId={
-                    context.visits.find((visit) => visit.booking_id === booking.id)?.id
-                  }
-                />
+                    <div className="admin-detail-layout">
+                      <section className="detail-panel">
+                        <h2>Payment actions</h2>
+                        <p className="muted">{paymentSummary.detail}</p>
 
-                <div className="form-grid">
-                  <label className="field">
-                    <span>Payment status</span>
-                    <select name="paymentStatus" defaultValue={booking.payment_status}>
-                      {validPaymentStatuses.map((status) => (
-                        <option value={status} key={status}>
-                          {humanizeStatus(status)}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label className="field">
-                    <span>Payment link</span>
-                    <textarea name="paymentLink" defaultValue={checkoutUrl} rows={2} />
-                  </label>
-                  <label className="field">
-                    <span>Payment method</span>
-                    <input
-                      name="paymentMethod"
-                      defaultValue={booking.payment_method ?? ""}
-                      placeholder="Stripe, Square, Venmo, Zelle, manual"
-                    />
-                  </label>
-                  <label className="field">
-                    <span>Provider / reference</span>
-                    <input
-                      name="paymentProvider"
-                      defaultValue={booking.payment_provider ?? ""}
-                      placeholder="Provider"
-                    />
-                  </label>
-                  <input
-                    type="hidden"
-                    name="paymentReference"
-                    value={booking.payment_reference ?? ""}
-                  />
-                </div>
+                        <div className="admin-action-list">
+                          <QuickActionForm
+                            action={sendPaymentLinkAction}
+                            bookingId={booking.id}
+                            label="Send Payment Link"
+                            pendingLabel="Sending..."
+                            successMessage="Payment link email sent."
+                          />
 
-                <div className="action-row">
-                  <button className="button button-dark" type="submit">
-                    Save Payment
-                  </button>
-                  <CopyButton value={checkoutUrl} label="Copy Link" />
-                  <button
-                    className="button button-outline"
-                    formAction={updatePaymentStatusAction.bind(null, "pending")}
-                    type="submit"
-                  >
-                    Mark Pending
-                  </button>
-                  <button
-                    className="button button-outline"
-                    formAction={updatePaymentStatusAction.bind(null, "paid")}
-                    type="submit"
-                  >
-                    Mark Paid
-                  </button>
-                  <button
-                    className="button button-outline"
-                    formAction={updatePaymentStatusAction.bind(null, "failed")}
-                    type="submit"
-                  >
-                    Mark Failed
-                  </button>
-                  <button
-                    className="button button-outline"
-                    formAction={updatePaymentStatusAction.bind(null, "refunded")}
-                    type="submit"
-                  >
-                    Mark Refunded
-                  </button>
-                  <button
-                    className="button button-outline"
-                    formAction={sendPaymentLinkAction}
-                    type="submit"
-                  >
-                    Send Reminder
-                  </button>
-                  <Link className="button button-outline" href={`/admin/bookings?q=${booking.id}`}>
-                    Open Booking
-                  </Link>
-                </div>
+                          <QuickPaymentStatusForm
+                            bookingId={booking.id}
+                            label="Mark Paid"
+                            pendingLabel="Marking..."
+                            status="paid"
+                            successMessage="Payment marked paid."
+                          />
+
+                          <QuickPaymentStatusForm
+                            bookingId={booking.id}
+                            label="Mark Pending"
+                            pendingLabel="Marking..."
+                            status="pending"
+                            successMessage="Payment marked pending."
+                          />
+
+                          <QuickPaymentStatusForm
+                            bookingId={booking.id}
+                            label="Mark Failed"
+                            pendingLabel="Marking..."
+                            status="failed"
+                            successMessage="Payment marked failed."
+                          />
+
+                          <QuickPaymentStatusForm
+                            bookingId={booking.id}
+                            label="Mark Refunded"
+                            pendingLabel="Marking..."
+                            status="refunded"
+                            successMessage="Payment marked refunded."
+                          />
+
+                          {checkoutUrl ? (
+                            <CopyButton value={checkoutUrl} label="Copy Link" />
+                          ) : null}
+                        </div>
+
+                        <AdminPaymentCreator
+                          addOns={booking.add_ons}
+                          binCount={booking.bin_count}
+                          bookingId={booking.id}
+                          customerId={booking.customer_id}
+                          defaultAmount={booking.estimated_price}
+                          defaultDescription={`Clean Curb Co. service at ${booking.street_address}`}
+                          frequency={booking.frequency}
+                          paymentId={latestPayment?.id}
+                          serviceVisitId={
+                            context.visits.find(
+                              (visit) => visit.booking_id === booking.id,
+                            )?.id
+                          }
+                        />
+                      </section>
+
+                      <section className="detail-panel">
+                        <h2>Edit payment record</h2>
+
+                        <FeedbackForm
+                          action={updateBookingAdminAction}
+                          className="compact-admin-form"
+                          pendingMessage="Saving payment..."
+                          successMessage="Payment record saved."
+                        >
+                          <input type="hidden" name="bookingId" value={booking.id} />
+                          <input type="hidden" name="status" value={booking.status} />
+                          <input
+                            type="hidden"
+                            name="confirmedRouteDay"
+                            value={booking.confirmed_route_day ?? ""}
+                          />
+                          <input
+                            type="hidden"
+                            name="internalNotes"
+                            value={booking.internal_notes ?? ""}
+                          />
+                          <input
+                            type="hidden"
+                            name="paymentReference"
+                            value={booking.payment_reference ?? ""}
+                          />
+
+                          <div className="form-grid">
+                            <label className="field">
+                              <span>Payment status</span>
+                              <select
+                                name="paymentStatus"
+                                defaultValue={booking.payment_status}
+                              >
+                                {validPaymentStatuses.map((status) => (
+                                  <option value={status} key={status}>
+                                    {humanizeStatus(status)}
+                                  </option>
+                                ))}
+                              </select>
+                            </label>
+
+                            <label className="field">
+                              <span>Payment method</span>
+                              <input
+                                name="paymentMethod"
+                                defaultValue={booking.payment_method ?? ""}
+                                placeholder="Stripe, manual, cash, etc."
+                              />
+                            </label>
+
+                            <label className="field">
+                              <span>Provider</span>
+                              <input
+                                name="paymentProvider"
+                                defaultValue={booking.payment_provider ?? ""}
+                                placeholder="Stripe, Square, manual"
+                              />
+                            </label>
+                          </div>
+
+                          <label className="field">
+                            <span>Payment link</span>
+                            <textarea
+                              name="paymentLink"
+                              defaultValue={checkoutUrl}
+                              rows={2}
+                            />
+                          </label>
+
+                          <ActionSubmitButton pendingLabel="Saving...">
+                            Save Payment
+                          </ActionSubmitButton>
+                        </FeedbackForm>
+
+                        <div className="admin-secondary-links">
+                          <Link
+                            className="button button-outline"
+                            href={`/admin/bookings?q=${booking.id}`}
+                          >
+                            Open Booking
+                          </Link>
+                          {booking.customer_id ? (
+                            <Link
+                              className="button button-outline"
+                              href={`/admin/customers/${booking.customer_id}`}
+                            >
+                              Open Customer
+                            </Link>
+                          ) : null}
+                        </div>
+
+                        <details className="technical-details">
+                          <summary>Technical details</summary>
+                          <div className="admin-data-grid">
+                            <InfoTile
+                              label="Payment records"
+                              value={String(bookingPayments.length)}
+                            />
+                            <InfoTile
+                              label="Created"
+                              value={formatDate(booking.created_at)}
+                            />
+                            <InfoTile
+                              label="Stripe checkout"
+                              value={
+                                latestPayment?.stripe_checkout_session_id ??
+                                booking.stripe_checkout_session_id ??
+                                "None"
+                              }
+                            />
+                            <InfoTile
+                              label="Stripe payment intent"
+                              value={
+                                latestPayment?.stripe_payment_intent_id ??
+                                booking.stripe_payment_intent_id ??
+                                "None"
+                              }
+                            />
+                            <InfoTile
+                              label="Stripe subscription"
+                              value={
+                                latestPayment?.stripe_subscription_id ??
+                                booking.stripe_subscription_id ??
+                                "None"
+                              }
+                            />
+                          </div>
+                        </details>
+                      </section>
+                    </div>
                   </div>
                 </details>
-              </form>
               );
             })}
           </div>
         ) : (
-          <p>No payment records match those filters.</p>
+          <div className="empty-state-card">
+            <h2>No payment records match this view.</h2>
+            <p>
+              Try clearing filters or checking another payment status.
+            </p>
+          </div>
         )}
       </section>
     </AdminShell>
   );
+}
+
+function QuickActionForm({
+  action,
+  bookingId,
+  label,
+  pendingLabel,
+  successMessage,
+}: {
+  action: (formData: FormData) => Promise<ActionResult | void>;
+  bookingId: string;
+  label: string;
+  pendingLabel: string;
+  successMessage: string;
+}) {
+  return (
+    <FeedbackForm
+      action={action}
+      className="inline-action-form"
+      pendingMessage={pendingLabel}
+      successMessage={successMessage}
+    >
+      <input type="hidden" name="bookingId" value={bookingId} />
+      <ActionSubmitButton className="button button-outline" pendingLabel={pendingLabel}>
+        {label}
+      </ActionSubmitButton>
+    </FeedbackForm>
+  );
+}
+
+function QuickPaymentStatusForm({
+  bookingId,
+  label,
+  pendingLabel,
+  status,
+  successMessage,
+}: {
+  bookingId: string;
+  label: string;
+  pendingLabel: string;
+  status: "pending" | "paid" | "failed" | "refunded";
+  successMessage: string;
+}) {
+  return (
+    <FeedbackForm
+      action={updatePaymentStatusAction.bind(null, status)}
+      className="inline-action-form"
+      pendingMessage={pendingLabel}
+      successMessage={successMessage}
+    >
+      <input type="hidden" name="bookingId" value={bookingId} />
+      <ActionSubmitButton className="button button-outline" pendingLabel={pendingLabel}>
+        {label}
+      </ActionSubmitButton>
+    </FeedbackForm>
+  );
+}
+
+function DashboardStat({
+  label,
+  value,
+  href,
+}: {
+  label: string;
+  value: number;
+  href: string;
+}) {
+  return (
+    <Link className="admin-command-card" href={href}>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </Link>
+  );
+}
+
+function InfoTile({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <span>{label}</span>
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function getPaymentStats(bookings: BookingRow[], payments: PaymentRow[]) {
+  return bookings.reduce(
+    (totals, booking) => {
+      const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+      const latestPayment = linkedPayments[0] ?? null;
+      const checkoutUrl = latestPayment?.checkout_url ?? booking.payment_link ?? "";
+      const clearance = getServiceClearanceStatus(booking, latestPayment);
+
+      if (booking.payment_status === "failed" || latestPayment?.status === "failed") {
+        totals.failed += 1;
+      }
+
+      if (!clearance.cleared && !checkoutUrl && booking.status !== "cancelled") {
+        totals.needsLink += 1;
+      }
+
+      if (!clearance.cleared && checkoutUrl) {
+        totals.linkSent += 1;
+      }
+
+      if (clearance.cleared) {
+        totals.cleared += 1;
+      }
+
+      return totals;
+    },
+    { needsLink: 0, linkSent: 0, failed: 0, cleared: 0 },
+  );
+}
+
+function getPaymentNextAction(
+  booking: BookingRow,
+  payment: PaymentRow | null,
+  checkoutUrl: string,
+) {
+  const clearance = getServiceClearanceStatus(booking, payment);
+
+  if (booking.payment_status === "failed" || payment?.status === "failed") {
+    return { label: "Payment failed", tone: "danger" as const };
+  }
+
+  if (booking.status === "completed" && booking.payment_status !== "paid") {
+    return { label: "Completed unpaid", tone: "danger" as const };
+  }
+
+  if (clearance.cleared) {
+    return { label: "Cleared for service", tone: "good" as const };
+  }
+
+  if (!checkoutUrl) {
+    return { label: "Send payment link", tone: "warning" as const };
+  }
+
+  return { label: "Waiting on payment", tone: "warning" as const };
 }
 
 function filterAndSortBookings(
@@ -428,8 +696,8 @@ function filterAndSortBookings(
   return bookings
     .filter((booking) => {
       const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
-      return (
-      includesSearch(
+
+      return includesSearch(
         [
           bookingCustomerName(booking),
           booking.email,
@@ -452,20 +720,51 @@ function filterAndSortBookings(
           ]),
         ],
         query,
-      )
       );
     })
     .filter((booking) => {
-      if (!params.payment) return true;
       const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+      const latestPayment = linkedPayments[0] ?? null;
+      const checkoutUrl = latestPayment?.checkout_url ?? booking.payment_link ?? "";
+      const clearance = getServiceClearanceStatus(booking, latestPayment);
+
+      if (params.focus === "needs_link") {
+        return !clearance.cleared && !checkoutUrl && booking.status !== "cancelled";
+      }
+
+      if (params.focus === "link_sent") {
+        return !clearance.cleared && Boolean(checkoutUrl);
+      }
+
+      if (params.focus === "failed") {
+        return booking.payment_status === "failed" || latestPayment?.status === "failed";
+      }
+
+      if (params.focus === "cleared") {
+        return clearance.cleared;
+      }
+
+      if (params.focus === "completed_unpaid") {
+        return booking.status === "completed" && booking.payment_status !== "paid";
+      }
+
+      return true;
+    })
+    .filter((booking) => {
+      if (!params.payment) return true;
+
+      const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+
       if (params.payment === "expired") {
         return linkedPayments.some(
           (payment) => payment.metadata?.last_stripe_event === "checkout.session.expired",
         );
       }
+
       if (params.payment === "cancelled") {
         return linkedPayments.some((payment) => payment.status === "cancelled");
       }
+
       return (
         booking.payment_status === params.payment ||
         linkedPayments.some((payment) => payment.status === params.payment)
@@ -476,7 +775,9 @@ function filterAndSortBookings(
     .filter((booking) => !params.bookingStatus || booking.status === params.bookingStatus)
     .filter((booking) => {
       if (!params.method) return true;
+
       const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+
       return (
         booking.payment_method === params.method ||
         booking.payment_provider === params.method ||
@@ -488,45 +789,88 @@ function filterAndSortBookings(
       const hasLink =
         Boolean(booking.payment_link) ||
         linkedPayments.some((payment) => Boolean(payment.checkout_url));
+
       if (params.link === "has_link") return hasLink;
       if (params.link === "missing_link") return !hasLink;
+
       return true;
     })
     .filter((booking) => {
       if (params.dateRange === "created_this_week") {
         return new Date(booking.created_at) >= weekAgo;
       }
+
       if (params.dateRange === "created_this_month") {
         return new Date(booking.created_at) >= monthStart;
       }
+
       if (params.dateRange === "route_day_scheduled") {
         return Boolean(booking.confirmed_route_day);
       }
+
       if (params.dateRange === "completed_unpaid") {
         return booking.status === "completed" && booking.payment_status !== "paid";
       }
+
       return true;
     })
-    .sort((a, b) => sortBookings(a, b, params.sort ?? "newest"));
+    .sort((a, b) => sortBookings(a, b, payments, params.sort || "needs_action"));
 }
 
-function sortBookings(a: BookingRow, b: BookingRow, sort: string) {
+function sortBookings(
+  a: BookingRow,
+  b: BookingRow,
+  payments: PaymentRow[],
+  sort: string,
+) {
   if (sort === "oldest") return a.created_at.localeCompare(b.created_at);
   if (sort === "price_high") return b.estimated_price - a.estimated_price;
   if (sort === "price_low") return a.estimated_price - b.estimated_price;
   if (sort === "payment_status") return a.payment_status.localeCompare(b.payment_status);
+
   if (sort === "neighborhood") {
     return (a.neighborhood ?? "").localeCompare(b.neighborhood ?? "");
   }
+
   if (sort === "customer_name") {
     return bookingCustomerName(a).localeCompare(bookingCustomerName(b));
   }
+
   if (sort === "route_day") {
     return (a.confirmed_route_day ?? "9999").localeCompare(
       b.confirmed_route_day ?? "9999",
     );
   }
+
+  const priorityDifference =
+    getPaymentPriority(a, payments) - getPaymentPriority(b, payments);
+
+  if (priorityDifference !== 0) return priorityDifference;
+
   return b.created_at.localeCompare(a.created_at);
+}
+
+function getPaymentPriority(booking: BookingRow, payments: PaymentRow[]) {
+  const linkedPayments = payments.filter((payment) => payment.booking_id === booking.id);
+  const latestPayment = linkedPayments[0] ?? null;
+  const checkoutUrl = latestPayment?.checkout_url ?? booking.payment_link ?? "";
+  const clearance = getServiceClearanceStatus(booking, latestPayment);
+
+  if (booking.payment_status === "failed" || latestPayment?.status === "failed") return 10;
+  if (booking.status === "completed" && booking.payment_status !== "paid") return 20;
+  if (!clearance.cleared && !checkoutUrl && booking.status !== "cancelled") return 30;
+  if (!clearance.cleared && checkoutUrl) return 40;
+  if (clearance.cleared) return 70;
+  if (booking.status === "cancelled") return 100;
+
+  return 80;
+}
+
+function clearanceStatusClass(tone: "success" | "warning" | "danger" | "neutral") {
+  if (tone === "success") return "paid";
+  if (tone === "danger") return "failed";
+  if (tone === "warning") return "pending";
+  return "standard";
 }
 
 function formatDate(value: string) {

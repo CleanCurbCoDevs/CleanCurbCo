@@ -340,17 +340,24 @@ export default async function CustomerDetailPage({
               );
             })}
           </DetailPanel>
-
           <DetailPanel title="Customer requests" empty="No requests yet.">
             {requests.map((request) => (
               <article className="mini-record" key={request.id}>
                 <strong>{humanizeStatus(request.request_type)}</strong>
                 <span>{humanizeStatus(request.status)}</span>
+                {request.requested_frequency ? (
+                  <span>Requested frequency: {humanizeStatus(request.requested_frequency)}</span>
+                ) : null}
+                {request.requested_route_day ? (
+                  <span>Requested route day: {request.requested_route_day}</span>
+                ) : null}
                 <span>{request.message ?? "No message"}</span>
+                <Link href={`/admin/requests?q=${request.id}`}>
+                  Open request decision
+                </Link>
               </article>
             ))}
           </DetailPanel>
-
           <DetailPanel title="Account deletion requests" empty="No deletion requests.">
             {deletionRequests.map((request) => (
               <article className="mini-record" key={request.id}>

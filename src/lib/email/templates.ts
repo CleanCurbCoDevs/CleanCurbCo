@@ -376,21 +376,25 @@ export function customerRequestReceivedTemplate(
 export function customerRequestUpdatedTemplate(
   request: CustomerRequestRow,
 ): EmailTemplate {
+  const statusLabel = request.status.replaceAll("_", " ");
+
   const body = `
-    <p>Your service request has been updated.</p>
+    <p>We made a decision on your Clean Curb Co. service request.</p>
+    <p><strong>Decision:</strong> ${escapeHtml(statusLabel)}</p>
     ${customerRequestSummaryHtml(request)}
     ${
       request.customer_visible_admin_message
         ? `<p><strong>Message from Clean Curb Co.:</strong> ${escapeHtml(request.customer_visible_admin_message)}</p>`
         : ""
     }
+    <p>If you have questions, reply to this email and our team will help.</p>
   `;
 
   return {
-    subject: "Update on your Clean Curb Co. service request",
-    html: shell("Service request update", body),
+    subject: "Decision on your Clean Curb Co. service request",
+    html: shell("Service request decision", body),
     text: customerText(
-      `Your Clean Curb Co. service request is now ${request.status}.`,
+      `We made a decision on your Clean Curb Co. service request. Decision: ${statusLabel}. ${request.customer_visible_admin_message ?? ""}`.trim(),
     ),
   };
 }
