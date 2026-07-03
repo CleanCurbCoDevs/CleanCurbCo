@@ -1,5 +1,9 @@
 import Link from "next/link";
 import { updateStopStatusAction } from "@/app/field/actions";
+import {
+  ActionSubmitButton,
+  FeedbackForm,
+} from "@/components/action-feedback";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
 import { getServiceClearanceStatus } from "@/lib/payment-clearance";
 import { formatFrequency } from "@/lib/pricing";
@@ -46,7 +50,7 @@ export function FieldStopCard({
   const addOns = booking.add_ons.length ? booking.add_ons.join(", ") : "None";
   const paymentStatus = payment?.status ?? booking.payment_status;
   const clearance = getServiceClearanceStatus(booking, payment);
-  const actionLabel = getStopActionLabel(stop.status);
+  const actionLabel = getStopActionLabel(stop.status, clearance.cleared);
   const displayStopNumber = stop.optimoroute_stop_sequence ?? stop.stop_order ?? 1;
   const isOptimized = Boolean(stop.optimoroute_stop_sequence);
   const scheduledTime = stop.optimoroute_scheduled_at
@@ -133,18 +137,29 @@ export function FieldStopCard({
         <a className="button button-outline" href={googleMaps} target="_blank" rel="noreferrer">
           Google Maps
         </a>
-        {stop.status === "completed" || stop.status === "needs_follow_up" ? (
+        {stop.status === "scheduled" && clearance.cleared ? (
+          <FeedbackForm
+            action={updateStopStatusAction}
+            pendingMessage="Marking On The Way..."
+            successMessage="Marked On The Way."
+          >
+            <input type="hidden" name="visitId" value={visit.id} />
+            <input type="hidden" name="status" value="on_the_way" />
+            <ActionSubmitButton
+              className="button button-primary"
+              pendingLabel="Marking..."
+            >
+              Mark On The Way
+            </ActionSubmitButton>
+          </FeedbackForm>
+        ) : stop.status === "completed" || stop.status === "needs_follow_up" ? (
           <Link className="button button-primary" href={`/field/stops/${visit.id}`}>
             {actionLabel}
           </Link>
         ) : (
-          <form action={updateStopStatusAction}>
-            <input type="hidden" name="visitId" value={visit.id} />
-            <input type="hidden" name="status" value="in_progress" />
-            <button className="button button-primary" type="submit">
-              {actionLabel}
-            </button>
-          </form>
+          <Link className="button button-primary" href={`/field/stops/${visit.id}`}>
+            {actionLabel}
+          </Link>
         )}
         <Link className="button button-dark" href={`/field/stops/${visit.id}`}>
           View Details
@@ -172,8 +187,8 @@ function formatDistance(meters: number) {
   return `${miles.toFixed(1)} mi`;
 }
 
-function getStopActionLabel(status: RouteStopRow["status"]) {
-  if (status === "scheduled") return "Start Stop";
+function getStopActionLabel(status: RouteStopRow["status"], cleared: boolean) {
+  if (status === "scheduled") return cleared ? "Mark On The Way" : "Review Payment";
   if (status === "on_the_way") return "Continue";
   if (status === "in_progress") return "Continue Service";
   if (status === "completed") return "View Completed Stop";

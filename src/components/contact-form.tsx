@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, Send } from "lucide-react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type ContactReason =
   | "Booking question"
@@ -30,6 +31,7 @@ const initialContactRequest: ContactRequest = {
 };
 
 export function ContactForm() {
+  const feedback = useActionFeedback();
   const [request, setRequest] = useState<ContactRequest>(
     initialContactRequest,
   );
@@ -64,12 +66,14 @@ export function ContactForm() {
 
       setSubmittedRequest(request);
       setRequest(initialContactRequest);
+      feedback.success("Message sent. We will follow up.");
     } catch (caughtError) {
-      setError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "Something got stuck. Please try again or contact us directly.",
-      );
+          : "Something got stuck. Please try again or contact us directly.";
+      setError(message);
+      feedback.error(message);
     } finally {
       setIsSubmitting(false);
     }

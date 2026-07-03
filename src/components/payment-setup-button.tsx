@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type PaymentSetupButtonProps = {
   bookingId: string;
@@ -17,6 +18,7 @@ export function PaymentSetupButton({
   label = "Add Payment Info",
   className = "button button-dark",
 }: PaymentSetupButtonProps) {
+  const feedback = useActionFeedback();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState("");
 
@@ -38,10 +40,13 @@ export function PaymentSetupButton({
       };
 
       if (!response.ok || !data.checkoutUrl) {
-        setError(data.error ?? "Could not open payment setup.");
+        const message = data.error ?? "Could not open payment setup.";
+        setError(message);
+        feedback.error(message);
         return;
       }
 
+      feedback.success("Opening secure Stripe payment setup.");
       window.location.assign(data.checkoutUrl);
     });
   }

@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+import { actionFailure, actionSuccess, type ActionResult } from "@/lib/action-result";
 import { formatBookingAddress } from "@/lib/booking-utils";
 import {
   sendFieldPaymentLinkEmail,
@@ -9,6 +10,7 @@ import {
   sendServiceCompletedEmail,
 } from "@/lib/email/sendFieldNotifications";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { requireField } from "@/lib/supabase/auth";
 import { isAdminRole } from "@/lib/supabase/roles";
 import type {
@@ -76,6 +78,27 @@ const breakReasonsRequiringNotes: readonly BreakReason[] = [
   "customer_delay",
   "other",
 ];
+const fieldFollowUpReasons = [
+  "payment_not_confirmed",
+  "access_issue",
+  "customer_issue",
+  "equipment_issue",
+  "safety_concern",
+  "weather_delay",
+  "vehicle_issue",
+  "other",
+] as const;
+const followUpReasonsRequiringNotes: readonly FieldFollowUpReason[] = [
+  "access_issue",
+  "customer_issue",
+  "equipment_issue",
+  "safety_concern",
+  "weather_delay",
+  "vehicle_issue",
+  "other",
+];
+
+type FieldFollowUpReason = (typeof fieldFollowUpReasons)[number];
 
 function cleanId(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
@@ -83,6 +106,11 @@ function cleanId(formData: FormData, key: string) {
 
 function cleanText(formData: FormData, key: string, max = 1200) {
   return String(formData.get(key) ?? "").trim().slice(0, max);
+}
+
+function cleanDate(formData: FormData, key: string) {
+  const value = String(formData.get(key) ?? "").trim();
+  return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
 }
 
 async function requireFieldUser() {
@@ -146,7 +174,9 @@ function revalidateField(visitId?: string | null) {
   if (visitId) revalidatePath(`/field/stops/${visitId}`);
 }
 
-export async function updateStopStatusAction(formData: FormData) {
+export async function updateStopStatusAction(
+  formData: FormData,
+): Promise<ActionResult> {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
   const status = cleanId(formData, "status") as FieldStopStatus;
@@ -162,10 +192,12 @@ export async function updateStopStatusAction(formData: FormData) {
     "cancelled",
   ];
 
-  if (!visitId || !validStatuses.includes(status)) return;
+  if (!visitId || !validStatuses.includes(status)) {
+    return actionFailure("Choose a valid stop status.");
+  }
 
   const { admin, stop, visit, booking } = await getStopBundle(visitId);
-  if (!visit || !stop) return;
+  if (!visit || !stop) return actionFailure("This stop could not be loaded.");
 
   const timestamp = new Date().toISOString();
   const stopUpdate: Partial<RouteStopRow> = { status };
@@ -200,6 +232,188 @@ export async function updateStopStatusAction(formData: FormData) {
   });
 
   revalidateField(visit.id);
+  return actionSuccess(statusSuccessMessage(status));
+}
+
+export async function markStopFollowUpAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireFieldUser();
+  const visitId = cleanId(formData, "visitId");
+  const requestedReason = cleanId(formData, "reason") as FieldFollowUpReason;
+  const reason = fieldFollowUpReasons.includes(requestedReason)
+    ? requestedReason
+    : "other";
+  const notes = cleanText(formData, "notes", 900);
+
+  if (followUpReasonsRequiringNotes.includes(reason) && !notes) {
+    return actionFailure(
+      `${humanizeFollowUpReason(reason)} requires a note so admin knows what happened.`,
+    );
+  }
+
+  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  if (!visit || !stop) return actionFailure("This stop could not be loaded.");
+
+  const now = new Date().toISOString();
+  const followUpNote = [
+    `Follow-up reason: ${humanizeFollowUpReason(reason)}.`,
+    notes ? `Notes: ${notes}` : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const technicianNotes = [stop.technician_notes, followUpNote]
+    .filter(Boolean)
+    .join("\n\n");
+  const issueFlags = Array.from(
+    new Set([...stop.issue_flags, "needs_follow_up", reason]),
+  );
+
+  await Promise.all([
+    admin
+      .from("route_stops")
+      .update({
+        status: "needs_follow_up",
+        completed_at: now,
+        technician_notes: technicianNotes,
+        issue_flags: issueFlags,
+      })
+      .eq("id", stop.id),
+    admin
+      .from("service_visits")
+      .update({
+        status: "needs_follow_up",
+        technician_notes: technicianNotes,
+      })
+      .eq("id", visit.id),
+    booking
+      ? admin
+          .from("bookings")
+          .update({
+            status: "needs_follow_up",
+            last_customer_change_request_at: now,
+          })
+          .eq("id", booking.id)
+      : Promise.resolve(),
+  ]);
+
+  await Promise.allSettled([
+    recordServiceEvent({
+      actorId: auth.userId,
+      booking,
+      visit,
+      stop,
+      eventType: "stop_follow_up_required",
+      message: `Stop marked for follow-up: ${humanizeFollowUpReason(reason)}.`,
+      metadata: { reason, notes },
+    }),
+    booking
+      ? createAdminNotification({
+          type: "field_follow_up_required",
+          title: "Field follow-up required",
+          message: `${booking.first_name} ${booking.last_name}: ${humanizeFollowUpReason(reason)}.`,
+          href: `/admin/routes`,
+          customer_id: booking.customer_id,
+          booking_id: booking.id,
+          severity: reason === "safety_concern" ? "urgent" : "warning",
+          metadata: { reason, visitId: visit.id, routeStopId: stop.id },
+        })
+      : Promise.resolve(),
+  ]);
+
+  revalidateField(visit.id);
+  return actionSuccess("Stop marked for follow-up.");
+}
+
+export async function requestFieldRescheduleAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireFieldUser();
+  const visitId = cleanId(formData, "visitId");
+  const requestedRouteDay = cleanDate(formData, "requestedRouteDay") || null;
+  const notes = cleanText(formData, "notes", 900);
+
+  if (!requestedRouteDay && !notes) {
+    return actionFailure("Add a requested date or note for admin.");
+  }
+
+  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  if (!visit || !stop || !booking) {
+    return actionFailure("This stop could not be loaded.");
+  }
+
+  const { data: request } = await admin
+    .from("customer_requests")
+    .insert({
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      request_type: "reschedule_service",
+      status: "new",
+      policy_window: "standard",
+      policy_acknowledged: false,
+      requested_route_day: requestedRouteDay,
+      message:
+        notes ||
+        `Field tech requested reschedule from stop ${stop.stop_order}.`,
+      metadata_json: {
+        source: "field_app",
+        visitId: visit.id,
+        routeStopId: stop.id,
+        routeDayId: stop.route_day_id,
+      },
+    })
+    .select("*")
+    .single();
+
+  await Promise.all([
+    admin
+      .from("route_stops")
+      .update({
+        status: "rescheduled",
+        technician_notes: [stop.technician_notes, notes]
+          .filter(Boolean)
+          .join("\n\n"),
+        issue_flags: Array.from(new Set([...stop.issue_flags, "reschedule_requested"])),
+      })
+      .eq("id", stop.id),
+    admin
+      .from("service_visits")
+      .update({ status: "rescheduled", technician_notes: notes || visit.technician_notes })
+      .eq("id", visit.id),
+    admin
+      .from("bookings")
+      .update({
+        status: "needs_follow_up",
+        last_customer_change_request_at: new Date().toISOString(),
+      })
+      .eq("id", booking.id),
+  ]);
+
+  await Promise.allSettled([
+    recordServiceEvent({
+      actorId: auth.userId,
+      booking,
+      visit,
+      stop,
+      eventType: "field_reschedule_requested",
+      message: "Field tech requested reschedule review.",
+      metadata: { requestedRouteDay, notes, requestId: request?.id ?? null },
+    }),
+    createAdminNotification({
+      type: "field_reschedule_requested",
+      title: "Field reschedule request",
+      message: `${booking.first_name} ${booking.last_name} needs admin reschedule review.`,
+      href: request?.id ? `/admin/requests?q=${request.id}` : "/admin/requests",
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      customer_request_id: request?.id ?? null,
+      severity: "warning",
+      metadata: { requestedRouteDay, visitId: visit.id, routeStopId: stop.id },
+    }),
+  ]);
+
+  revalidateField(visit.id);
+  return actionSuccess("Reschedule request sent to admin.");
 }
 
 export async function saveChecklistAction(formData: FormData) {
@@ -631,8 +845,10 @@ export async function markManualPaidAction(formData: FormData) {
   revalidateField(visitId);
 }
 
-export async function sendPaymentLinkFromFieldAction(formData: FormData) {
-  await requireFieldUser();
+export async function sendPaymentLinkFromFieldAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireFieldUser();
   const bookingId = cleanId(formData, "bookingId");
   const visitId = cleanId(formData, "visitId");
   const routeStopId = cleanId(formData, "routeStopId");
@@ -643,13 +859,73 @@ export async function sendPaymentLinkFromFieldAction(formData: FormData) {
     .eq("id", bookingId)
     .maybeSingle();
 
-  if (!booking) return;
+  if (!booking) return actionFailure("Booking was not found.");
+  if (!booking.payment_link) {
+    return actionFailure(
+      "Create a Stripe payment link before sending the payment email.",
+    );
+  }
 
-  await sendFieldPaymentLinkEmail(booking, {
+  const result = await sendFieldPaymentLinkEmail(booking, {
     bookingId,
     visitId,
     routeStopId,
   });
+  if (result.status === "failed") {
+    return actionFailure("Payment email failed. Use the admin billing page or try again.");
+  }
+  if (result.status === "skipped") {
+    return actionFailure(
+      "Payment email is not configured yet. Use admin billing/payment page to send a payment link.",
+    );
+  }
+
+  await Promise.all([
+    admin
+      .from("bookings")
+      .update({ payment_status: "pending", payment_provider: "stripe" })
+      .eq("id", booking.id),
+    admin
+      .from("payments")
+      .update({
+        status: "pending",
+        metadata: {
+          field_payment_email_sent_at: new Date().toISOString(),
+          route_stop_id: routeStopId,
+          service_visit_id: visitId,
+        },
+      })
+      .eq("booking_id", booking.id),
+    recordServiceEvent({
+      actorId: auth.userId,
+      booking,
+      eventType: "field_payment_email_sent",
+      message: "Payment email sent from the field app.",
+      metadata: { visitId, routeStopId },
+    }),
+  ]);
 
   revalidateField(visitId);
+  return actionSuccess("Payment email sent.");
+}
+
+function statusSuccessMessage(status: FieldStopStatus) {
+  if (status === "on_the_way") return "Marked On The Way.";
+  if (status === "arrived") return "Marked Arrived.";
+  if (status === "in_progress") return "Service started.";
+  if (status === "completed") return "Stop completed.";
+  if (status === "needs_follow_up") return "Stop marked for follow-up.";
+  if (status === "rescheduled") return "Reschedule request sent to admin.";
+  return `Stop marked ${status.replaceAll("_", " ")}.`;
+}
+
+function humanizeFollowUpReason(reason: string) {
+  if (reason === "payment_not_confirmed") return "Payment not confirmed";
+  if (reason === "access_issue") return "Access issue";
+  if (reason === "customer_issue") return "Customer issue";
+  if (reason === "equipment_issue") return "Equipment issue";
+  if (reason === "safety_concern") return "Safety concern";
+  if (reason === "weather_delay") return "Weather delay";
+  if (reason === "vehicle_issue") return "Vehicle issue";
+  return "Other";
 }

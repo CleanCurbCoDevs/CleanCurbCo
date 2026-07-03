@@ -2,6 +2,7 @@
 
 import { useCallback, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
+import { useActionFeedback } from "@/components/action-feedback";
 import { PaymentSetupButton } from "@/components/payment-setup-button";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import {
@@ -111,6 +112,7 @@ export function BookingForm({
   serviceAreaChecked?: boolean;
   turnstileSiteKey: string;
 }) {
+  const feedback = useActionFeedback();
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
     customer: {
@@ -240,6 +242,7 @@ export function BookingForm({
       }
 
       setSubmittedBooking(data.booking);
+      feedback.success("Booking request received.");
       setSetupHref(data.redirectTo ?? null);
       setPaymentSetup(
         data.paymentSetupHref && data.paymentSetupContext?.bookingId
@@ -253,11 +256,12 @@ export function BookingForm({
     } catch (error) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
-      setError(
+      const message =
         error instanceof Error
           ? error.message
-          : "Something got stuck. Please try again or contact us directly.",
-      );
+          : "Something got stuck. Please try again or contact us directly.";
+      setError(message);
+      feedback.error(message);
     } finally {
       setIsSubmitting(false);
     }

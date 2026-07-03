@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 const paymentTypes = [
   ["booking", "Booking"],
@@ -34,6 +35,7 @@ export function AdminPaymentCreator({
   binCount?: number | null;
   addOns?: string[];
 }) {
+  const feedback = useActionFeedback();
   const [amount, setAmount] = useState(String(defaultAmount));
   const [paymentType, setPaymentType] = useState("booking");
   const [description, setDescription] = useState(defaultDescription);
@@ -70,12 +72,15 @@ export function AdminPaymentCreator({
       };
 
       if (!response.ok || !data.checkoutUrl) {
-        setError(data.error ?? "Could not create checkout session.");
+        const message = data.error ?? "Could not create checkout session.";
+        setError(message);
+        feedback.error(message);
         return;
       }
 
       setCheckoutUrl(data.checkoutUrl);
       await navigator.clipboard?.writeText(data.checkoutUrl).catch(() => undefined);
+      feedback.success("Checkout created and copied.");
     });
   }
 
@@ -130,7 +135,10 @@ export function AdminPaymentCreator({
           <button
             className="button button-outline"
             type="button"
-            onClick={() => navigator.clipboard?.writeText(checkoutUrl)}
+            onClick={() => {
+              navigator.clipboard?.writeText(checkoutUrl);
+              feedback.success("Checkout link copied.");
+            }}
           >
             Copy Checkout
           </button>

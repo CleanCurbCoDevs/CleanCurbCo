@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type PaymentLinkButtonProps = {
   bookingId: string;
@@ -29,6 +31,8 @@ export function PaymentLinkButton({
   existingCheckoutUrl,
   returnPath,
 }: PaymentLinkButtonProps) {
+  const router = useRouter();
+  const feedback = useActionFeedback();
   const [isPending, startTransition] = useTransition();
   const [checkoutUrl, setCheckoutUrl] = useState(existingCheckoutUrl ?? "");
   const [error, setError] = useState("");
@@ -59,12 +63,16 @@ export function PaymentLinkButton({
       };
 
       if (!response.ok || !data.checkoutUrl) {
-        setError(data.error ?? "Could not create a payment link.");
+        const message = data.error ?? "Could not create a payment link.";
+        setError(message);
+        feedback.error(message);
         return;
       }
 
       setCheckoutUrl(data.checkoutUrl);
       await navigator.clipboard?.writeText(data.checkoutUrl).catch(() => undefined);
+      feedback.success("Stripe payment link created and copied.");
+      router.refresh();
     });
   }
 
@@ -87,7 +95,10 @@ export function PaymentLinkButton({
         <button
           className="button button-outline"
           type="button"
-          onClick={() => navigator.clipboard?.writeText(checkoutUrl)}
+          onClick={() => {
+            void navigator.clipboard?.writeText(checkoutUrl);
+            feedback.success("Payment link copied.");
+          }}
         >
           Copy Link
         </button>

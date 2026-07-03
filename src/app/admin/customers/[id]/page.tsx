@@ -459,6 +459,8 @@ function BookingMiniRecord({ booking }: { booking: BookingRow }) {
         Founding Neighbor Special:{" "}
         {foundingSpecial.status === "applied"
           ? "Applied"
+          : foundingSpecial.status === "manual_override"
+            ? "Manual override"
           : foundingSpecial.status === "eligible"
             ? "Eligible"
             : "Not eligible"}

@@ -3,6 +3,7 @@ import type { Viewport } from "next";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { Geist, Geist_Mono } from "next/font/google";
+import { ActionFeedbackProvider } from "@/components/action-feedback";
 import { ChromeFrame } from "@/components/chrome-frame";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
@@ -105,9 +106,11 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">
-        <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
-          {children}
-        </ChromeFrame>
+        <ActionFeedbackProvider>
+          <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
+            {children}
+          </ChromeFrame>
+        </ActionFeedbackProvider>
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{

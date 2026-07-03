@@ -10,6 +10,12 @@ The first-pass integration does not enable OptimoRoute customer-facing tools.
 
 Clean Curb Co. does not trigger OptimoRoute customer texts, emails, tracking links, proof-of-delivery messages, feedback requests, or a driver-app workflow. Synced orders are sent with `notificationPreference: "dont_notify"`.
 
+## Dashboard Visibility
+
+Clean Curb Co. sends route stops to OptimoRoute as orders with `CCC-{routeStopId}` order numbers. They may not appear as an obvious dashboard route until planning has run, the correct date/filter is selected in OptimoRoute, and OptimoRoute has schedulable driver/work-hour/depot settings.
+
+After optimization is imported, Clean Curb Co. remains the primary admin and field route view. If checking OptimoRoute directly, open `https://my.optimoroute.com/`, select the matching route date, and look for the synced order numbers. Do not publish/share routes to the OptimoRoute driver app or enable OptimoRoute customer notifications for this first-pass workflow.
+
 ## Expected Environment
 
 `OPTIMOROUTE_API_KEY` must be set server-side only. The app trims leading/trailing whitespace before using it.
@@ -131,7 +137,9 @@ The field app uses `/field/manifest.webmanifest`, app name `CCC Field`, `start_u
 
 The current eligibility rule lives in `src/lib/pricing.ts`.
 
-Current behavior: the special is enabled for qualifying recurring two-bin Cane Bay founding-route customers before the configured cutoff date. Admin/payment views display whether the special is eligible/applied/not eligible and the reason. Josh should confirm the final cutoff date and neighborhood list before launch.
+Current behavior: the $25 special applies to the first recurring residential two-bin cleaning for customers in the initial Cane Bay founding route who book before August 1, 2026. Admin/payment views display whether the special is eligible, applied, not eligible, or manually overridden, plus the reason.
+
+Admin may manually approve exceptions by setting the booking/payment amount to the special amount. That appears as `Manual override by admin.` when the normal eligibility checks do not pass. Josh should still confirm the final neighborhood list before launch.
 
 ## Analytics and Cookies
 

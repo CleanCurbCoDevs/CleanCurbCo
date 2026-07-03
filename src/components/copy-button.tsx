@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Copy } from "lucide-react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 export function CopyButton({
   value,
@@ -10,13 +11,19 @@ export function CopyButton({
   value: string;
   label?: string;
 }) {
+  const feedback = useActionFeedback();
   const [copied, setCopied] = useState(false);
 
   async function handleCopy() {
     if (!value) return;
-    await navigator.clipboard.writeText(value);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1800);
+    try {
+      await navigator.clipboard.writeText(value);
+      setCopied(true);
+      feedback.success("Copied.");
+      window.setTimeout(() => setCopied(false), 1800);
+    } catch {
+      feedback.error("Could not copy. Please select and copy manually.");
+    }
   }
 
   return (

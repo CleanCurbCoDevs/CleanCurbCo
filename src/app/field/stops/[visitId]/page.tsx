@@ -6,11 +6,15 @@ import {
   markManualPaidAction,
   readyForNextStopAction,
   saveTechnicianNotesAction,
-  sendPaymentLinkFromFieldAction,
   startBreakAction,
-  updateStopStatusAction,
   uploadServicePhotosAction,
 } from "@/app/field/actions";
+import {
+  ActionSubmitButton,
+  FeedbackForm,
+} from "@/components/action-feedback";
+import { FieldPaymentEmailForm } from "@/components/field-payment-email-form";
+import { FieldStopActions } from "@/components/field-stop-actions";
 import { PaymentLinkButton } from "@/components/payment-link-button";
 import { ServiceChecklistPanel } from "@/components/service-checklist-panel";
 import { FieldShell } from "@/components/shells/field-shell";
@@ -196,20 +200,11 @@ export default async function FieldStopPage({
         ) : null}
       </section>
 
-      <section className="field-card">
-        <p className="section-kicker">Status Actions</p>
-        <div className="field-actions">
-          <StatusButton visitId={visit.id} status="on_the_way" label="Mark On The Way" />
-          <StatusButton visitId={visit.id} status="arrived" label="Mark Arrived Internally" />
-          <StatusButton visitId={visit.id} status="in_progress" label="Start Service" />
-          <StatusButton visitId={visit.id} status="needs_follow_up" label="Skip / Needs Follow-Up" />
-          <StatusButton visitId={visit.id} status="rescheduled" label="Reschedule Request" />
-        </div>
-        <p className="muted">
-          Arrival is tracked internally only. No customer &quot;we are here&quot; message
-          is sent yet.
-        </p>
-      </section>
+      <FieldStopActions
+        clearance={clearance}
+        initialStatus={stop.status}
+        visitId={visit.id}
+      />
 
       <PhotoSection
         actionLabel="Upload Before Photos"
@@ -251,7 +246,12 @@ export default async function FieldStopPage({
 
       <section className="field-card">
         <p className="section-kicker">Technician Notes</p>
-        <form action={saveTechnicianNotesAction} className="field-form">
+        <FeedbackForm
+          action={saveTechnicianNotesAction}
+          className="field-form"
+          pendingMessage="Saving notes..."
+          successMessage="Technician notes saved."
+        >
           <input type="hidden" name="visitId" value={visit.id} />
           <label>
             Internal notes
@@ -274,10 +274,10 @@ export default async function FieldStopPage({
               </label>
             ))}
           </div>
-          <button className="button button-dark" type="submit">
+          <ActionSubmitButton className="button button-dark" pendingLabel="Saving...">
             Save Notes
-          </button>
-        </form>
+          </ActionSubmitButton>
+        </FeedbackForm>
       </section>
 
       <section className="field-card">
@@ -317,18 +317,20 @@ export default async function FieldStopPage({
           />
         ) : null}
         <div className="field-actions">
-          {!isPaid ? (
-            <form action={sendPaymentLinkFromFieldAction}>
-              <input type="hidden" name="bookingId" value={booking.id} />
-              <input type="hidden" name="visitId" value={visit.id} />
-              <input type="hidden" name="routeStopId" value={stop.id} />
-              <button className="button button-outline" type="submit">
-                Send Payment Email
-              </button>
-            </form>
-          ) : null}
+          <FieldPaymentEmailForm
+            bookingId={booking.id}
+            hasPaymentLink={Boolean(currentPaymentLink)}
+            isPaid={isPaid}
+            routeStopId={stop.id}
+            visitId={visit.id}
+          />
           {!isPaid && manualPaymentAllowed ? (
-            <form action={markManualPaidAction} className="field-form inline-payment-form">
+            <FeedbackForm
+              action={markManualPaidAction}
+              className="field-form inline-payment-form"
+              pendingMessage="Marking payment..."
+              successMessage="Manual payment marked paid."
+            >
               <input type="hidden" name="bookingId" value={booking.id} />
               <input type="hidden" name="visitId" value={visit.id} />
               <input
@@ -336,10 +338,10 @@ export default async function FieldStopPage({
                 placeholder="Cash, Zelle, Venmo, check"
               />
               <input name="manualPaymentNotes" placeholder="Optional payment note" />
-              <button className="button button-outline" type="submit">
+              <ActionSubmitButton className="button button-outline" pendingLabel="Saving...">
                 Mark Manual Paid
-              </button>
-            </form>
+              </ActionSubmitButton>
+            </FeedbackForm>
           ) : null}
         </div>
       </section>
@@ -351,12 +353,19 @@ export default async function FieldStopPage({
           This saves completion, marks the visit complete, updates the booking,
           and sends the completion email if email is configured.
         </p>
-        <form action={completeStopAction}>
+        <FeedbackForm
+          action={completeStopAction}
+          pendingMessage="Completing stop..."
+          successMessage="Stop completed."
+        >
           <input type="hidden" name="visitId" value={visit.id} />
-          <button className="button button-primary field-big-button" type="submit">
+          <ActionSubmitButton
+            className="button button-primary field-big-button"
+            pendingLabel="Completing..."
+          >
             End Service / Complete Stop
-          </button>
-        </form>
+          </ActionSubmitButton>
+        </FeedbackForm>
         {stop.status === "completed" ? (
           <div className="field-complete-panel">
             <h3>Stop completed</h3>
@@ -406,26 +415,6 @@ export default async function FieldStopPage({
   );
 }
 
-function StatusButton({
-  visitId,
-  status,
-  label,
-}: {
-  visitId: string;
-  status: string;
-  label: string;
-}) {
-  return (
-    <form action={updateStopStatusAction}>
-      <input type="hidden" name="visitId" value={visitId} />
-      <input type="hidden" name="status" value={status} />
-      <button className="button button-outline" type="submit">
-        {label}
-      </button>
-    </form>
-  );
-}
-
 function PhotoSection({
   title,
   actionLabel,
@@ -442,14 +431,19 @@ function PhotoSection({
   return (
     <section className="field-card">
       <p className="section-kicker">{title}</p>
-      <form action={uploadServicePhotosAction} className="field-form">
+      <FeedbackForm
+        action={uploadServicePhotosAction}
+        className="field-form"
+        pendingMessage="Uploading photos..."
+        successMessage={`${title} uploaded.`}
+      >
         <input type="hidden" name="visitId" value={visitId} />
         <input type="hidden" name="photoType" value={photoType} />
         <input accept="image/*" capture="environment" multiple name="photos" type="file" />
-        <button className="button button-dark" type="submit">
+        <ActionSubmitButton className="button button-dark" pendingLabel="Uploading...">
           {actionLabel}
-        </button>
-      </form>
+        </ActionSubmitButton>
+      </FeedbackForm>
       {photos.length ? (
         <div className="field-photo-grid">
           {photos.map((photo) => (
@@ -461,13 +455,20 @@ function PhotoSection({
               ) : (
                 <div className="field-photo-placeholder">Photo unavailable</div>
               )}
-              <form action={deleteServicePhotoAction}>
+              <FeedbackForm
+                action={deleteServicePhotoAction}
+                pendingMessage="Deleting photo..."
+                successMessage="Photo deleted."
+              >
                 <input type="hidden" name="photoId" value={photo.id} />
                 <input type="hidden" name="visitId" value={visitId} />
-                <button className="link-button destructive" type="submit">
+                <ActionSubmitButton
+                  className="link-button destructive"
+                  pendingLabel="Deleting..."
+                >
                   Delete / Retry
-                </button>
-              </form>
+                </ActionSubmitButton>
+              </FeedbackForm>
             </figure>
           ))}
         </div>

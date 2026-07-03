@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { CheckCircle2, LockKeyhole } from "lucide-react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type AccountSetupFormProps = {
   bookingId: string;
@@ -16,6 +17,7 @@ export function AccountSetupForm({
   email,
   customerName,
 }: AccountSetupFormProps) {
+  const feedback = useActionFeedback();
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -27,6 +29,7 @@ export function AccountSetupForm({
 
     if (password !== confirmPassword) {
       setError("Those passwords do not match yet.");
+      feedback.error("Those passwords do not match yet.");
       return;
     }
 
@@ -52,13 +55,15 @@ export function AccountSetupForm({
         throw new Error(data.error ?? "Account setup failed");
       }
 
+      feedback.success("Account created. Opening your portal.");
       window.location.assign(data.redirectTo);
     } catch (caughtError) {
-      setError(
+      const message =
         caughtError instanceof Error
           ? caughtError.message
-          : "We could not set up that account. Please try again.",
-      );
+          : "We could not set up that account. Please try again.";
+      setError(message);
+      feedback.error(message);
     } finally {
       setIsSubmitting(false);
     }

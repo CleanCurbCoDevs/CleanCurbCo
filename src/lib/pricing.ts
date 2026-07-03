@@ -19,6 +19,7 @@ type FoundingNeighborSpecialInput = {
 
 export type FoundingNeighborSpecialStatus =
   | "eligible"
+  | "manual_override"
   | "applied"
   | "not_eligible";
 
@@ -26,7 +27,7 @@ export const pricingConfig = {
   foundingNeighborSpecialEnabled: true,
   foundingNeighborRecurringTwoBinFirstCleanPrice: 25,
   recurringExtraBinPrice: 10,
-  foundingNeighborCutoffDate: "2026-07-13T23:59:59-04:00",
+  foundingNeighborCutoffDate: "2026-07-31T23:59:59-04:00",
   foundingNeighborRouteLabel: "Cane Bay launch route",
 };
 
@@ -72,7 +73,7 @@ export function calculateBookingEstimate(input: PriceInput) {
     pricingConfig.foundingNeighborSpecialEnabled &&
     input.applyFoundingNeighborPromo &&
     input.frequency !== "one_time" &&
-    input.binCount <= 2;
+    input.binCount === 2;
 
   const basePrice = eligibleForFoundingSpecial
     ? pricingConfig.foundingNeighborRecurringTwoBinFirstCleanPrice
@@ -96,7 +97,7 @@ export function getFoundingNeighborSpecialStatus(
     : createdAt <= cutoff;
   const isRecurring = input.frequency !== "one_time";
   const isFoundingRoute = isFoundingRouteNeighborhood(input.neighborhood);
-  const isTwoBinClean = input.binCount <= 2;
+  const isTwoBinClean = input.binCount === 2;
   const standardPrice = calculateBookingEstimate({
     binCount: input.binCount,
     frequency: input.frequency,
@@ -126,7 +127,18 @@ export function getFoundingNeighborSpecialStatus(
       status: "not_eligible" as const,
       eligible: false,
       applied: false,
-      reason: "Not recurring.",
+      reason: "Not eligible: not recurring.",
+      standardPrice,
+      specialPrice,
+    };
+  }
+
+  if (!isFoundingRoute && input.estimatedPrice === specialPrice) {
+    return {
+      status: "manual_override" as const,
+      eligible: true,
+      applied: true,
+      reason: "Manual override by admin.",
       standardPrice,
       specialPrice,
     };
@@ -137,7 +149,18 @@ export function getFoundingNeighborSpecialStatus(
       status: "not_eligible" as const,
       eligible: false,
       applied: false,
-      reason: "Outside founding Cane Bay route.",
+      reason: "Not eligible: outside founding route.",
+      standardPrice,
+      specialPrice,
+    };
+  }
+
+  if (!isBeforeCutoff && input.estimatedPrice === specialPrice) {
+    return {
+      status: "manual_override" as const,
+      eligible: true,
+      applied: true,
+      reason: "Manual override by admin.",
       standardPrice,
       specialPrice,
     };
@@ -148,7 +171,18 @@ export function getFoundingNeighborSpecialStatus(
       status: "not_eligible" as const,
       eligible: false,
       applied: false,
-      reason: "After promo period.",
+      reason: "Not eligible: after cutoff.",
+      standardPrice,
+      specialPrice,
+    };
+  }
+
+  if (!isTwoBinClean && input.estimatedPrice === specialPrice) {
+    return {
+      status: "manual_override" as const,
+      eligible: true,
+      applied: true,
+      reason: "Manual override by admin.",
       standardPrice,
       specialPrice,
     };
@@ -159,7 +193,10 @@ export function getFoundingNeighborSpecialStatus(
       status: "not_eligible" as const,
       eligible: false,
       applied: false,
-      reason: "More than two bins.",
+      reason:
+        input.binCount < 2
+          ? "Not eligible: not a two-bin cleaning."
+          : "Not eligible: more than two bins.",
       standardPrice,
       specialPrice,
     };
@@ -173,7 +210,9 @@ export function getFoundingNeighborSpecialStatus(
     status: applied ? ("applied" as const) : ("eligible" as const),
     eligible: true,
     applied,
-    reason: "Recurring Cane Bay route before launch.",
+    reason: applied
+      ? "Applied: first founding route visit."
+      : "Eligible: recurring two-bin founding route before cutoff.",
     standardPrice,
     specialPrice,
   };

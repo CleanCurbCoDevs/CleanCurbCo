@@ -537,8 +537,11 @@ function formatDate(value: string) {
   }).format(new Date(value));
 }
 
-function foundingSpecialLabel(status: "eligible" | "applied" | "not_eligible") {
+function foundingSpecialLabel(
+  status: "eligible" | "applied" | "manual_override" | "not_eligible",
+) {
   if (status === "applied") return "Applied";
+  if (status === "manual_override") return "Manual override";
   if (status === "eligible") return "Eligible";
   return "Not eligible";
 }

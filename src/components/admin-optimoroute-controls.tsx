@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type AdminOptimoRouteControlsProps = {
   routeDayId: string;
@@ -53,6 +54,7 @@ export function AdminOptimoRouteControls({
   planningStatus,
 }: AdminOptimoRouteControlsProps) {
   const router = useRouter();
+  const feedback = useActionFeedback();
   const [includePaymentBlocked, setIncludePaymentBlocked] = useState(false);
   const [includeNotApproved, setIncludeNotApproved] = useState(false);
   const [pendingAction, setPendingAction] = useState<ActionKey | null>(null);
@@ -85,13 +87,19 @@ export function AdminOptimoRouteControls({
             .filter(Boolean)
             .join(" "),
         );
+        feedback.error(result.error ?? "OptimoRoute action failed.");
         return;
       }
 
-      setMessage(formatSuccess(action, result));
+      const success = formatSuccess(action, result);
+      setMessage(success);
+      feedback.success(success);
       router.refresh();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : "OptimoRoute action failed.");
+      const nextError =
+        caught instanceof Error ? caught.message : "OptimoRoute action failed.";
+      setError(nextError);
+      feedback.error(nextError);
     } finally {
       setPendingAction(null);
     }
