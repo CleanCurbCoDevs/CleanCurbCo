@@ -27,11 +27,15 @@ type ApiResult = {
   percentageComplete?: number | null;
   imported?: unknown[];
   unscheduled?: unknown[];
+  routeCount?: number;
+  stopCount?: number;
+  message?: string;
 };
 
-type ActionKey = "sync" | "start" | "status" | "import";
+type ActionKey = "test" | "sync" | "start" | "status" | "import";
 
 const endpoints: Record<ActionKey, string> = {
+  test: "/api/admin/optimoroute/test-connection",
   sync: "/api/admin/optimoroute/sync",
   start: "/api/admin/optimoroute/start-planning",
   status: "/api/admin/optimoroute/planning-status",
@@ -94,6 +98,7 @@ export function AdminOptimoRouteControls({
   }
 
   const hasSyncedStops = syncedCount > 0 || importedCount > 0;
+  const canImport = ["finished", "imported"].includes(planningStatus ?? "");
   const busy = pendingAction !== null;
 
   return (
@@ -134,6 +139,14 @@ export function AdminOptimoRouteControls({
 
       <div className="button-row compact-actions">
         <button
+          className="button button-outline"
+          disabled={busy}
+          onClick={() => runAction("test")}
+          type="button"
+        >
+          {pendingAction === "test" ? "Testing..." : "Test Connection"}
+        </button>
+        <button
           className="button button-dark"
           disabled={busy || (!eligibleCount && !includePaymentBlocked && !includeNotApproved)}
           onClick={() => runAction("sync")}
@@ -159,7 +172,7 @@ export function AdminOptimoRouteControls({
         </button>
         <button
           className="button button-primary"
-          disabled={busy || !hasSyncedStops}
+          disabled={busy || !hasSyncedStops || !canImport}
           onClick={() => runAction("import")}
           type="button"
         >
@@ -171,6 +184,7 @@ export function AdminOptimoRouteControls({
         {planningId ? `Planning #${planningId}` : "No planning job yet"}
         {planningStatus ? ` - ${planningStatus}` : ""}. Clean Curb Co remains the
         source of truth for service, payment, photos, notes, and checklists.
+        {!canImport && hasSyncedStops ? " Import unlocks after planning status is finished." : ""}
       </p>
       {message ? <p className="optimoroute-message success">{message}</p> : null}
       {error ? <p className="optimoroute-message error">{error}</p> : null}
@@ -179,6 +193,9 @@ export function AdminOptimoRouteControls({
 }
 
 function formatSuccess(action: ActionKey, result: ApiResult) {
+  if (action === "test") {
+    return `${result.message ?? "OptimoRoute connection test completed."} Routes returned for preflight date: ${result.routeCount ?? 0}; stops: ${result.stopCount ?? 0}.`;
+  }
   if (action === "sync") {
     return `Synced ${(result.synced ?? []).length} stop(s); ${(result.failed ?? []).length} failed; ${(result.skipped ?? []).length} skipped.`;
   }

@@ -4,6 +4,7 @@ import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
 import {
   createOptimoRouteClient,
   OptimoRouteApiError,
+  type OptimoRouteSchedulingInfoResponse,
   type OptimoRouteRoute,
   type OptimoRouteRouteStop,
 } from "@/lib/optimoroute/client";
@@ -271,6 +272,51 @@ export async function getOptimoRoutePreview(routeDayId: string) {
   };
 }
 
+export async function testOptimoRouteConnection(context: RequestContext = {}) {
+  const client = createOptimoRouteClient(context);
+  const testDate = "2099-01-01";
+
+  try {
+    const response = await client.getRoutes(testDate);
+    const routeCount = response.routes?.length ?? 0;
+    const stopCount =
+      response.routes?.reduce((total, route) => total + (route.stops?.length ?? 0), 0) ?? 0;
+
+    logger.info("optimoroute_connection_test_completed", {
+      requestId: context.requestId,
+      route: context.route,
+      action: context.action,
+      userId: context.actor?.userId,
+      role: context.actor?.role,
+      metadata: {
+        testDate,
+        routeCount,
+        stopCount,
+      },
+    });
+
+    return {
+      ok: true,
+      status: 200,
+      testDate,
+      routeCount,
+      stopCount,
+      message: "OptimoRoute accepted the configured API key.",
+    };
+  } catch (error) {
+    const message = safeOptimoRouteErrorMessage(error);
+    logger.warn("optimoroute_connection_test_failed", {
+      requestId: context.requestId,
+      route: context.route,
+      action: context.action,
+      userId: context.actor?.userId,
+      role: context.actor?.role,
+      metadata: { testDate, message },
+    });
+    return { ok: false, status: 502, error: message, testDate };
+  }
+}
+
 export async function syncRouteDayToOptimoRoute(
   routeDayId: string,
   options: OptimoRouteSyncOptions,
@@ -345,9 +391,13 @@ export async function syncRouteDayToOptimoRoute(
     }
   }
 
-  await recordRouteEvent(routeDay, "optimoroute_stops_synced", {
+  const eventName =
+    synced.length > 0 ? "optimoroute_sync_completed" : "optimoroute_sync_failed";
+  await recordRouteEvent(routeDay, eventName, {
     context,
+    status: synced.length > 0 ? "success" : "failure",
     metadata: {
+      eligibleCount: eligible.length,
       syncedCount: synced.length,
       failedCount: failed.length,
       skippedCount: skipped.length,
@@ -424,7 +474,12 @@ export async function startOptimoRoutePlanning(
     ]);
     await recordRouteEvent(routeDay, "optimoroute_planning_started", {
       context,
-      metadata: { planningId, orderCount: orderObjects.length },
+      metadata: {
+        planningId,
+        orderCount: orderObjects.length,
+        missingOrderCount: response.missingOrders?.length ?? 0,
+        invalidLocationCount: response.ordersWithInvalidLocation?.length ?? 0,
+      },
     });
     return { ok: true, status: 200, planningId, orderCount: orderObjects.length };
   } catch (error) {
@@ -436,6 +491,11 @@ export async function startOptimoRoutePlanning(
         optimoroute_planning_error: message,
       })
       .eq("id", routeDay.id);
+    await recordRouteEvent(routeDay, "optimoroute_planning_failed", {
+      context,
+      status: "failure",
+      metadata: { error: message },
+    });
     return { ok: false, status: 502, error: message };
   }
 }
@@ -483,6 +543,22 @@ export async function checkOptimoRoutePlanningStatus(
         .eq("optimoroute_sync_status", "planning_pending");
     }
 
+    logger.info("optimoroute_planning_status_checked", {
+      requestId: context.requestId,
+      route: context.route,
+      action: context.action,
+      userId: context.actor?.userId,
+      role: context.actor?.role,
+      metadata: {
+        routeDayId: routeDay.id,
+        routeDate: routeDay.route_date,
+        planningId: routeDay.optimoroute_planning_id,
+        planningStatus: status,
+        optimorouteStatus: response.status,
+        percentageComplete: response.percentageComplete ?? null,
+      },
+    });
+
     return {
       ok: true,
       status: 200,
@@ -515,7 +591,12 @@ export async function importOptimoRouteSchedule(
 
   const admin = getSupabaseAdmin();
   const imported: Array<{ routeStopId: string; orderNo: string; sequence: number }> = [];
-  const unscheduled: Array<{ routeStopId: string; orderNo: string }> = [];
+  const unscheduled: Array<{
+    routeStopId: string;
+    orderNo: string;
+    reason: string;
+    suggestedFix: string;
+  }> = [];
   const syncedBundles = bundles.filter((bundle) => bundle.stop.optimoroute_order_no);
 
   if (!syncedBundles.length) {
@@ -523,6 +604,21 @@ export async function importOptimoRouteSchedule(
       ok: false,
       status: 400,
       error: "Sync at least one stop before importing an optimized route.",
+    };
+  }
+
+  if (!["finished", "imported"].includes(routeDay.optimoroute_planning_status ?? "")) {
+    const status = routeDay.optimoroute_planning_status ?? "unknown";
+    const error =
+      status === "failed"
+        ? `OptimoRoute planning failed. ${routeDay.optimoroute_planning_error ?? "Check the planning error and try again."}`
+        : `Optimization is not complete yet. Current status: ${humanizeStatus(status)}. Check status again before importing.`;
+    return {
+      ok: false,
+      status: 409,
+      error,
+      planningStatus: status,
+      planningId: routeDay.optimoroute_planning_id,
     };
   }
 
@@ -536,51 +632,111 @@ export async function importOptimoRouteSchedule(
         .map((item) => [item.stop.orderNo, item]),
     );
 
-    await Promise.all(
-      syncedBundles
-        .map(async (bundle) => {
-          const orderNo = getOptimoRouteOrderNo(bundle.stop);
-          const scheduled = scheduledByOrderNo.get(orderNo);
+    for (const bundle of syncedBundles) {
+      const orderNo = getOptimoRouteOrderNo(bundle.stop);
+      const scheduled = scheduledByOrderNo.get(orderNo);
 
-          if (!scheduled) {
-            await admin
-              .from("route_stops")
-              .update({
-                optimoroute_sync_status: "unscheduled",
-                optimoroute_sync_error: "OptimoRoute did not schedule this stop.",
-                optimoroute_planning_status: routeDay.optimoroute_planning_status,
-              })
-              .eq("id", bundle.stop.id);
-            unscheduled.push({ routeStopId: bundle.stop.id, orderNo });
-            return;
-          }
+      if (scheduled) {
+        const sequence = scheduled.stop.stopNumber;
+        await admin
+          .from("route_stops")
+          .update({
+            optimoroute_order_id: scheduled.stop.id ?? bundle.stop.optimoroute_order_id,
+            optimoroute_sync_status: "imported",
+            optimoroute_sync_error: null,
+            optimoroute_scheduled_at: parseOptimoRouteDateTime(
+              scheduled.stop.scheduledAtDt,
+              routeDay.route_date,
+            ),
+            optimoroute_stop_sequence: sequence,
+            optimoroute_route_id: scheduled.routeId,
+            optimoroute_driver_name: scheduled.route.driverName ?? null,
+            optimoroute_eta: parseOptimoRouteDateTime(
+              scheduled.stop.arrivalTimeDt ?? scheduled.stop.scheduledAtDt,
+              routeDay.route_date,
+            ),
+            optimoroute_travel_time_seconds: scheduled.stop.travelTime ?? null,
+            optimoroute_distance_meters: scheduled.stop.distance ?? null,
+            optimoroute_planning_status: "imported",
+          })
+          .eq("id", bundle.stop.id);
+        imported.push({ routeStopId: bundle.stop.id, orderNo, sequence });
+        continue;
+      }
 
-          const sequence = scheduled.stop.stopNumber;
-          await admin
-            .from("route_stops")
-            .update({
-              optimoroute_order_id: scheduled.stop.id ?? bundle.stop.optimoroute_order_id,
-              optimoroute_sync_status: "imported",
-              optimoroute_sync_error: null,
-              optimoroute_scheduled_at: parseOptimoRouteDateTime(
-                scheduled.stop.scheduledAtDt,
-                routeDay.route_date,
-              ),
-              optimoroute_stop_sequence: sequence,
-              optimoroute_route_id: scheduled.routeId,
-              optimoroute_driver_name: scheduled.route.driverName ?? null,
-              optimoroute_eta: parseOptimoRouteDateTime(
-                scheduled.stop.arrivalTimeDt ?? scheduled.stop.scheduledAtDt,
-                routeDay.route_date,
-              ),
-              optimoroute_travel_time_seconds: scheduled.stop.travelTime ?? null,
-              optimoroute_distance_meters: scheduled.stop.distance ?? null,
-              optimoroute_planning_status: "imported",
-            })
-            .eq("id", bundle.stop.id);
-          imported.push({ routeStopId: bundle.stop.id, orderNo, sequence });
-        }),
-    );
+      const schedulingInfo = await getSchedulingInfoSafely(client, orderNo);
+      if (
+        schedulingInfo.response?.orderScheduled &&
+        schedulingInfo.response.scheduleInformation
+      ) {
+        const info = schedulingInfo.response.scheduleInformation;
+        const sequence = info.stopNumber ?? bundle.stop.stop_order;
+        await admin
+          .from("route_stops")
+          .update({
+            optimoroute_sync_status: "imported",
+            optimoroute_sync_error: null,
+            optimoroute_scheduled_at: parseOptimoRouteDateTime(
+              info.scheduledAtDt ?? info.scheduledAt,
+              routeDay.route_date,
+            ),
+            optimoroute_stop_sequence: sequence,
+            optimoroute_route_id:
+              info.driverSerial ||
+              info.driverExternalId ||
+              info.vehicleLabel ||
+              info.vehicleRegistration ||
+              null,
+            optimoroute_driver_name: info.driverName ?? null,
+            optimoroute_eta: parseOptimoRouteDateTime(
+              info.liveEstimate?.arrivalTimeDt ??
+                info.arrivalTimeDt ??
+                info.scheduledAtDt ??
+                info.scheduledAt,
+              routeDay.route_date,
+            ),
+            optimoroute_travel_time_seconds: info.travelTime ?? null,
+            optimoroute_distance_meters: info.distance ?? null,
+            optimoroute_planning_status: "imported",
+          })
+          .eq("id", bundle.stop.id);
+        imported.push({ routeStopId: bundle.stop.id, orderNo, sequence });
+        continue;
+      }
+
+      const reason = schedulingInfo.reason;
+      const suggestedFix = getUnscheduledSuggestedFix(reason);
+      await admin
+        .from("route_stops")
+        .update({
+          optimoroute_sync_status: "unscheduled",
+          optimoroute_sync_error: `${reason} Suggested fix: ${suggestedFix}`,
+          optimoroute_planning_status: routeDay.optimoroute_planning_status,
+        })
+        .eq("id", bundle.stop.id);
+      unscheduled.push({
+        routeStopId: bundle.stop.id,
+        orderNo,
+        reason,
+        suggestedFix,
+      });
+    }
+
+    logger.info("optimoroute_schedule_import_checked", {
+      requestId: context.requestId,
+      route: context.route,
+      action: context.action,
+      userId: context.actor?.userId,
+      role: context.actor?.role,
+      metadata: {
+        routeDayId: routeDay.id,
+        routeDate: routeDay.route_date,
+        routesReturned: response.routes?.length ?? 0,
+        scheduledStopsFound: scheduledStops.length,
+        importedCount: imported.length,
+        unscheduledCount: unscheduled.length,
+      },
+    });
   } catch (error) {
     const message = safeOptimoRouteErrorMessage(error);
     await admin
@@ -593,31 +749,76 @@ export async function importOptimoRouteSchedule(
     return { ok: false, status: 502, error: message };
   }
 
+  const noScheduledMessage =
+    "OptimoRoute did not schedule any stops. Check driver availability, work hours, route date, timezone, depot/start location, vehicle settings, and stop constraints.";
   await admin
     .from("route_days")
     .update({
-      optimoroute_planning_status: "imported",
+      optimoroute_planning_status: imported.length ? "imported" : "finished",
       optimoroute_planning_error: unscheduled.length
-        ? `${unscheduled.length} synced stop(s) were not scheduled.`
+        ? imported.length
+          ? `${unscheduled.length} synced stop(s) were not scheduled.`
+          : noScheduledMessage
         : null,
       optimoroute_last_imported_at: new Date().toISOString(),
     })
     .eq("id", routeDay.id);
 
-  await recordRouteEvent(routeDay, "optimoroute_schedule_imported", {
+  const eventName = imported.length
+    ? "optimoroute_schedule_import_completed"
+    : "optimoroute_schedule_import_no_scheduled_stops";
+  await recordRouteEvent(routeDay, eventName, {
     context,
+    status: imported.length ? "success" : "failure",
     metadata: {
       importedCount: imported.length,
       unscheduledCount: unscheduled.length,
+      unscheduledReasons: unscheduled.map((item) => ({
+        routeStopId: item.routeStopId,
+        orderNo: item.orderNo,
+        reason: item.reason,
+      })),
     },
   });
 
   return {
     ok: imported.length > 0,
-    status: imported.length > 0 ? 200 : 400,
+    status: imported.length > 0 ? 200 : 409,
+    error: imported.length > 0 ? undefined : noScheduledMessage,
     imported,
     unscheduled,
   };
+}
+
+async function getSchedulingInfoSafely(
+  client: ReturnType<typeof createOptimoRouteClient>,
+  orderNo: string,
+): Promise<{
+  response?: OptimoRouteSchedulingInfoResponse;
+  reason: string;
+}> {
+  try {
+    const response = await client.getSchedulingInfo(orderNo);
+    return {
+      response,
+      reason: response.orderScheduled
+        ? "Scheduled according to OptimoRoute scheduling lookup."
+        : "OptimoRoute says this order is not scheduled.",
+    };
+  } catch (error) {
+    return {
+      reason: safeOptimoRouteErrorMessage(error),
+    };
+  }
+}
+
+function getUnscheduledSuggestedFix(reason: string) {
+  const normalized = reason.toLowerCase();
+  if (normalized.includes("not found")) return "Sync this stop again and confirm the order exists in OptimoRoute.";
+  if (normalized.includes("invalid") || normalized.includes("address")) return "Check the stop address and resync.";
+  if (normalized.includes("driver") || normalized.includes("resource")) return "Check driver availability, work hours, vehicle settings, and start/depot location.";
+  if (normalized.includes("not scheduled")) return "Check driver availability, work hours, route date, timezone, depot/start location, and stop constraints.";
+  return "Check driver availability, work hours, route date, depot/start location, and stop constraints.";
 }
 
 function flattenOptimizedStops(routes: OptimoRouteRoute[]) {
@@ -674,6 +875,7 @@ async function recordRouteEvent(
   eventType: string,
   input: {
     context: RequestContext;
+    status?: "success" | "failure";
     metadata?: Record<string, unknown>;
   },
 ) {
@@ -704,7 +906,7 @@ async function recordRouteEvent(
       after_summary: metadata,
       note: "OptimoRoute routing supplement action.",
       request_id: input.context.requestId ?? null,
-      status: "success",
+      status: input.status ?? "success",
       metadata,
     }),
   ]);

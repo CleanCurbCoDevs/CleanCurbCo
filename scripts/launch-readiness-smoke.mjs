@@ -27,6 +27,10 @@ const legalRoutes = [
   "/communications-policy",
   "/accessibility",
   "/vulnerability-disclosure",
+  "/commercial-services-addendum",
+  "/door-to-door-cancellation-notice",
+  "/field-safety-policy",
+  "/photo-media-release",
 ];
 
 const privateRoutes = [
@@ -185,6 +189,16 @@ async function checkOptimoRouteApiGuards() {
   assert(
     anonymous.status === 401,
     `anonymous OptimoRoute sync expected 401, got ${anonymous.status}`,
+  );
+
+  const anonymousPreflight = await request("/api/admin/optimoroute/test-connection", {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify({}),
+  });
+  assert(
+    anonymousPreflight.status === 401,
+    `anonymous OptimoRoute preflight expected 401, got ${anonymousPreflight.status}`,
   );
 
   if (!adminEmail || !adminPassword || !customerEmail || !customerPassword) {

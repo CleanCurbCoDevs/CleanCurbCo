@@ -1,4 +1,3 @@
-import type { Metadata } from "next";
 import { Camera, Droplets, Sparkles, SprayCan, Truck } from "lucide-react";
 import {
   AddOnsSection,
@@ -6,12 +5,14 @@ import {
   HowItWorksSection,
 } from "@/components/sections/home-sections";
 import { SectionHeader } from "@/components/section-header";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Services",
   description:
     "Residential garbage bin cleaning, sanitizing, deodorizing, and supportive outdoor add-ons in Cane Bay, SC.",
-};
+  path: "/services",
+});
 
 export default function ServicesPage() {
   const serviceValues = [

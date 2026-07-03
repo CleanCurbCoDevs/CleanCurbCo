@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Photo & Media Release",
   description: "Clean Curb Co. photo, video, before-and-after, and marketing media policy.",
-};
+  path: "/photo-media-release",
+});
 
 export default function PhotoMediaReleasePage() {
   return (

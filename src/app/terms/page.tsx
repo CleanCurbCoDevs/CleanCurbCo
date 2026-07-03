@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Terms of Service",
   description: "Clean Curb Co. terms of service.",
-};
+  path: "/terms",
+});
 
 export default function TermsPage() {
   return (
@@ -26,11 +27,12 @@ export default function TermsPage() {
 
           <h2>1. Who we are</h2>
           <p>
-            Clean Curb Co. is operated as a DBA/brand under Stonebranch Capital
-            LLC. These Terms apply to Clean Curb Co.&apos;s website, booking forms,
-            customer portal, communications, payment tools, and services. In
-            these Terms, “Clean Curb Co.,” “we,” “us,” and “our” refer to
-            Stonebranch Capital LLC doing business as Clean Curb Co.
+            Clean Curb Co. is operated by Stonebranch Capital LLC. These Terms
+            apply to Clean Curb Co.&apos;s website, booking forms, customer portal,
+            communications, payment tools, and services. In these Terms,
+            &quot;Clean Curb Co.,&quot; &quot;we,&quot; &quot;us,&quot; and
+            &quot;our&quot; refer to Stonebranch Capital LLC doing business as Clean
+            Curb Co.
           </p>
 
           <h2>2. Agreement to these Terms</h2>

@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Accessibility Statement",
   description: "Clean Curb Co. accessibility statement and support contact information.",
-};
+  path: "/accessibility",
+});
 
 export default function AccessibilityStatementPage() {
   return (

@@ -35,6 +35,8 @@ export default async function PortalPhotosPage() {
                     {photos.map((photo) => (
                       <figure key={photo.id}>
                         {photo.signedUrl ? (
+                          // Supabase signed service-photo URLs are short-lived and intentionally rendered directly.
+                          // eslint-disable-next-line @next/next/no-img-element
                           <img
                             alt={`${photo.photo_type} Clean Curb Co. service photo`}
                             src={photo.signedUrl}

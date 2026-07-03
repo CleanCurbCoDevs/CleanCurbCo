@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Field Safety Policy",
   description: "Clean Curb Co. employee and contractor field safety policy.",
-};
+  path: "/field-safety-policy",
+});
 
 export default function FieldSafetyPolicyPage() {
   return (

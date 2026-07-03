@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Cookie & Analytics Policy",
   description: "Clean Curb Co. cookie and analytics policy.",
-};
+  path: "/cookie-analytics-policy",
+});
 
 export default function CookieAnalyticsPolicyPage() {
   return (
@@ -26,10 +27,10 @@ export default function CookieAnalyticsPolicyPage() {
 
           <h2>1. What this policy covers</h2>
           <p>
-            This policy explains how Clean Curb Co. may use cookies, pixels,
-            local storage, server logs, analytics tools, and similar
-            technologies on our website, booking forms, customer portal, and
-            related online services.
+            This policy explains how Clean Curb Co. uses essential cookies or
+            storage, server logs, Vercel Analytics, Vercel Speed Insights, and
+            similar operational technologies on our website, booking forms,
+            customer portal, and related online services.
           </p>
 
           <h2>2. Types of technologies we may use</h2>
@@ -38,7 +39,9 @@ export default function CookieAnalyticsPolicyPage() {
             work, remember basic preferences, maintain sessions, protect forms,
             prevent fraud, and support account access. We may also use analytics
             tools, server logs, or performance monitoring tools to understand
-            website usage and fix technical issues.
+            website usage and fix technical issues. We do not currently use
+            Google Analytics, Meta pixel, Nextdoor pixel, or other marketing
+            pixels in the app code.
           </p>
 
           <h2>3. Analytics information</h2>
@@ -79,7 +82,7 @@ export default function CookieAnalyticsPolicyPage() {
 
           <h2>7. Do Not Track</h2>
           <p>
-            Some browsers offer “Do Not Track” signals. Because there is not a
+            Some browsers offer &quot;Do Not Track&quot; signals. Because there is not a
             single industry-standard response for all websites, our website may
             not automatically respond to those signals. You can still contact us
             with privacy requests or use browser-level controls where available.

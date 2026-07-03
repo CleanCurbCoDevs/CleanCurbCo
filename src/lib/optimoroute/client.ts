@@ -130,6 +130,28 @@ export class OptimoRouteApiError extends Error {
   }
 }
 
+export function getFriendlyOptimoRouteApiMessage(code?: string, fallback?: string) {
+  if (code === "AUTH_KEY_UNKNOWN") {
+    return "OptimoRoute rejected the API key. Check the OPTIMOROUTE_API_KEY value in Vercel and confirm the key is enabled in OptimoRoute.";
+  }
+  if (code === "AUTH_KEY_MISSING") {
+    return "OptimoRoute API key is missing. Add OPTIMOROUTE_API_KEY on the server.";
+  }
+  if (code === "ERR_OPT_NO_RESOURCES") {
+    return "OptimoRoute could not find an available driver for this date. Check driver availability, work hours, timezone, vehicle settings, and start/depot location.";
+  }
+  if (code === "ERR_ORD_WITH_INVALID_LOC") {
+    return "OptimoRoute found an invalid stop address. Review the affected stop addresses, then sync again.";
+  }
+  if (code === "ERR_ORD_NOT_FOUND") {
+    return "OptimoRoute could not find one or more synced orders. Sync stops again before starting optimization.";
+  }
+  if (code === "ERR_MULTIPLE_ORD_FOUND") {
+    return "OptimoRoute found duplicate order numbers. Resync the route and check for duplicate CCC order numbers in OptimoRoute.";
+  }
+  return fallback || code || "OptimoRoute request failed.";
+}
+
 function getApiKey() {
   const apiKey = process.env.OPTIMOROUTE_API_KEY?.trim();
   if (!apiKey) {
@@ -178,10 +200,10 @@ async function optimorouteFetch<T extends OptimoRouteResponse>(
     const data = (await response.json().catch(() => ({}))) as T;
 
     if (!response.ok || data.success === false) {
-      const message =
-        data.message ||
-        data.code ||
-        `OptimoRoute request failed with status ${response.status}.`;
+      const message = getFriendlyOptimoRouteApiMessage(
+        data.code,
+        data.message || `OptimoRoute request failed with status ${response.status}.`,
+      );
       logger.warn("optimoroute_api_request_failed", {
         requestId: context.requestId,
         route: context.route,

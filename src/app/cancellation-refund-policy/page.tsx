@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Cancellation & Refund Policy",
   description: "Clean Curb Co. cancellation, rescheduling, and refund policy.",
-};
+  path: "/cancellation-refund-policy",
+});
 
 export default function CancellationRefundPolicyPage() {
   return (

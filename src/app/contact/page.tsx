@@ -1,14 +1,15 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { Mail, MapPin, Phone } from "lucide-react";
 import { ContactForm } from "@/components/contact-form";
+import { publicPageMetadata } from "@/lib/seo";
 import { brand, launchNotice, launchReservationCopy } from "@/lib/site";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Contact",
   description:
     "Contact Clean Curb Co. for garbage bin cleaning in Cane Bay and nearby Summerville communities.",
-};
+  path: "/contact",
+});
 
 export default function ContactPage() {
   return (

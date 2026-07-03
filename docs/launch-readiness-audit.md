@@ -155,9 +155,12 @@ Error/protection routes:
 
 ## Remaining Manual Review
 
+- OptimoRoute operations, live-test steps, required account setup, sync eligibility,
+  field fallback behavior, and unscheduled-stop troubleshooting are documented in
+  `docs/optimoroute-operations.md`.
 - MFA/passkey enforcement for admin/owner users is not implemented in this pass. Supabase MFA policy/UX should be planned as a separate auth project.
 - Technician data scoping still depends on the current field-role model and RLS policies. A separate technician account was not supplied for this audit, and route assignment-only enforcement should be revisited before adding more field staff.
 - Legal pages should receive counsel/business review before launch. Some older legal copy still contains smart-quote encoding artifacts that should be cleaned as a copy-edit pass.
 - Cloudflare/Vercel production security headers, robots, sitemap, and 403 behavior must be rechecked after deployment because live production still reflects the previous build until this branch is deployed.
 - Vercel Analytics and Speed Insights are present. Cookie/analytics policy language should be reviewed against the final production analytics/consent posture.
-- Image optimization warnings remain for field stop photos and portal photos where `<img>` is used for Supabase signed URLs.
+- Supabase signed service-photo URLs intentionally use direct `<img>` tags with narrow eslint disables because they are short-lived private URLs.

@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { ServiceAreaSection } from "@/components/sections/home-sections";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Service Area",
   description:
     "Clean Curb Co. is now serving Cane Bay and nearby Summerville communities with route-based bin cleaning.",
-};
+  path: "/service-area",
+});
 
 export default function ServiceAreaPage() {
   return (

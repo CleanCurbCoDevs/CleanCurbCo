@@ -7,6 +7,7 @@ import {
   launchReservationCopy,
   launchRouteHeadline,
 } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 import {
   AddOnsSection,
   ExpectationsSection,
@@ -21,6 +22,13 @@ import {
   WhatGetsCleanedSection,
   WhyChooseUsSection,
 } from "@/components/sections/home-sections";
+
+export const metadata = publicPageMetadata({
+  title: "Garbage Bin Cleaning in Cane Bay, SC",
+  description:
+    "Professional garbage bin cleaning, sanitizing, and deodorizing for Cane Bay and nearby Summerville communities.",
+  path: "/",
+});
 
 export default function Home() {
   return (

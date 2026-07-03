@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Service Policy",
   description: "Clean Curb Co. service policy and service limitations.",
-};
+  path: "/service-policy",
+});
 
 export default function ServicePolicyPage() {
   return (

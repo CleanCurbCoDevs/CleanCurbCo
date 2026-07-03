@@ -7,6 +7,7 @@ import { ChromeFrame } from "@/components/chrome-frame";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getSiteUrl } from "@/lib/env";
+import { localBusinessStructuredData } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./globals.css";
 
@@ -95,6 +96,8 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  const siteUrl = getSiteUrl();
+
   return (
     <html
       lang="en"
@@ -105,6 +108,12 @@ export default function RootLayout({
         <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
           {children}
         </ChromeFrame>
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{
+            __html: JSON.stringify(localBusinessStructuredData(siteUrl)),
+          }}
+        />
         <Analytics />
         <SpeedInsights />
       </body>

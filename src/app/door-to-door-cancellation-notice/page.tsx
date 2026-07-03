@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Door-to-Door Cancellation Notice",
   description: "Clean Curb Co. notice of cancellation for qualifying home solicitation sales.",
-};
+  path: "/door-to-door-cancellation-notice",
+});
 
 export default function DoorToDoorCancellationNoticePage() {
   return (

@@ -1,12 +1,13 @@
-import type { Metadata } from "next";
 import Link from "next/link";
 import { submitCareerApplicationAction } from "@/app/careers/actions";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Careers",
   description:
     "Join the Clean Curb Co. career interest list for future local service roles in Cane Bay and nearby Summerville communities.",
-};
+  path: "/careers",
+});
 
 type CareersPageProps = {
   searchParams: Promise<Record<string, string | undefined>>;

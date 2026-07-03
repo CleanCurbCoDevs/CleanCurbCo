@@ -455,6 +455,8 @@ function PhotoSection({
           {photos.map((photo) => (
             <figure key={photo.id}>
               {photo.signedUrl ? (
+                // Supabase signed service-photo URLs are short-lived and intentionally rendered directly.
+                // eslint-disable-next-line @next/next/no-img-element
                 <img alt={`${photo.photo_type} service upload`} src={photo.signedUrl} />
               ) : (
                 <div className="field-photo-placeholder">Photo unavailable</div>

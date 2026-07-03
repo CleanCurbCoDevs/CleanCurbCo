@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { FAQSection } from "@/components/sections/home-sections";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "FAQ",
   description:
     "Answers about Clean Curb Co. garbage bin cleaning, water use, wastewater, recurring service, and route scheduling.",
-};
+  path: "/faq",
+});
 
 export default function FAQPage() {
   return (

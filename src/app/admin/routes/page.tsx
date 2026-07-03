@@ -151,6 +151,9 @@ export default async function AdminRoutesPage() {
             const importedCount = stopItems.filter(
               (item) => item.stop.optimoroute_sync_status === "imported",
             ).length;
+            const unscheduledItems = stopItems.filter(
+              (item) => item.stop.optimoroute_sync_status === "unscheduled",
+            );
 
             return (
               <article className="detail-panel" key={routeDay.id}>
@@ -252,6 +255,36 @@ export default async function AdminRoutesPage() {
                     </p>
                   ) : null}
 
+                  {unscheduledItems.length ? (
+                    <div className="optimoroute-review-list">
+                      <p className="optimoroute-note">
+                        {importedCount
+                          ? `${unscheduledItems.length} synced stop(s) need route review.`
+                          : "OptimoRoute did not schedule any synced stops. Check driver availability, work hours, route date, timezone, depot/start location, vehicle settings, and stop constraints."}
+                      </p>
+                      {unscheduledItems.map((item) => (
+                        <div key={item.stop.id}>
+                          <span className="status-badge status-unscheduled">Unscheduled</span>
+                          <strong>
+                            {item.booking
+                              ? `${item.booking.first_name} ${item.booking.last_name}`
+                              : "Missing booking"}
+                          </strong>
+                          <span>
+                            {item.booking ? formatBookingAddress(item.booking) : "No address"}
+                          </span>
+                          <span>
+                            Order {item.stop.optimoroute_order_no ?? `CCC-${item.stop.id}`}
+                          </span>
+                          <span>
+                            {item.stop.optimoroute_sync_error ??
+                              "OptimoRoute did not return a schedule for this stop. Check driver availability, work hours, route date, depot/start location, and stop constraints."}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
+
                   {needsReviewCount ? (
                     <div className="optimoroute-review-list">
                       {stopItems
@@ -334,6 +367,9 @@ export default async function AdminRoutesPage() {
                               {booking ? formatBookingAddress(booking) : "No address"} |{" "}
                               {humanizeStatus(stop.status)}
                             </span>
+                            <span>
+                              OptimoRoute order: {stop.optimoroute_order_no ?? `CCC-${stop.id}`}
+                            </span>
                             {stop.optimoroute_scheduled_at ||
                             stop.optimoroute_driver_name ||
                             stop.optimoroute_sync_error ? (
@@ -351,6 +387,12 @@ export default async function AdminRoutesPage() {
                             ) : (
                               <span>{eligibility.summary}</span>
                             )}
+                            {stop.optimoroute_sync_status === "unscheduled" ? (
+                              <p className="optimoroute-message error">
+                                {stop.optimoroute_sync_error ??
+                                  "OptimoRoute did not schedule this stop. Check driver availability, work hours, route date, depot/start location, and stop constraints."}
+                              </p>
+                            ) : null}
                           </div>
                           {visit ? (
                             <div className="action-row">

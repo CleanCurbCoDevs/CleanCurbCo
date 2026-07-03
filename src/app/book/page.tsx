@@ -1,8 +1,8 @@
-import type { Metadata } from "next";
 import {
   BookingForm,
   type InitialBookingCustomer,
 } from "@/components/booking/booking-form";
+import { publicPageMetadata } from "@/lib/seo";
 import {
   bookingBillingAfterLaunchNotice,
   bookingLaunchTimingNotice,
@@ -10,11 +10,12 @@ import {
 } from "@/lib/site";
 import type { ServiceFrequency } from "@/types/booking";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Book Garbage Bin Cleaning",
   description:
     "Request garbage bin cleaning for Cane Bay and nearby Summerville communities.",
-};
+  path: "/book",
+});
 
 type BookPageProps = {
   searchParams: Promise<{

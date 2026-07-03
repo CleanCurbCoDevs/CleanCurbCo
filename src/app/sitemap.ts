@@ -18,6 +18,10 @@ const routes = [
   "/communications-policy",
   "/accessibility",
   "/vulnerability-disclosure",
+  "/commercial-services-addendum",
+  "/door-to-door-cancellation-notice",
+  "/field-safety-policy",
+  "/photo-media-release",
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {

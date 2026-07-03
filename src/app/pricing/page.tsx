@@ -1,11 +1,12 @@
-import type { Metadata } from "next";
 import { AddOnsSection, PricingSection } from "@/components/sections/home-sections";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Pricing",
   description:
     "Clean Curb Co. garbage bin cleaning pricing for Cane Bay and nearby Summerville communities.",
-};
+  path: "/pricing",
+});
 
 export default function PricingPage() {
   return (

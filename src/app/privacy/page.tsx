@@ -1,10 +1,11 @@
-import type { Metadata } from "next";
 import { brand } from "@/lib/site";
+import { publicPageMetadata } from "@/lib/seo";
 
-export const metadata: Metadata = {
+export const metadata = publicPageMetadata({
   title: "Privacy Policy",
   description: "Clean Curb Co. privacy policy.",
-};
+  path: "/privacy",
+});
 
 export default function PrivacyPage() {
   return (
@@ -26,10 +27,10 @@ export default function PrivacyPage() {
 
           <h2>Who we are</h2>
           <p>
-            Clean Curb Co. is operated as a DBA/brand under Stonebranch Capital
-            LLC. In this Privacy Policy, “Clean Curb Co.,” “we,” “us,” and
-            “our” refer to Stonebranch Capital LLC doing business as Clean Curb
-            Co.
+            Clean Curb Co. is operated by Stonebranch Capital LLC. In this
+            Privacy Policy, &quot;Clean Curb Co.,&quot; &quot;we,&quot;
+            &quot;us,&quot; and &quot;our&quot; refer to Stonebranch Capital LLC
+            doing business as Clean Curb Co.
           </p>
 
           <h2>Information we collect</h2>
@@ -103,14 +104,16 @@ export default function PrivacyPage() {
 
           <h2>Website analytics, cookies, and logs</h2>
           <p>
-            We may use cookies, pixels, server logs, or similar technologies to
+            We use essential cookies or storage, server logs, Vercel Analytics,
+            Vercel Speed Insights, and similar operational technologies to
             understand website traffic, measure booking form performance,
             diagnose technical issues, prevent abuse, remember basic
             preferences, and improve the customer experience. Analytics may
             include pages visited, approximate location derived from IP address,
             browser or device type, referring pages, form events, and general
-            usage patterns. We do not use analytics to sell personal
-            information.
+            usage patterns. We do not currently use Google Analytics, Meta
+            pixel, Nextdoor pixel, or other marketing pixels in the app code,
+            and we do not use analytics to sell personal information.
           </p>
 
           <h2>Who we share information with</h2>
