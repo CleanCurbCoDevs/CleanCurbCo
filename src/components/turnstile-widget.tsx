@@ -8,14 +8,14 @@ declare global {
     turnstile?: {
       render: (
         container: HTMLElement,
-          options: {
-            sitekey: string;
-            action?: string;
-            callback: (token: string) => void;
-            "expired-callback": () => void;
-            "error-callback": () => void;
-            "timeout-callback"?: () => void;
-          },
+        options: {
+          sitekey: string;
+          action?: string;
+          callback: (token: string) => void;
+          "expired-callback": () => void;
+          "error-callback": () => void;
+          "timeout-callback"?: () => void;
+        },
       ) => string;
       remove: (widgetId: string) => void;
     };
@@ -44,6 +44,35 @@ export function TurnstileWidget({
   );
 
   useEffect(() => {
+    if (window.turnstile) {
+      setScriptReady(true);
+      return;
+    }
+
+    const interval = window.setInterval(() => {
+      if (window.turnstile) {
+        setScriptReady(true);
+        window.clearInterval(interval);
+      }
+    }, 250);
+
+    const timeout = window.setTimeout(() => {
+      window.clearInterval(interval);
+
+      if (!window.turnstile) {
+        setStatusMessage(
+          "Verification could not load. Please refresh or contact us to book directly.",
+        );
+      }
+    }, 8000);
+
+    return () => {
+      window.clearInterval(interval);
+      window.clearTimeout(timeout);
+    };
+  }, []);
+
+  useEffect(() => {
     if (!siteKey || !scriptReady || !containerRef.current || !window.turnstile) {
       return;
     }
@@ -56,6 +85,8 @@ export function TurnstileWidget({
       window.turnstile.remove(widgetIdRef.current);
       widgetIdRef.current = null;
     }
+
+    containerRef.current.innerHTML = "";
 
     widgetIdRef.current = window.turnstile.render(containerRef.current, {
       sitekey: siteKey,
@@ -77,6 +108,7 @@ export function TurnstileWidget({
         onTokenChange("");
       },
     });
+
     setWidgetRendered(true);
 
     return () => {
@@ -84,6 +116,7 @@ export function TurnstileWidget({
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
+
       setWidgetRendered(false);
     };
   }, [action, onTokenChange, resetKey, scriptReady, siteKey]);
@@ -100,15 +133,27 @@ export function TurnstileWidget({
   return (
     <div className="turnstile-panel">
       <Script
+        id="cloudflare-turnstile"
         src="https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit"
         strategy="afterInteractive"
         onLoad={() => setScriptReady(true)}
+        onReady={() => setScriptReady(true)}
+        onError={() => {
+          setStatusMessage(
+            "Verification could not load. Please refresh or contact us to book directly.",
+          );
+          onTokenChange("");
+        }}
       />
+
       <span className="muted">{statusMessage}</span>
+
       <div ref={containerRef} className="turnstile-widget" />
-      {!widgetRendered ? (
+
+      {!widgetRendered && !statusMessage.includes("could not load") ? (
         <span className="muted">Loading secure verification...</span>
       ) : null}
+
       <noscript>
         Verification requires JavaScript. Please enable JavaScript or contact
         Clean Curb Co. to book directly.

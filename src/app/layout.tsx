@@ -11,6 +11,7 @@ import { getSiteUrl } from "@/lib/env";
 import { localBusinessStructuredData } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./globals.css";
+import { PublicPageEffects } from "@/components/public-page-effects";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -107,9 +108,10 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ActionFeedbackProvider>
-          <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
-            {children}
-          </ChromeFrame>
+        <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
+          <PublicPageEffects />
+          {children}
+        </ChromeFrame>
         </ActionFeedbackProvider>
         <script
           type="application/ld+json"
