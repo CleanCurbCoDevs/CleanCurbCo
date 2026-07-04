@@ -130,8 +130,8 @@ export function ProofSection() {
           title="Real bins. Real fresh starts."
           centered
         >
-          A quick look at the kind of curbside cleanup we are bringing to Cane
-          Bay and nearby Summerville neighborhoods.
+          A quick look at the kind of curbside cleanup we are bringing to
+          Summerville-area neighborhoods.
         </SectionHeader>
         <div className="proof-gallery" aria-label="Clean Curb Co. service photos">
           <ProofPhotoCard photo={proofPhotos[0]} priority />
@@ -194,16 +194,19 @@ export function WhatGetsCleanedSection() {
 export function HowItWorksSection() {
   const steps = [
     {
-      title: "Book your cleaning",
-      body: "Tell us your address, bin count, and preferred service plan.",
+      title: "Book the gross stuff",
+      body:
+        "Tell us your address, bin count, service plan, and any curbside add-ons you want reviewed.",
     },
     {
-      title: "We confirm your route day",
-      body: "You will get a text with your service window and final price before we show up.",
+      title: "We confirm the route",
+      body:
+        "We confirm your service area, route day, final price, and payment timing by email or text when available.",
     },
     {
-      title: "Roll bins to the curb",
-      body: "We clean them outside, deodorize, and send photo updates when we are done.",
+      title: "You leave it accessible",
+      body:
+        "Roll bins out or tell us where the mess is. We clean, document, and send updates when the job is done.",
     },
   ];
 
@@ -212,20 +215,23 @@ export function HowItWorksSection() {
       <div className="container">
         <SectionHeader
           kicker="How it works"
-          title="Ridiculously easy, as trash-can chores should be."
+          title="Ridiculously easy, as gross chores should be."
         >
-          Work each stop from top to bottom? That is our job. Your job is to
-          book, roll the bins out, and enjoy a less dramatic trash day.
+          Your job is to book it and make the area accessible. Our job is to
+          handle the hose-and-regret part.
         </SectionHeader>
-        <div className="grid grid-3">
+
+        <ol className="how-step-list" aria-label="How Clean Curb Co. works">
           {steps.map((step, index) => (
-            <article className="card" key={step.title}>
-              <span className="step-number">0{index + 1}</span>
+            <li className="card how-step-card" key={step.title}>
+              <span className="step-number" aria-hidden="true">
+                Step {index + 1}
+              </span>
               <h3>{step.title}</h3>
               <p>{step.body}</p>
-            </article>
+            </li>
           ))}
-        </div>
+        </ol>
       </div>
     </section>
   );
@@ -367,8 +373,8 @@ export function ExpectationsSection() {
   const expectations = [
     {
       icon: MessageSquareText,
-      title: "Clear route-day texts",
-      description: "No guessing whether your bin is on the list.",
+      title: "Clear route updates",
+      description: "Email or text updates when available, so you know what is happening.",
     },
     {
       icon: DollarSign,
@@ -393,14 +399,14 @@ export function ExpectationsSection() {
     {
       icon: Flag,
       title: "Local and veteran-owned",
-      description: "Built for Cane Bay routes, not corporate call-center vibes.",
+      description: "Built for local neighborhood routes, not corporate call-center vibes.",
     },
   ];
 
   return (
     <section className="section section-white">
       <div className="container">
-        <SectionHeader kicker="What to expect" title="Clean bins, clear texts, no weirdness." centered>
+        <SectionHeader kicker="What to expect" title="Clear updates. Cleaner curb. Less weirdness." centered>
           Simple communication, honest pricing, and proof when the job is done.
         </SectionHeader>
         <div className="grid grid-3">
@@ -418,7 +424,7 @@ export function WhyChooseUsSection() {
     {
       icon: MapPin,
       title: "Local",
-      description: "Built for Cane Bay and nearby Summerville communities.",
+      description: "Built for Summerville-area neighborhoods and nearby communities.",
     },
     {
       icon: Flag,
@@ -433,7 +439,7 @@ export function WhyChooseUsSection() {
     {
       icon: MessageSquareText,
       title: "Clear communication",
-      description: "Texts for confirmation, reminders, updates, and completion.",
+      description: "Email or text updates for confirmations, reminders, and completion when available.",
     },
     {
       icon: Camera,
@@ -460,7 +466,7 @@ export function WhyChooseUsSection() {
   return (
     <section className="section section-cream">
       <div className="container">
-        <SectionHeader kicker="Why choose us" title="Clean bins, clear texts, no weirdness.">
+        <SectionHeader kicker="Why choose us" title="Local routes. Clear updates. No weirdness.">
           The customer experience is designed around one thought: that was
           ridiculously easy.
         </SectionHeader>
@@ -510,8 +516,8 @@ export function FinalCTASection() {
           kicker="Ready?"
           title="Ready for a fresh start at the curb?"
         >
-          Join the Cane Bay route and let trash day stop following you back to
-          the garage. {launchPromo}
+          Join a local route and let trash day stop following you back to the
+          garage. {launchPromo}
         </SectionHeader>
         <div className="hero-actions">
           <Link className="button button-primary" href="/book">
@@ -520,7 +526,7 @@ export function FinalCTASection() {
           </Link>
           <Link className="button button-secondary" href="/book">
             <BadgeCheck size={20} aria-hidden="true" />
-            Join Cane Bay Route
+            Join a Local Route
           </Link>
         </div>
       </div>

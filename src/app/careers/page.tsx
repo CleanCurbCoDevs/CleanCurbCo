@@ -83,8 +83,8 @@ export default async function CareersPage({ searchParams }: CareersPageProps) {
             <a className="button button-primary" href="#interest-form">
               Join the Interest List
             </a>
-            <Link className="button button-secondary" href="/employee-login">
-              Employee Login
+            <Link className="button button-secondary" href="/contact">
+              Ask a Question
             </Link>
           </div>
         </div>
@@ -103,7 +103,20 @@ export default async function CareersPage({ searchParams }: CareersPageProps) {
               related exterior cleaning routes.
             </p>
           </section>
-
+          <section className="current-hiring-card">
+            <p className="section-kicker">Current hiring status</p>
+            <h2>We are collecting interest as routes grow.</h2>
+            <p>
+              Clean Curb Co. is in launch stage. This page is for future opportunities
+              and early interest, not a guarantee that a role is open today.
+            </p>
+            <ul>
+              <li>First opportunities may be part-time, seasonal, contract, or limited launch help.</li>
+              <li>Field work may require a valid driver&apos;s license, reliable transportation, outdoor work, and physical route work.</li>
+              <li>Pay, schedule, employment type, and start date will be confirmed before any offer.</li>
+              <li>Customer-facing and route roles require professionalism, reliability, and comfort using a mobile web app.</li>
+            </ul>
+          </section>
           <section className="detail-panel">
             <p className="section-kicker">Who We&apos;re Looking For</p>
             <div className="mini-list careers-trait-list">

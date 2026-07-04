@@ -6,6 +6,7 @@ import {
 } from "@/lib/site";
 import { formatFrequency } from "@/lib/pricing";
 import { policyWindowLabels, requestTypeLabels } from "@/lib/service-policy";
+import { america250Promotion } from "@/lib/promotions";
 import type {
   AccountDeletionRequestRow,
   BookingRow,
@@ -162,9 +163,18 @@ export function bookingConfirmationTemplate(
   booking: BookingRow,
   options: { accountSetupUrl?: string | null; paymentSetupUrl?: string | null } = {},
 ): EmailTemplate {
-  const body = `
-    <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your Cane Bay route day and final price by text or email.</p>
-    <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
+  const america250Claimed = booking.internal_notes?.includes(
+      america250Promotion.code,
+    );
+
+    const body = `
+      <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your Cane Bay route day and final price by email or text when available.</p>
+      <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
+      ${
+        america250Claimed
+          ? `<p style="background:#f4fff5;border:1px solid #b6efbd;border-radius:12px;padding:14px"><strong>America 250 Deal:</strong> Your request was submitted during the America 250 promotion window. We will confirm eligibility, final discount, route day, and pricing before charging.</p>`
+          : ""
+      }
     ${
       options.accountSetupUrl
         ? `<p>${emailButton(options.accountSetupUrl, "Create account")}</p>`

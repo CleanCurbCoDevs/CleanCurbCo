@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
 import { useActionFeedback } from "@/components/action-feedback";
@@ -14,6 +15,10 @@ import {
   launchPromo,
   neighborhoods,
 } from "@/lib/site";
+import {
+  america250Promotion,
+  isAmerica250PromoActive,
+} from "@/lib/promotions";
 import {
   calculateEstimatedPrice,
   formatFrequency,
@@ -113,6 +118,7 @@ export function BookingForm({
   turnstileSiteKey: string;
 }) {
   const feedback = useActionFeedback();
+  const america250Active = isAmerica250PromoActive();
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
     customer: {
@@ -274,10 +280,17 @@ export function BookingForm({
           <CheckCircle2 size={34} aria-hidden="true" />
           <h2>Thanks! Your request has been received.</h2>
           <p>
-            We will text you shortly to confirm your Cane Bay route day and
-            final price. Fresh Starts at the Curb.
+            We will email or text you when available to confirm your route day,
+            final price, and service details. Fresh Starts at the Curb.
           </p>
           <p>{bookingSuccessLaunchMessage}</p>
+          {isAmerica250PromoActive() &&
+            submittedBooking.service.frequency !== "one_time" ? (
+              <p className="promo-confirmation-note">
+                Your request was submitted during the America 250 Deal window. We will
+                confirm promotional eligibility and final pricing before charging.
+              </p>
+            ) : null}
           {setupHref ? (
             <a className="button button-dark" href={setupHref}>
               Set Up Customer Account
@@ -489,7 +502,7 @@ export function BookingForm({
           <h2>Scheduling</h2>
           <p className="muted">
             We service Cane Bay by neighborhood route. After booking, we will
-            confirm your next available route day by text.
+            confirm your next available route day by email or text when available.
           </p>
           <div className="choice-grid">
             {[
@@ -708,15 +721,44 @@ export function BookingForm({
           </strong>
           <span>
             {foundingSpecial.eligible
-              ? `Eligible: ${foundingSpecial.reason}`
+              ? foundingSpecial.reason
               : `Not applied to this estimate: ${foundingSpecial.reason}`}
           </span>
           <small>{launchBillingNote}</small>
         </div>
+        {america250Active ? (
+          <div className="america250-estimate-callout">
+            <div>
+              <p className="section-kicker">America 250 Deal</p>
+              <strong>
+                {america250Promotion.discountPercent}% off recurring base pricing
+              </strong>
+            </div>
+
+            <p>
+              Today and tomorrow only. Stacks with the Founding Neighbor Special when
+              eligible.
+            </p>
+
+            {form.service.frequency === "one_time" ? (
+              <span>
+                Choose Monthly, Every Other Month, or Quarterly to use this recurring
+                service discount.
+              </span>
+            ) : (
+              <span>
+                Eligible recurring bookings submitted by{" "}
+                {america250Promotion.deadlineLabel} may qualify.
+              </span>
+            )}
+
+            <Link href={america250Promotion.detailsHref}>Learn More</Link>
+          </div>
+        ) : null}
         <div className="estimate-panel-section">
           <h3>What happens after you submit?</h3>
           <ol className="number-list">
-            <li>We confirm your route day by text.</li>
+            <li>We confirm your route day by email or text when available.</li>
             <li>You approve the final price/payment link before service.</li>
             <li>We clean the bins and send completion photos.</li>
           </ol>
@@ -814,7 +856,7 @@ function BookingSummary({ booking }: { booking: BookingRequest }) {
         {booking.scheduling.preference.replaceAll("_", " ")}
       </p>
       <p>
-        We will confirm the route day, final price, and payment link before
+        We will confirm the route day, final price, and payment timing before
         service.
       </p>
     </aside>

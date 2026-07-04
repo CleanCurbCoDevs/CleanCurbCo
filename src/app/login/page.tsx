@@ -38,6 +38,10 @@ export default function LoginPage() {
             <Link className="button button-dark" href="/book">
               Book a Cleaning
             </Link>
+            <p className="auth-help-note">
+              Having trouble getting in?{" "}
+              <Link href="/contact">Contact support</Link>.
+            </p>
           </section>
         </div>
       </section>

@@ -4,7 +4,7 @@ export const brand = {
   name: "Clean Curb Co.",
   tagline: "Fresh Starts at the Curb.",
   legalNote: "Clean Curb Co. is operated by Stonebranch Capital LLC.",
-  area: "Cane Bay / Summerville, SC",
+  area: "Summerville / Cane Bay / Goose Creek / Moncks Corner, SC",
   phone: "+1 (843) 888-4124",
   phoneHref: "tel:+18438884124",
   email: "contact@cleancurbco.com",
@@ -176,7 +176,10 @@ export const serviceAreas = [
   "Sanctuary Cove",
   "Four Seasons",
   "Lakes of Cane Bay",
-  "Nearby Summerville communities",
+  "Summerville",
+  "Goose Creek",
+  "Moncks Corner",
+  "Nearby communities by route fit",
 ];
 
 export const futureServices = [

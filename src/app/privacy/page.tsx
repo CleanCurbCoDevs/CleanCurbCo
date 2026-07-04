@@ -24,7 +24,17 @@ export default function PrivacyPage() {
       <section className="section section-white">
         <div className="container legal-copy">
           <p className="muted">Effective date: July 2, 2026</p>
-
+          <aside className="legal-summary-card">
+            <p className="section-kicker">Plain-English Summary</p>
+            <h2>What this means</h2>
+            <ul>
+              <li>We collect the information needed to book, route, clean, bill, and support your service.</li>
+              <li>We use your address and neighborhood to confirm service area and build efficient routes.</li>
+              <li>We may send operational emails, calls, or texts about bookings, route updates, payments, and service support.</li>
+              <li>We may take service photos for proof, quality control, and customer updates, but we do not publicly identify your address without permission.</li>
+              <li>We do not sell personal information.</li>
+            </ul>
+          </aside>
           <h2>Who we are</h2>
           <p>
             Clean Curb Co. is operated by Stonebranch Capital LLC. In this

@@ -1,8 +1,9 @@
 import Link from "next/link";
-import { Mail, MapPin, Phone } from "lucide-react";
+import { CalendarCheck, HelpCircle, Mail, MapPin, Phone } from "lucide-react";
 import { ContactForm } from "@/components/contact-form";
 import { publicPageMetadata } from "@/lib/seo";
-import { brand, launchNotice, launchReservationCopy } from "@/lib/site";
+import { brand } from "@/lib/site";
+import { LaunchStatusCard } from "@/components/launch-status-card";
 
 export const metadata = publicPageMetadata({
   title: "Contact",
@@ -25,6 +26,47 @@ export default function ContactPage() {
         </div>
       </section>
       <section className="section section-cream contact-section">
+        <div className="container contact-choice-grid">
+          <article className="contact-choice-card">
+            <CalendarCheck size={24} aria-hidden="true" />
+            <p className="section-kicker">Need service?</p>
+            <h2>Book first. We will confirm the details.</h2>
+            <p>
+              Ready to get on a route? Booking is the fastest way to send your
+              address, bin count, add-ons, and service preferences.
+            </p>
+            <Link className="button button-primary" href="/book">
+              Book Cleaning
+            </Link>
+          </article>
+
+          <article className="contact-choice-card">
+            <MapPin size={24} aria-hidden="true" />
+            <p className="section-kicker">Route / waitlist question?</p>
+            <h2>Not sure whether you fit the route?</h2>
+            <p>
+              Send your neighborhood, general location, and what you need cleaned.
+              We will let you know whether it fits the current route plan.
+            </p>
+            <a className="button button-secondary" href={brand.emailHref}>
+              Email Us
+            </a>
+          </article>
+
+          <article className="contact-choice-card">
+            <HelpCircle size={24} aria-hidden="true" />
+            <p className="section-kicker">Need help?</p>
+            <h2>Questions, weird bin situation, or support?</h2>
+            <p>
+              Use the form below for service questions, account help, special
+              cleanup notes, or anything that does not fit neatly in the booking form.
+            </p>
+            <a className="button button-dark" href="#contact-form">
+              Send a Note
+            </a>
+          </article>
+        </div>
+
         <div className="container contact-card-grid">
           <article className="card contact-info-card">
             <Phone size={24} aria-hidden="true" />
@@ -51,15 +93,12 @@ export default function ContactPage() {
           </article>
         </div>
         <div className="container contact-body-grid">
-          <aside className="launch-info-card contact-launch-note">
-            <p className="section-kicker">Launch timing</p>
-            <h2>{launchNotice}</h2>
-            <p>{launchReservationCopy}</p>
-            <Link className="button button-dark" href="/book">
-              Book Now
-            </Link>
-          </aside>
-          <div className="contact-form-wrap">
+          <LaunchStatusCard
+            variant="card"
+            className="launch-info-card contact-launch-note"
+            showButton
+          />
+          <div className="contact-form-wrap" id="contact-form">
             <ContactForm />
           </div>
         </div>

@@ -24,7 +24,17 @@ export default function TermsPage() {
       <section className="section section-white">
         <div className="container legal-copy">
           <p className="muted">Effective date: July 2, 2026</p>
-
+          <aside className="legal-summary-card">
+            <p className="section-kicker">Plain-English Summary</p>
+            <h2>The short version</h2>
+            <ul>
+              <li>Submitting a booking request does not guarantee service until we confirm your route, price, and service details.</li>
+              <li>During launch, you should not be charged until service/payment terms are confirmed.</li>
+              <li>Bins need to be empty, accessible, and safe to clean when service is scheduled.</li>
+              <li>Recurring service continues until paused or cancelled under the applicable policy.</li>
+              <li>Promos, estimates, route timing, and add-ons may require final confirmation before service.</li>
+            </ul>
+          </aside>
           <h2>1. Who we are</h2>
           <p>
             Clean Curb Co. is operated by Stonebranch Capital LLC. These Terms

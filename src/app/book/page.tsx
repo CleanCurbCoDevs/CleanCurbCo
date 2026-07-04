@@ -5,10 +5,10 @@ import {
 import { publicPageMetadata } from "@/lib/seo";
 import {
   bookingBillingAfterLaunchNotice,
-  bookingLaunchTimingNotice,
   neighborhoods,
 } from "@/lib/site";
 import type { ServiceFrequency } from "@/types/booking";
+import { LaunchStatusCard } from "@/components/launch-status-card";
 
 export const metadata = publicPageMetadata({
   title: "Book Garbage Bin Cleaning",
@@ -38,22 +38,18 @@ export default async function BookPage({ searchParams }: BookPageProps) {
       <section className="page-hero">
         <div className="container section-header">
           <p className="section-kicker">Book in under 2 minutes</p>
-          <h1>Join the Cane Bay route.</h1>
+          <h1>Join a local route.</h1>
           <p>
             Tell us what needs cleaning. We will confirm your route day, final
-            price, and payment link by text before service. Pre-launch bookings
-            reserve your spot without an immediate charge.
+            price, and payment timing by email or text when available before
+            service. Launch bookings reserve your spot without an immediate charge.
           </p>
         </div>
       </section>
       <section className="section section-cream">
         <div className="container">
           <div className="booking-launch-grid">
-            <article className="launch-info-card">
-              <p className="section-kicker">Route launch timing</p>
-              <h2>First route planned for July 13, 2026.</h2>
-              <p>{bookingLaunchTimingNotice}</p>
-            </article>
+            <LaunchStatusCard variant="card" className="launch-info-card" />
             <article className="launch-info-card">
               <p className="section-kicker">Billing after launch</p>
               <h2>August billing rhythm.</h2>

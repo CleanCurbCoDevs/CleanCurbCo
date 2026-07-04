@@ -27,6 +27,7 @@ import {
 import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { verifyTurnstileToken } from "@/lib/server/turnstile";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
+import { america250PromoInternalNote } from "@/lib/promotions";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
@@ -273,6 +274,8 @@ export async function POST(request: Request) {
     addOns,
     applyFoundingNeighborPromo: foundingSpecial.eligible,
   });
+  const america250InternalNote =
+  frequency === "one_time" ? null : america250PromoInternalNote(new Date());
 
   const admin = getSupabaseAdmin();
   let customerId: string | null = null;
@@ -383,6 +386,7 @@ export async function POST(request: Request) {
       payment_setup_completed_at: existingPaymentSetupCompletedAt,
       referral_code: referralCode,
       referred_by_profile_id: referredByProfileId,
+      internal_notes: america250InternalNote,
     })
     .select("*")
     .single();
@@ -415,6 +419,7 @@ export async function POST(request: Request) {
       addOnCount: addOns.length,
       hasReferralCode: Boolean(referralCode),
       foundingNeighborSpecial: foundingSpecial.status,
+      america250PromoClaimed: Boolean(america250InternalNote),
     },
   });
 

@@ -15,11 +15,10 @@ const footerGroups = [
   },
   {
     title: "Account",
-    links: [
-      { label: "Customer Portal", href: "/portal" },
-      { label: "Employee Login", href: "/employee-login" },
-      { label: "Careers", href: "/careers" },
-    ],
+      links: [
+        { label: "Customer Portal", href: "/portal" },
+        { label: "Careers", href: "/careers" },
+      ],
   },
   {
     title: "Contact / Legal",
@@ -46,8 +45,8 @@ export function SiteFooter() {
           <div className="footer-brand">
             <BrandLogo />
             <p className="muted">
-              Locally owned, veteran-owned garbage bin cleaning for Cane Bay
-              and nearby Summerville communities.
+              Locally owned, veteran-owned curbside cleaning and outdoor grime cleanup
+              for Summerville-area communities.
             </p>
           </div>
           {footerGroups.map((group) => (
@@ -67,7 +66,10 @@ export function SiteFooter() {
             </nav>
           ))}
         </div>
-        <p className="footer-small">{brand.legalNote}</p>
+        <div className="footer-small footer-meta-links">
+          <span>{brand.legalNote}</span>
+          <Link href="/employee-login">Team login</Link>
+        </div>
       </div>
     </footer>
   );

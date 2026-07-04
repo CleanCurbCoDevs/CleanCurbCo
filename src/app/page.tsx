@@ -8,6 +8,7 @@ import {
   launchRouteHeadline,
 } from "@/lib/site";
 import { publicPageMetadata } from "@/lib/seo";
+import { LaunchStatusCard } from "@/components/launch-status-card";
 import {
   AddOnsSection,
   ExpectationsSection,
@@ -24,9 +25,9 @@ import {
 } from "@/components/sections/home-sections";
 
 export const metadata = publicPageMetadata({
-  title: "Garbage Bin Cleaning in Cane Bay, SC",
+  title: "Curbside Cleaning & Garbage Bin Cleaning in Summerville, SC",
   description:
-    "Professional garbage bin cleaning, sanitizing, and deodorizing for Cane Bay and nearby Summerville communities.",
+    "Curbside cleaning, garbage bin cleaning, sanitizing, deodorizing, and outdoor grime cleanup for Summerville, Cane Bay, Goose Creek, Moncks Corner, and nearby communities.",
   path: "/",
 });
 
@@ -52,32 +53,29 @@ export default function Home() {
             className="hero-logo"
             loading="eager"
           />
-          <p className="eyebrow">Clean Curb Co. | Cane Bay, SC</p>
+          <p className="eyebrow">Clean Curb Co. | Summerville-area curbside cleaning</p>
           <p className="offer-badge">{launchPromo}</p>
           <h1>Fresh Starts at the Curb.</h1>
-          <p className="hero-subtitle">
-            We clean, sanitize, and deodorize the trash bins you hate touching.
-          </p>
-          <p className="hero-supporting">
-            Now serving Cane Bay and nearby Summerville neighborhoods.
-          </p>
-          <div className="hero-launch-note">
-            <strong>{launchRouteHeadline}</strong>
-            <span>{launchReservationCopy}</span>
-          </div>
+            <p className="hero-subtitle">
+              We clean the gross curbside stuff nobody wants to deal with.
+            </p>
+            <p className="hero-supporting">
+              Garbage bins are the main thing — but not the only thing.
+            </p>
+            <LaunchStatusCard />
           <p className="trust-line">
             Locally owned | Veteran owned | Eco-conscious
           </p>
           <div className="hero-chip-list" aria-label="Service highlights">
             <span>Veteran-owned</span>
-            <span>Local Cane Bay routes</span>
+            <span>Local route-based service</span>            
             <span>Before/after photos</span>
-            <span>Route-day text updates</span>
+            <span>Email/text route updates</span>
           </div>
           <div className="hero-actions">
             <Link className="button button-primary" href="/book">
               <CalendarCheck size={20} aria-hidden="true" />
-              Book My Bin Cleaning
+              Book Curbside Cleaning
             </Link>
             <Link className="button button-secondary" href="#pricing">
               <DollarSign size={20} aria-hidden="true" />

@@ -51,7 +51,7 @@ export default function ServicesPage() {
           <h1>Residential garbage bin cleaning first.</h1>
           <p>
             Cleaner, fresher trash and recycling bins for Cane Bay neighbors.
-            Simple route-day service, clear texts, and proof when the job is done.
+            Simple route-day service, clear updates, and proof when the job is done.
           </p>
         </div>
       </section>
