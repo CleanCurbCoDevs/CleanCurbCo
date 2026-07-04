@@ -44,22 +44,22 @@ export function TurnstileWidget({
   );
 
   useEffect(() => {
-    if (window.turnstile) {
-      setScriptReady(true);
-      return;
+    let cancelled = false;
+
+    function markReadyIfAvailable() {
+      if (!cancelled && window.turnstile) {
+        setScriptReady(true);
+      }
     }
 
-    const interval = window.setInterval(() => {
-      if (window.turnstile) {
-        setScriptReady(true);
-        window.clearInterval(interval);
-      }
-    }, 250);
+    const initialCheck = window.setTimeout(markReadyIfAvailable, 0);
+
+    const interval = window.setInterval(markReadyIfAvailable, 250);
 
     const timeout = window.setTimeout(() => {
       window.clearInterval(interval);
 
-      if (!window.turnstile) {
+      if (!cancelled && !window.turnstile) {
         setStatusMessage(
           "Verification could not load. Please refresh or contact us to book directly.",
         );
@@ -67,6 +67,8 @@ export function TurnstileWidget({
     }, 8000);
 
     return () => {
+      cancelled = true;
+      window.clearTimeout(initialCheck);
       window.clearInterval(interval);
       window.clearTimeout(timeout);
     };
@@ -77,47 +79,68 @@ export function TurnstileWidget({
       return;
     }
 
-    onTokenChange("");
-    setWidgetRendered(false);
-    setStatusMessage("Complete verification before submitting.");
+    let cancelled = false;
+    const container = containerRef.current;
 
-    if (widgetIdRef.current) {
-      window.turnstile.remove(widgetIdRef.current);
-      widgetIdRef.current = null;
-    }
+    const renderTimer = window.setTimeout(() => {
+      if (cancelled || !window.turnstile) {
+        return;
+      }
 
-    containerRef.current.innerHTML = "";
+      onTokenChange("");
+      setWidgetRendered(false);
+      setStatusMessage("Complete verification before submitting.");
 
-    widgetIdRef.current = window.turnstile.render(containerRef.current, {
-      sitekey: siteKey,
-      action,
-      callback: (token) => {
-        setStatusMessage("Verification complete.");
-        onTokenChange(token);
-      },
-      "expired-callback": () => {
-        setStatusMessage("Verification expired. Please verify again.");
-        onTokenChange("");
-      },
-      "error-callback": () => {
-        setStatusMessage("Verification could not load. Please refresh and try again.");
-        onTokenChange("");
-      },
-      "timeout-callback": () => {
-        setStatusMessage("Verification timed out. Please verify again.");
-        onTokenChange("");
-      },
-    });
-
-    setWidgetRendered(true);
-
-    return () => {
-      if (widgetIdRef.current && window.turnstile) {
+      if (widgetIdRef.current) {
         window.turnstile.remove(widgetIdRef.current);
         widgetIdRef.current = null;
       }
 
-      setWidgetRendered(false);
+      container.innerHTML = "";
+
+      try {
+        widgetIdRef.current = window.turnstile.render(container, {
+          sitekey: siteKey,
+          action,
+          callback: (token) => {
+            setStatusMessage("Verification complete.");
+            onTokenChange(token);
+          },
+          "expired-callback": () => {
+            setStatusMessage("Verification expired. Please verify again.");
+            onTokenChange("");
+          },
+          "error-callback": () => {
+            setStatusMessage(
+              "Verification could not load. Please refresh and try again.",
+            );
+            onTokenChange("");
+          },
+          "timeout-callback": () => {
+            setStatusMessage("Verification timed out. Please verify again.");
+            onTokenChange("");
+          },
+        });
+
+        if (!cancelled) {
+          setWidgetRendered(true);
+        }
+      } catch {
+        setStatusMessage(
+          "Verification could not load. Please refresh or contact us to book directly.",
+        );
+        onTokenChange("");
+      }
+    }, 0);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(renderTimer);
+
+      if (widgetIdRef.current && window.turnstile) {
+        window.turnstile.remove(widgetIdRef.current);
+        widgetIdRef.current = null;
+      }
     };
   }, [action, onTokenChange, resetKey, scriptReady, siteKey]);
 

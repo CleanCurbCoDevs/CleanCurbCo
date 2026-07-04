@@ -154,7 +154,7 @@ function AddressCheckResult({ result }: { result: ServiceAreaCheckResult }) {
             Matched route area: <strong>{result.matchedArea}</strong>
           </p>
           <Link className="button button-dark" href={result.bookingHref}>
-            Book My Bin Cleaning
+            Book Curbside Cleaning
           </Link>
         </>
       ) : null}

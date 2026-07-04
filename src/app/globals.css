@@ -5569,3 +5569,30 @@ form.data-row label textarea,
     transform: translateY(12px);
   }
 }
+
+/* Fix How It Works step badges after converting to accessible steps */
+
+.how-step-card .step-number {
+  align-items: center;
+  background: #050505;
+  border-radius: 999px;
+  color: #ffffff;
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 1000;
+  height: auto;
+  justify-content: center;
+  justify-self: start;
+  letter-spacing: 0.04em;
+  line-height: 1;
+  min-height: 0;
+  min-width: 0;
+  padding: 8px 11px;
+  text-transform: uppercase;
+  width: auto;
+}
+
+.how-step-card .step-number::before,
+.how-step-card .step-number::after {
+  content: none !important;
+}
