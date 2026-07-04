@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { SiteFeedbackNudge } from "@/components/site-feedback-nudge";
 
 export function ChromeFrame({
   header,
@@ -18,6 +19,7 @@ export function ChromeFrame({
     <>
       {hidePublicChrome ? null : header}
       {children}
+      {hidePublicChrome ? null : <SiteFeedbackNudge />}
       {hidePublicChrome ? null : footer}
     </>
   );

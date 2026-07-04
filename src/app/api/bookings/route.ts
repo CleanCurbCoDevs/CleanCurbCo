@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import {
   createAccountSetupLink,
   createClaimToken,
-  createPaymentSetupLink,
   hashClaimToken,
 } from "@/lib/booking-claims";
 import {
@@ -436,34 +435,25 @@ export async function POST(request: Request) {
 
   let redirectTo: string | null = null;
   let setupLink: string | null = null;
-  let paymentSetupUrl: string | null = null;
-  let paymentSetupPath: string | null = null;
-  let guestClaimToken: string | null = null;
 
-  if (!customerId) {
-    const token = createClaimToken();
-    guestClaimToken = token;
-    const tokenHash = hashClaimToken(token);
+if (!customerId) {
+  const token = createClaimToken();
+  const tokenHash = hashClaimToken(token);
 
-    await admin.from("booking_claims").insert({
-      booking_id: booking.id,
-      email,
-      token_hash: tokenHash,
-    });
+  await admin.from("booking_claims").insert({
+    booking_id: booking.id,
+    email,
+    token_hash: tokenHash,
+  });
 
-    redirectTo = `/account-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
-    setupLink = createAccountSetupLink(booking.id, token);
-    paymentSetupUrl = createPaymentSetupLink(booking.id, token);
-    paymentSetupPath = `/payment-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
-  } else if (!existingPaymentMethodOnFile) {
-    paymentSetupUrl = createPaymentSetupLink(booking.id);
-    paymentSetupPath = `/payment-setup?booking=${booking.id}`;
-  }
+  redirectTo = `/account-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
+  setupLink = createAccountSetupLink(booking.id, token);
+}
 
   const emailJobs = [
     sendBookingConfirmation(booking, {
       accountSetupUrl: setupLink,
-      paymentSetupUrl,
+      paymentSetupUrl: null,
     }),
     sendAdminBookingNotification(booking),
     createAdminNotification({
@@ -499,11 +489,6 @@ export async function POST(request: Request) {
     {
       booking: bookingRowToRequest(booking),
       redirectTo,
-      paymentSetupHref: paymentSetupPath,
-      paymentSetupContext: {
-        bookingId: booking.id,
-        token: guestClaimToken,
-      },
       message: bookingSuccessLaunchMessage,
       requestId,
     },

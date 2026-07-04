@@ -34,7 +34,7 @@ export default async function AccountSetupPage({
           <p className="section-kicker">Customer Account</p>
           <h1>Fresh starts are easier with an account.</h1>
           <p>
-            Manage booking status, route updates, payment links, and service
+            Manage booking status, route updates, service details, and service
             photos once your account is connected.
           </p>
         </div>

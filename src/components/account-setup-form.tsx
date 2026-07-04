@@ -75,7 +75,7 @@ export function AccountSetupForm({
         <CheckCircle2 size={30} aria-hidden="true" />
         <h2>Your booking request has been received.</h2>
         <p>
-          Create your account to manage service updates, payment links, and
+          Create your account to manage service updates, service details, and
           future before/after photos.
         </p>
       </div>

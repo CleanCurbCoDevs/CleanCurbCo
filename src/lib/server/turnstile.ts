@@ -33,6 +33,7 @@ export type TurnstileVerificationResult =
 const SITEVERIFY_URL =
   "https://challenges.cloudflare.com/turnstile/v0/siteverify";
 const VERIFY_TIMEOUT_MS = 5000;
+const LOCAL_DEV_BYPASS_TOKEN = "local-dev-turnstile-bypass";
 
 export async function verifyTurnstileToken({
   token,
@@ -43,6 +44,22 @@ export async function verifyTurnstileToken({
 }: VerifyTurnstileInput): Promise<TurnstileVerificationResult> {
   const { secretKey } = getTurnstileEnv();
   const cleanToken = token?.trim();
+
+  const localBypassEnabled =
+    process.env.NODE_ENV !== "production" &&
+    process.env.TURNSTILE_LOCAL_BYPASS === "true";
+
+  if (localBypassEnabled && cleanToken === LOCAL_DEV_BYPASS_TOKEN) {
+    logger.warn("turnstile_local_bypass_used", {
+      requestId,
+      route,
+      metadata: {
+        expectedAction: expectedAction ?? null,
+      },
+    });
+
+    return { success: true, requestId };
+  }
 
   if (!secretKey) {
     logger.error("turnstile_secret_missing", { requestId, route });

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { useCallback, useMemo, useState } from "react";
 import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
 import { useActionFeedback } from "@/components/action-feedback";
-import { PaymentSetupButton } from "@/components/payment-setup-button";
+import { SiteFeedbackNudge } from "@/components/site-feedback-nudge";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import {
   addOns,
@@ -119,6 +119,7 @@ export function BookingForm({
 }) {
   const feedback = useActionFeedback();
   const america250Active = isAmerica250PromoActive();
+
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
     customer: {
@@ -134,15 +135,18 @@ export function BookingForm({
   const [submittedBooking, setSubmittedBooking] =
     useState<BookingRequest | null>(null);
   const [setupHref, setSetupHref] = useState<string | null>(null);
-  const [paymentSetup, setPaymentSetup] = useState<{
-    href: string;
-    bookingId: string;
-    token?: string | null;
-  } | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
+
+  const turnstileDisabled =
+    process.env.NEXT_PUBLIC_DISABLE_TURNSTILE === "true" &&
+    process.env.NODE_ENV !== "production";
+
+  const turnstileTokenForSubmit = turnstileDisabled
+    ? "local-dev-turnstile-bypass"
+    : turnstileToken;
 
   const handleTurnstileToken = useCallback((token: string) => {
     setTurnstileToken(token);
@@ -228,17 +232,15 @@ export function BookingForm({
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, turnstileToken }),
+        body: JSON.stringify({
+          ...form,
+          turnstileToken: turnstileTokenForSubmit,
+        }),
       });
 
       const data = (await response.json()) as {
         booking?: BookingRequest;
         redirectTo?: string | null;
-        paymentSetupHref?: string | null;
-        paymentSetupContext?: {
-          bookingId?: string;
-          token?: string | null;
-        } | null;
         error?: string;
         requestId?: string;
       };
@@ -250,21 +252,12 @@ export function BookingForm({
       setSubmittedBooking(data.booking);
       feedback.success("Booking request received.");
       setSetupHref(data.redirectTo ?? null);
-      setPaymentSetup(
-        data.paymentSetupHref && data.paymentSetupContext?.bookingId
-          ? {
-              href: data.paymentSetupHref,
-              bookingId: data.paymentSetupContext.bookingId,
-              token: data.paymentSetupContext.token,
-            }
-          : null,
-      );
-    } catch (error) {
+    } catch (caughtError) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
       const message =
-        error instanceof Error
-          ? error.message
+        caughtError instanceof Error
+          ? caughtError.message
           : "Something got stuck. Please try again or contact us directly.";
       setError(message);
       feedback.error(message);
@@ -281,40 +274,55 @@ export function BookingForm({
           <h2>Thanks! Your request has been received.</h2>
           <p>
             We will email or text you when available to confirm your route day,
-            final price, and service details. Fresh Starts at the Curb.
+            final price, and service details before anything is charged.
+            Fresh Starts at the Curb.
           </p>
           <p>{bookingSuccessLaunchMessage}</p>
+
           {isAmerica250PromoActive() &&
-            submittedBooking.service.frequency !== "one_time" ? (
-              <p className="promo-confirmation-note">
-                Your request was submitted during the America 250 Deal window. We will
-                confirm promotional eligibility and final pricing before charging.
-              </p>
-            ) : null}
-          {setupHref ? (
-            <a className="button button-dark" href={setupHref}>
-              Set Up Customer Account
-            </a>
+          submittedBooking.service.frequency !== "one_time" ? (
+            <p className="promo-confirmation-note">
+              Your request was submitted during the America 250 Deal window. We
+              will confirm promotional eligibility and final pricing before
+              charging.
+            </p>
           ) : null}
-          {paymentSetup ? (
-            <div className="payment-setup-success-cta">
-              <p>
-                You can securely add payment information now so your account is
-                ready when your route is confirmed. You will not be charged
-                until service/payment terms are confirmed.
-              </p>
-              <PaymentSetupButton
-                bookingId={paymentSetup.bookingId}
-                token={paymentSetup.token}
-                returnPath={paymentSetup.href}
-                label="Add Payment Info"
-              />
-            </div>
-          ) : null}
+
+          <div className="account-setup-success-cta">
+            {setupHref ? (
+              <>
+                <p>
+                  Create your customer account to view this request, manage your info, and
+                  make future service changes easier.
+                </p>
+
+                <a className="button button-dark" href={setupHref}>
+                  Create Customer Account
+                </a>
+              </>
+            ) : (
+              <>
+                <p>
+                  Your request is saved. If you already have an account, you can open your
+                  customer portal to view updates once this request is connected.
+                </p>
+
+                <Link className="button button-dark" href="/portal">
+                  Open Customer Portal
+                </Link>
+              </>
+            )}
+          </div>
           <p>
             <strong>Booking ID:</strong> {submittedBooking.id}
           </p>
+
+          <SiteFeedbackNudge
+            variant="inline"
+            context={`Booking confirmation ${submittedBooking.id}`}
+          />
         </div>
+
         <BookingSummary booking={submittedBooking} />
       </div>
     );
@@ -334,12 +342,13 @@ export function BookingForm({
             }
           />
         </label>
+
         {serviceAreaChecked ? (
           <div className="booking-route-confirmation" role="status">
             <CheckCircle2 size={20} aria-hidden="true" />
             <p>
-              Good news. Your address passed the quick service-area check, so
-              we prefilled what we could below.
+              Good news. Your address passed the quick service-area check, so we
+              prefilled what we could below.
             </p>
           </div>
         ) : null}
@@ -396,6 +405,7 @@ export function BookingForm({
               value={form.customer.zipCode}
               onChange={(value) => updateCustomer("zipCode", value)}
             />
+
             <label className="field">
               <span>Neighborhood / subdivision</span>
               <select
@@ -409,6 +419,7 @@ export function BookingForm({
                 ))}
               </select>
             </label>
+
             <TextField
               label="Referral code, if you have one"
               value={form.referralCode}
@@ -424,6 +435,7 @@ export function BookingForm({
 
         <section className="form-section">
           <h2>Service Selection</h2>
+
           <div className="form-grid">
             <label className="field">
               <span>Number of bins</span>
@@ -439,6 +451,7 @@ export function BookingForm({
                 <option value={4}>4+</option>
               </select>
             </label>
+
             <label className="field">
               <span>Frequency</span>
               <select
@@ -501,9 +514,11 @@ export function BookingForm({
         <section className="form-section">
           <h2>Scheduling</h2>
           <p className="muted">
-            We service Cane Bay by neighborhood route. After booking, we will
-            confirm your next available route day by email or text when available.
+            We build service days by neighborhood route. After booking, we will
+            confirm your next available route day by email or text when
+            available.
           </p>
+
           <div className="choice-grid">
             {[
               {
@@ -545,6 +560,7 @@ export function BookingForm({
               </label>
             ))}
           </div>
+
           {form.scheduling.preference !== "next_available_route_day" ? (
             <TextField
               label="Requested date"
@@ -562,6 +578,7 @@ export function BookingForm({
 
         <section className="form-section">
           <h2>Service Instructions</h2>
+
           <div className="form-grid">
             <label className="field">
               <span>Where will your bins be?</span>
@@ -583,6 +600,7 @@ export function BookingForm({
                 <option>Other</option>
               </select>
             </label>
+
             <label className="field">
               <span>Is an exterior water spigot available?</span>
               <select
@@ -604,6 +622,7 @@ export function BookingForm({
               </select>
             </label>
           </div>
+
           <label className="field">
             <span>Notes</span>
             <textarea
@@ -626,9 +645,7 @@ export function BookingForm({
           <h2>Required Agreements</h2>
           <Agreement
             checked={form.agreements.waterUse}
-            onChange={(checked) =>
-              setAgreement("waterUse", checked, setForm)
-            }
+            onChange={(checked) => setAgreement("waterUse", checked, setForm)}
             label="I authorize Clean Curb Co. to use an exterior water spigot at the service address when needed. Water usage is minimal and may be recorded with an inline water meter."
           />
           <Agreement
@@ -640,9 +657,7 @@ export function BookingForm({
           />
           <Agreement
             checked={form.agreements.wastewater}
-            onChange={(checked) =>
-              setAgreement("wastewater", checked, setForm)
-            }
+            onChange={(checked) => setAgreement("wastewater", checked, setForm)}
             label="I understand Clean Curb Co. uses reasonable efforts to collect, manage, or redirect wastewater when appropriate and will not intentionally discharge wastewater into storm drains."
           />
           <Agreement
@@ -678,20 +693,32 @@ export function BookingForm({
         ) : null}
 
         <div className="submit-area">
-          <TurnstileWidget
-            siteKey={turnstileSiteKey}
-            action="booking_submit"
-            resetKey={turnstileResetKey}
-            onTokenChange={handleTurnstileToken}
-          />
+          {turnstileDisabled ? (
+            <div
+              className="turnstile-panel local-dev-turnstile-bypass"
+              role="status"
+            >
+              Local dev verification bypass is enabled. Turnstile is skipped on
+              localhost.
+            </div>
+          ) : (
+            <TurnstileWidget
+              siteKey={turnstileSiteKey}
+              action="booking_submit"
+              resetKey={turnstileResetKey}
+              onTokenChange={handleTurnstileToken}
+            />
+          )}
+
           <button
             className="button button-dark"
             type="submit"
-            disabled={isSubmitting || !turnstileToken}
+            disabled={isSubmitting || (!turnstileDisabled && !turnstileToken)}
           >
             <Send size={20} aria-hidden="true" />
             {isSubmitting ? "Sending Request..." : "Request My Cleaning"}
           </button>
+
           <p className="muted">
             No surprise charges. We confirm your route day and final price
             before service.
@@ -702,16 +729,19 @@ export function BookingForm({
       <aside className="estimate-panel">
         <CalendarCheck size={30} aria-hidden="true" />
         <h2>Estimated visit price</h2>
+
         <div className="estimate-total">
           <strong>${estimatedPrice}</strong>
           <span>/ visit</span>
         </div>
+
         <p>
           <strong>{formatFrequency(form.service.frequency)}</strong>
           <br />
           Estimated visit for {form.service.binCount}
           {form.service.binCount === 1 ? " bin" : " bins"}.
         </p>
+
         <div className="launch-reminder">
           <p className="section-kicker">Founding Neighbor Special</p>
           <strong>
@@ -726,6 +756,7 @@ export function BookingForm({
           </span>
           <small>{launchBillingNote}</small>
         </div>
+
         {america250Active ? (
           <div className="america250-estimate-callout">
             <div>
@@ -736,14 +767,14 @@ export function BookingForm({
             </div>
 
             <p>
-              Today and tomorrow only. Stacks with the Founding Neighbor Special when
-              eligible.
+              Today and tomorrow only. Stacks with the Founding Neighbor Special
+              when eligible.
             </p>
 
             {form.service.frequency === "one_time" ? (
               <span>
-                Choose Monthly, Every Other Month, or Quarterly to use this recurring
-                service discount.
+                Choose Monthly, Every Other Month, or Quarterly to use this
+                recurring service discount.
               </span>
             ) : (
               <span>
@@ -755,6 +786,7 @@ export function BookingForm({
             <Link href={america250Promotion.detailsHref}>Learn More</Link>
           </div>
         ) : null}
+
         <div className="estimate-panel-section">
           <h3>What happens after you submit?</h3>
           <ol className="number-list">
@@ -763,6 +795,7 @@ export function BookingForm({
             <li>We clean the bins and send completion photos.</li>
           </ol>
         </div>
+
         <p className="estimate-note">
           Estimate shown until route day, add-ons, and final price are confirmed.
         </p>
