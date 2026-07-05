@@ -21,14 +21,18 @@ export default function America250PromotionPage() {
             Please read carefully before booking.
           </p>
 
-          <div className="action-row">
-            <Link className="button button-primary" href={america250Promotion.bookingHref}>
-              Book with America 250 Deal
-            </Link>
-            <Link className="button button-outline" href="/pricing">
-              View Regular Pricing
-            </Link>
-          </div>
+          <div className="promo-hero-actions">
+  <Link
+    className="button button-primary promo-hero-primary"
+    href={america250Promotion.bookingHref}
+  >
+    Book with America 250 Deal
+  </Link>
+
+  <Link className="button button-secondary promo-hero-secondary" href="/pricing">
+    View Regular Pricing
+  </Link>
+</div>
         </div>
       </section>
 
