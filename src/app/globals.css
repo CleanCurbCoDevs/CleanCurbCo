@@ -5349,7 +5349,7 @@ form.data-row label textarea,
 }
 
 .promo-terms-cta {
-  display: flex;
+  display: center;
   flex-wrap: wrap;
   gap: 10px;
 }
