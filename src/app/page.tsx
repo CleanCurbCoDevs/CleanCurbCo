@@ -1,11 +1,6 @@
 import Image from "next/image";
 import Link from "next/link";
 import { CalendarCheck, DollarSign } from "lucide-react";
-import {
-  launchPromo,
-  launchReservationCopy,
-  launchRouteHeadline,
-} from "@/lib/site";
 import { publicPageMetadata } from "@/lib/seo";
 import {
   AddOnsSection,
