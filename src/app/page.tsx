@@ -1,14 +1,12 @@
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, CalendarCheck, DollarSign } from "lucide-react";
+import { CalendarCheck, DollarSign } from "lucide-react";
 import {
-  brand,
   launchPromo,
   launchReservationCopy,
   launchRouteHeadline,
 } from "@/lib/site";
 import { publicPageMetadata } from "@/lib/seo";
-import { LaunchStatusCard } from "@/components/launch-status-card";
 import {
   AddOnsSection,
   ExpectationsSection,
@@ -43,49 +41,56 @@ export default function Home() {
           sizes="100vw"
           className="hero-image"
         />
+
         <div className="hero-scrim" />
+
         <div className="container hero-content">
-          <Image
-            src="/clean-curb-logo.png"
-            alt={brand.logoAlt}
-            width={132}
-            height={132}
-            className="hero-logo"
-            loading="eager"
-          />
-          <p className="eyebrow">Clean Curb Co. | Summerville-area curbside cleaning</p>
-          <p className="offer-badge">{launchPromo}</p>
           <h1>Fresh Starts at the Curb.</h1>
-            <p className="hero-subtitle">
-              We clean the gross curbside stuff nobody wants to deal with.
-            </p>
-            <p className="hero-supporting">
-              Garbage bins are the main thing — but not the only thing.
-            </p>
-            <LaunchStatusCard />
-          <p className="trust-line">
-            Locally owned | Veteran owned | Eco-conscious
+
+          <p className="hero-subtitle">
+            Curbside bin cleaning and grime cleanup for Cane Bay, Summerville,
+            and nearby neighborhoods.
           </p>
-          <div className="hero-chip-list" aria-label="Service highlights">
-            <span>Veteran-owned</span>
-            <span>Local route-based service</span>            
-            <span>Before/after photos</span>
-            <span>Email/text route updates</span>
-          </div>
+
+          <p className="trust-line">
+            Locally owned • Veteran-owned • Route-based service
+          </p>
+
           <div className="hero-actions">
             <Link className="button button-primary" href="/book">
               <CalendarCheck size={20} aria-hidden="true" />
               Book Curbside Cleaning
             </Link>
+
             <Link className="button button-secondary" href="#pricing">
               <DollarSign size={20} aria-hidden="true" />
               See Pricing
             </Link>
           </div>
+
           <p className="hero-note">
-            Stink happens. We handle it.
-            <ArrowRight size={18} aria-hidden="true" />
+            Reserve your spot now. You won&apos;t be charged until your route
+            and service are confirmed.
           </p>
+        </div>
+      </section>
+
+      <section className="section section-gold">
+        <div className="container">
+          <article className="launch-info-card">
+            <p className="section-kicker">Launch Special</p>
+
+            <h2>{launchPromo}</h2>
+
+            <p>
+              <strong>{launchRouteHeadline}</strong>{" "}
+              {launchReservationCopy}
+            </p>
+
+            <Link className="button button-dark" href="/book">
+              Book Your Spot
+            </Link>
+          </article>
         </div>
       </section>
 
