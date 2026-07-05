@@ -929,6 +929,60 @@ h3,
   border-left-color: var(--lime);
 }
 
+.launch-special-band {
+  background:
+    radial-gradient(circle at top left, rgba(0, 255, 56, 0.14), transparent 34%),
+    linear-gradient(135deg, #050505 0%, #111111 58%, #1f1328 100%);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: white;
+  padding: clamp(28px, 5vw, 54px) 0;
+}
+
+.launch-special-card {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-left: 6px solid var(--lime);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 22px 60px rgba(0, 0, 0, 0.28);
+  color: white;
+  display: grid;
+  gap: 14px;
+  margin: 0 auto;
+  max-width: 860px;
+  padding: clamp(20px, 5vw, 30px);
+}
+
+.launch-special-card .section-kicker {
+  color: var(--lime);
+  margin: 0;
+}
+
+.launch-special-card h2 {
+  color: white;
+  font-size: clamp(1.7rem, 6vw, 2.65rem);
+  font-weight: 1000;
+  line-height: 1.02;
+  margin: 0;
+}
+
+.launch-special-card p {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: 1.04rem;
+  line-height: 1.6;
+  margin: 0;
+  max-width: 680px;
+}
+
+.launch-special-card .button {
+  justify-self: start;
+}
+
+@media (max-width: 420px) {
+  .launch-special-card .button {
+    width: 100%;
+  }
+}
+
 .contact-launch-note {
   align-content: start;
   box-shadow: 0 14px 36px rgba(5, 5, 5, 0.12);
