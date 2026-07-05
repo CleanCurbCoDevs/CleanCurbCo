@@ -1316,6 +1316,28 @@ h3,
   max-width: 700px;
 }
 
+.promo-hero-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  justify-content: center;
+  margin-top: 8px;
+  width: 100%;
+}
+
+.promo-hero-actions .button {
+  width: fit-content;
+}
+
+.promo-hero-primary {
+  min-width: min(100%, 360px);
+}
+
+.promo-hero-secondary {
+  min-width: min(100%, 240px);
+}
+
 .booking-shell {
   display: grid;
   gap: 24px;
