@@ -75,24 +75,25 @@ export default function Home() {
         </div>
       </section>
 
-      <section className="section section-gold">
-        <div className="container">
-          <article className="launch-info-card">
-            <p className="section-kicker">Launch Special</p>
+   <section className="launch-special-band">
+  <div className="container">
+    <article className="launch-special-card">
+      <p className="section-kicker">Launch Special</p>
 
-            <h2>{launchPromo}</h2>
+      <h2>First 2-bin cleaning only $25.</h2>
 
-            <p>
-              <strong>{launchRouteHeadline}</strong>{" "}
-              {launchReservationCopy}
-            </p>
+      <p>
+        Join a recurring Cane Bay route and reserve your spot before our first
+        planned route on July 13, 2026. You won&apos;t be charged until your
+        route day and service are confirmed.
+      </p>
 
-            <Link className="button button-dark" href="/book">
-              Book Your Spot
-            </Link>
-          </article>
-        </div>
-      </section>
+      <Link className="button button-primary" href="/book">
+        Book Your Spot
+      </Link>
+    </article>
+  </div>
+</section>
 
       <ProblemSection />
       <ProofSection />
