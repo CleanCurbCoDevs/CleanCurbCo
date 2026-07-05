@@ -78,7 +78,7 @@ export default function Home() {
       <h2>First 2-bin cleaning only $25.</h2>
 
       <p>
-        Join a recurring Cane Bay route and reserve your spot before our first
+        Join a recurring route and reserve your spot before our first
         planned route on July 13, 2026. You won&apos;t be charged until your
         route day and service are confirmed.
       </p>
