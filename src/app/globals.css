@@ -5755,3 +5755,11 @@ form.data-row label textarea,
   font-weight: 850;
   margin: 0;
 }
+
+@media (max-width: 719px) {
+  .scroll-fade-item {
+    opacity: 1 !important;
+    transform: none !important;
+    transition: none !important;
+  }
+}
