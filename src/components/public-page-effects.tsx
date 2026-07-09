@@ -42,15 +42,25 @@ export function PublicPageEffects() {
       return;
     }
 
+    const isMobile = window.matchMedia("(max-width: 719px)").matches;
     const prefersReducedMotion = window.matchMedia(
       "(prefers-reduced-motion: reduce)",
     ).matches;
 
-    if (prefersReducedMotion) {
+    if (isMobile || prefersReducedMotion) {
+      document.documentElement.classList.remove("page-effects-mounted");
       document.documentElement.classList.add("effects-reduced-motion");
+
+      document
+        .querySelectorAll<HTMLElement>(effectSelector)
+        .forEach((element) => {
+          element.classList.remove("scroll-fade-item", "is-visible");
+        });
+
       return;
     }
 
+    document.documentElement.classList.remove("effects-reduced-motion");
     document.documentElement.classList.add("page-effects-mounted");
 
     const revealElements = Array.from(
