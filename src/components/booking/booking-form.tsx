@@ -407,6 +407,7 @@ export function BookingForm({
               label="ZIP code"
               value={form.customer.zipCode}
               onChange={(value) => updateCustomer("zipCode", value)}
+              required
             />
 
             <label className="field">
