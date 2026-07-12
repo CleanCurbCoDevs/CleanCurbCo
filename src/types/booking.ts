@@ -19,6 +19,17 @@ export type SchedulingPreference =
   | "specific_day"
   | "urgent";
 
+export type CollectionDay =
+  | "monday"
+  | "tuesday"
+  | "wednesday"
+  | "thursday"
+  | "friday"
+  | "saturday"
+  | "sunday"
+  | "varies"
+  | "not_sure";
+
 export type PaymentStatus =
   | "not_sent"
   | "pending"
@@ -54,6 +65,7 @@ export type BookingRequest = {
 
   scheduling: {
     preference: SchedulingPreference;
+    collectionDay?: CollectionDay;
     requestedDate?: string;
     confirmedRouteDay?: string;
   };
