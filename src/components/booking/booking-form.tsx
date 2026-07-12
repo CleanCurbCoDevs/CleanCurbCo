@@ -26,6 +26,7 @@ import {
 } from "@/lib/pricing";
 import type {
   BookingRequest,
+  CollectionDay,
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
@@ -52,6 +53,7 @@ type FormState = {
   };
   scheduling: {
     preference: SchedulingPreference;
+    collectionDay: CollectionDay | "";
     requestedDate: string;
   };
   instructions: {
@@ -86,6 +88,7 @@ const initialState: FormState = {
   },
   scheduling: {
     preference: "next_available_route_day",
+    collectionDay: "",
     requestedDate: "",
   },
   instructions: {
@@ -513,18 +516,57 @@ export function BookingForm({
 
         <section className="form-section">
           <h2>Scheduling</h2>
+
           <p className="muted">
-            We build service days by neighborhood route. After booking, we will
-            confirm your next available route day by email or text when
-            available.
+            Tell us when the garbage truck normally empties your bins. We use
+            that day to quietly place you on the best available cleaning route
+            after collection.
           </p>
+
+          <label className="field">
+            <span>
+              What day are your bins normally emptied?
+              <span className="required-mark"> *</span>
+            </span>
+
+            <select
+              value={form.scheduling.collectionDay}
+              onChange={(event) =>
+                setForm((current) => ({
+                  ...current,
+                  scheduling: {
+                    ...current.scheduling,
+                    collectionDay: event.target.value as CollectionDay | "",
+                  },
+                }))
+              }
+              required
+            >
+              <option value="" disabled>
+                Select your regular collection day
+              </option>
+              <option value="monday">Monday</option>
+              <option value="tuesday">Tuesday</option>
+              <option value="wednesday">Wednesday</option>
+              <option value="thursday">Thursday</option>
+              <option value="friday">Friday</option>
+              <option value="saturday">Saturday</option>
+              <option value="sunday">Sunday</option>
+              <option value="varies">My collection day varies</option>
+              <option value="not_sure">I’m not sure</option>
+            </select>
+
+            <small>
+              We normally clean after collection, once the bins are empty.
+            </small>
+          </label>
 
           <div className="choice-grid">
             {[
               {
                 value: "next_available_route_day",
-                title: "Next available route day",
-                note: "Best for route pricing and quick confirmation.",
+                title: "Clean after my regular collection",
+                note: "Recommended — we’ll place you on the nearest suitable route after your bins are emptied.",
               },
               {
                 value: "specific_day",
@@ -870,6 +912,22 @@ function normalizeReferralCode(value: string) {
   return value.replace(/[^a-z0-9]/gi, "").slice(0, 24).toUpperCase();
 }
 
+function formatCollectionDay(value?: CollectionDay) {
+  if (!value) {
+    return "Not provided";
+  }
+
+  if (value === "not_sure") {
+    return "Not sure";
+  }
+
+  if (value === "varies") {
+    return "Varies";
+  }
+
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
 function BookingSummary({ booking }: { booking: BookingRequest }) {
   return (
     <aside className="estimate-panel">
@@ -884,6 +942,9 @@ function BookingSummary({ booking }: { booking: BookingRequest }) {
         <strong>Estimated price:</strong> ${booking.service.estimatedPrice}
         <br />
         <strong>Neighborhood:</strong> {booking.customer.neighborhood}
+        <br />
+        <strong>Collection day:</strong>{" "}
+        {formatCollectionDay(booking.scheduling.collectionDay)}
         <br />
         <strong>Scheduling:</strong>{" "}
         {booking.scheduling.preference.replaceAll("_", " ")}
