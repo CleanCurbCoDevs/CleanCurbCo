@@ -6,6 +6,7 @@ import {
 } from "@/lib/booking-claims";
 import {
   bookingRowToRequest,
+  validCollectionDays,
   validFrequencies,
   validSchedulingPreferences,
 } from "@/lib/booking-utils";
@@ -19,6 +20,7 @@ import {
 } from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
 import { createRequestId, getClientIp, logger } from "@/lib/server/logger";
+import { evaluateServiceArea } from "@/lib/server/service-area";
 import {
   rejectCrossOriginRequest,
   rejectLimitedRequest,
@@ -39,7 +41,11 @@ import {
   parsePositiveInt,
   pickEnum,
 } from "@/lib/validation";
-import type { SchedulingPreference, ServiceFrequency } from "@/types/booking";
+import type {
+  CollectionDay,
+  SchedulingPreference,
+  ServiceFrequency,
+} from "@/types/booking";
 
 type IncomingBooking = {
   turnstileToken?: unknown;
@@ -66,6 +72,7 @@ type IncomingBooking = {
   };
   scheduling?: {
     preference?: unknown;
+    collectionDay?: unknown;
     requestedDate?: unknown;
   };
   instructions?: {
@@ -204,7 +211,20 @@ export async function POST(request: Request) {
     validSchedulingPreferences,
     "next_available_route_day",
   );
-  const requestedDate = cleanString(body.scheduling?.requestedDate, 30) || null;
+
+  const collectionDayValue = cleanString(
+    body.scheduling?.collectionDay,
+    30,
+  );
+
+  const collectionDay = validCollectionDays.includes(
+    collectionDayValue as CollectionDay,
+  )
+    ? (collectionDayValue as CollectionDay)
+    : null;
+
+  const requestedDate =
+    cleanString(body.scheduling?.requestedDate, 30) || null;
   const binTypes = cleanArray(body.service?.binTypes);
   const addOns = cleanArray(body.service?.addOns);
   const referralCode = cleanString(body.referralCode, 40).toUpperCase() || null;
@@ -244,6 +264,8 @@ export async function POST(request: Request) {
     !streetAddress && "street address",
     !city && "city",
     !state && "state",
+    !zipCode && "ZIP code",
+    !collectionDay && "regular collection day",
     !isValidEmail(email) && "valid email",
     !Object.values(agreements).every(Boolean) && "required agreements",
   ].filter(Boolean);
@@ -254,11 +276,66 @@ export async function POST(request: Request) {
       route,
       metadata: { missingRequired },
     });
+
     return NextResponse.json(
-      { error: `Please complete: ${missingRequired.join(", ")}.`, requestId },
+      {
+        error: `Please complete: ${missingRequired.join(", ")}.`,
+        requestId,
+      },
       { status: 400 },
     );
   }
+
+  const serviceAreaResult = await evaluateServiceArea({
+    streetAddress,
+    city,
+    state,
+    zipCode,
+  });
+
+  if (serviceAreaResult.status === "not_covered") {
+    logger.warn("booking_submission_outside_service_area", {
+      requestId,
+      route,
+      metadata: {
+        city,
+        state,
+        zipCode,
+        distanceMiles: serviceAreaResult.distanceMiles ?? null,
+        maxRadiusMiles: serviceAreaResult.maxRadiusMiles,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        error: serviceAreaResult.message,
+        requestId,
+      },
+      { status: 422 },
+    );
+  }
+
+  if (serviceAreaResult.status === "unverified") {
+    logger.warn("booking_submission_address_unverified", {
+      requestId,
+      route,
+      metadata: {
+        city,
+        state,
+        zipCode,
+      },
+    });
+
+    return NextResponse.json(
+      {
+        error: serviceAreaResult.message,
+        requestId,
+      },
+      { status: 422 },
+    );
+  }
+
+  const serviceAreaCheckedAt = new Date().toISOString();
 
   const foundingSpecial = getFoundingNeighborSpecialStatus({
     binCount,
@@ -321,7 +398,13 @@ export async function POST(request: Request) {
             state,
             zip_code: zipCode,
             neighborhood,
-            notes: cleanLongText(body.instructions?.notes, 1000) || null,
+            collection_day: collectionDay,
+            latitude: serviceAreaResult.latitude ?? null,
+            longitude: serviceAreaResult.longitude ?? null,
+            distance_from_hub_miles:
+              serviceAreaResult.distanceMiles ?? null,
+            notes:
+              cleanLongText(body.instructions?.notes, 1000) || null,
             is_primary: true,
           })
           .select("id")
@@ -362,6 +445,12 @@ export async function POST(request: Request) {
       state,
       zip_code: zipCode,
       neighborhood,
+      collection_day: collectionDay,
+      service_latitude: serviceAreaResult.latitude ?? null,
+      service_longitude: serviceAreaResult.longitude ?? null,
+      service_distance_miles:
+        serviceAreaResult.distanceMiles ?? null,
+      service_area_checked_at: serviceAreaCheckedAt,
       bin_count: binCount,
       bin_types: binTypes,
       frequency,
@@ -415,6 +504,9 @@ export async function POST(request: Request) {
     metadata: {
       frequency,
       binCount,
+      collectionDay,
+      serviceDistanceMiles:
+        serviceAreaResult.distanceMiles ?? null,
       addOnCount: addOns.length,
       hasReferralCode: Boolean(referralCode),
       foundingNeighborSpecial: foundingSpecial.status,
