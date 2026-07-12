@@ -129,10 +129,18 @@ export function ServiceAreaChecker() {
             requestId?: string;
           };
 
-      if (!response.ok || !("status" in data)) {
+      if (!response.ok) {
+        const message =
+          "error" in data && data.error
+            ? data.error
+            : "We could not check that address. Please try again.";
+
+        throw new Error(message);
+      }
+
+      if (!("status" in data)) {
         throw new Error(
-          data.error ??
-            "We could not check that address. Please try again.",
+          "We could not check that address. Please try again.",
         );
       }
 
