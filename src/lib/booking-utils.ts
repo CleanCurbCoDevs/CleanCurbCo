@@ -1,6 +1,7 @@
 import type {
   BookingRequest,
   BookingStatus,
+  CollectionDay,
   PaymentStatus,
   SchedulingPreference,
   ServiceFrequency,
@@ -23,6 +24,18 @@ export const validSchedulingPreferences: readonly SchedulingPreference[] = [
   "next_available_route_day",
   "specific_day",
   "urgent",
+];
+
+export const validCollectionDays: readonly CollectionDay[] = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+  "varies",
+  "not_sure",
 ];
 
 export const validBookingStatuses: readonly BookingStatus[] = [
@@ -102,6 +115,7 @@ export function bookingRowToRequest(row: BookingRow): BookingRequest {
     },
     scheduling: {
       preference: row.scheduling_preference,
+      collectionDay: row.collection_day ?? undefined,
       requestedDate: row.requested_date ?? undefined,
       confirmedRouteDay: row.confirmed_route_day ?? undefined,
     },
