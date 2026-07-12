@@ -67,11 +67,11 @@ export async function POST(request: Request) {
   const state = cleanString(body.state, 20);
   const zipCode = cleanString(body.zipCode, 20);
 
-  if (!streetAddress || !city || !state) {
+ if (!streetAddress || !city || !state || !zipCode) {
     return NextResponse.json(
       {
         error:
-          "Please enter the street address, city, and state before checking the service area.",
+          "Please enter the complete street address, city, state, and ZIP code before checking the service area.",
         requestId,
       },
       { status: 400 },
