@@ -1,3 +1,5 @@
+import type { CollectionDay } from "@/types/booking";
+
 export type AppRole = "customer" | "technician" | "admin" | "owner";
 export type ServiceFrequency =
   | "one_time"
@@ -142,6 +144,11 @@ export type BookingRow = {
   state: string;
   zip_code: string | null;
   neighborhood: string | null;
+  collection_day: CollectionDay | null;
+  service_latitude: number | null;
+  service_longitude: number | null;
+  service_distance_miles: number | null;
+  service_area_checked_at: string | null;
   bin_count: number;
   bin_types: string[];
   frequency: ServiceFrequency;
@@ -228,6 +235,10 @@ export type ServiceAddressRow = {
   state: string;
   zip_code: string | null;
   neighborhood: string | null;
+  collection_day: CollectionDay | null;
+  latitude: number | null;
+  longitude: number | null;
+  distance_from_hub_miles: number | null;
   gate_code: string | null;
   notes: string | null;
   is_primary: boolean;
