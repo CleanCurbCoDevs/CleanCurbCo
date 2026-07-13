@@ -269,25 +269,110 @@ export function reviewRequestTemplate(booking: BookingRow): EmailTemplate {
   };
 }
 
-export function paymentLinkTemplate(booking: BookingRow): EmailTemplate {
+function formatEmailDate(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatPaymentDeadline(routeDay: string) {
+  const date = new Date(`${routeDay}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return "at least 24 hours before service";
+  }
+
+  date.setDate(date.getDate() - 1);
+
+  return `${new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+  }).format(date)} at the latest`;
+}
+
+export function paymentLinkTemplate(
+  booking: BookingRow,
+): EmailTemplate {
   const paymentLink = booking.payment_link ?? "";
+
+  const routeDay = booking.confirmed_route_day
+    ? formatEmailDate(booking.confirmed_route_day)
+    : "your confirmed service date";
+
+  const paymentDeadline = booking.confirmed_route_day
+    ? formatPaymentDeadline(booking.confirmed_route_day)
+    : "at least 24 hours before service";
+
   const body = `
-    <p>Your Clean Curb Co. payment link is ready for the cleaning request below.</p>
+    <p>Hi ${escapeHtml(booking.first_name)},</p>
+
+    <p>
+      You're officially on the Clean Curb Co. route for
+      <strong>${escapeHtml(routeDay)}</strong>.
+    </p>
+
+    <p>
+      Just have your bin at the curb or somewhere easy for us to reach,
+      and we'll handle the dirty part.
+    </p>
+
+    <p>
+      Your total is <strong>$${Number(
+        booking.estimated_price,
+      ).toFixed(2)}</strong>.
+      Payment must be completed by
+      <strong>${escapeHtml(paymentDeadline)}</strong>.
+    </p>
+
     ${
       paymentLink
-        ? `<p>${emailButton(paymentLink, "Open payment link")}</p>`
-        : "<p>The payment link is being prepared. We will follow up shortly.</p>"
+        ? `<p>${emailButton(
+            paymentLink,
+            "Pay securely with Stripe",
+          )}</p>`
+        : "<p>Your payment link is still being prepared. Please reply to this email so we can fix it.</p>"
     }
+
     ${bookingSummaryHtml(booking)}
+
+    <p>
+      Thanks again for trusting us with the grime. We'll see you at the curb!
+    </p>
   `;
 
   return {
-    subject: "Your Clean Curb Co. payment link",
-    html: shell("Payment link ready", body),
+    subject: `Service confirmed for ${routeDay} | Clean Curb Co.`,
+    html: shell(
+      "Your route is confirmed",
+      body,
+      {
+        preview: `Your Clean Curb Co. service is scheduled for ${routeDay}.`,
+      },
+    ),
     text: customerText(
-      paymentLink
-        ? `Your Clean Curb Co. payment link: ${paymentLink}`
-        : "Your Clean Curb Co. payment link is being prepared.",
+      [
+        `Hi ${booking.first_name},`,
+        `Your Clean Curb Co. service is confirmed for ${routeDay}.`,
+        `Please have your bin at the curb or somewhere easily accessible.`,
+        `Total: $${Number(
+          booking.estimated_price,
+        ).toFixed(2)}.`,
+        `Payment is due by ${paymentDeadline}.`,
+        paymentLink
+          ? `Pay securely here: ${paymentLink}`
+          : "Your payment link is still being prepared.",
+        "Thanks again for trusting us with the grime!",
+      ].join("\n\n"),
     ),
   };
 }
