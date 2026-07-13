@@ -158,6 +158,13 @@ export const neighborhoods = [
   "Sanctuary Cove",
   "Four Seasons",
   "Lakes of Cane Bay",
+  "Nexton",
+  "Carnes Crossroads",
+  "Summers Corner",
+  "Downtown Summerville",
+  "Sangaree",
+  "Goose Creek",
+  "Moncks Corner",
   "Other / Not sure",
 ];
 
@@ -169,18 +176,14 @@ export const binTypes = [
 ];
 
 export const serviceAreas = [
-  "Cane Bay",
-  "Cane Bay Plantation",
-  "Lindera Preserve",
-  "The Oaks",
-  "Old Rice Retreat",
-  "Sanctuary Cove",
-  "Four Seasons",
-  "Lakes of Cane Bay",
   "Summerville",
+  "Cane Bay",
+  "Nexton",
+  "Carnes Crossroads",
+  "Summers Corner",
   "Goose Creek",
   "Moncks Corner",
-  "Nearby communities by route fit",
+  "Nearby Charleston-area communities within our service radius",
 ];
 
 export const futureServices = [
