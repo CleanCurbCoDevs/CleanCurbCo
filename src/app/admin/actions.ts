@@ -2,6 +2,10 @@
 
 import { revalidatePath } from "next/cache";
 import {
+  actionFailure,
+  actionSuccess,
+} from "@/lib/action-result";
+import {
   humanizeStatus,
   validCustomerRequestStatuses,
   validBookingStatuses,
@@ -467,33 +471,294 @@ export async function updatePaymentStatusAction(
   revalidatePath("/admin/referrals");
 }
 
-export async function sendPaymentLinkAction(formData: FormData) {
-  const auth = await requireAdmin("/admin/payments");
-  if (auth.status !== "ok") return;
+export async function sendPaymentLinkAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireAdmin("/admin/bookings");
 
-  const bookingId = cleanString(formData.get("bookingId"), 80);
-  if (!bookingId) return;
+  if (auth.status !== "ok") {
+    return actionFailure("Admin access is required.");
+  }
+
+  const requestId = createRequestId();
+  const bookingId = cleanString(
+    formData.get("bookingId"),
+    80,
+  );
+
+  if (!bookingId) {
+    return actionFailure("Booking ID is missing.");
+  }
+
+  if (!isStripeConfigured()) {
+    return actionFailure(
+      "Stripe is not configured. Check the Stripe environment variables in Vercel.",
+    );
+  }
 
   const admin = getSupabaseAdmin();
-  const { data: booking } = await admin
+
+  const { data: booking, error: bookingError } = await admin
     .from("bookings")
     .select("*")
     .eq("id", bookingId)
     .maybeSingle();
 
-  if (booking) {
-    await sendPaymentLink(booking);
-    await logActivity(admin, {
-      actor_profile_id: auth.userId,
-      customer_id: booking.customer_id,
-      booking_id: booking.id,
-      event_type: "payment_link_email_sent",
-      message: "Payment link email sent from admin.",
-      metadata: { paymentLink: booking.payment_link },
-    });
+  if (bookingError || !booking) {
+    return actionFailure("Booking could not be found.");
   }
 
-  revalidatePath("/admin/payments");
+  if (!booking.confirmed_route_day) {
+    return actionFailure(
+      "Confirm the service date before sending the payment link.",
+    );
+  }
+
+  if (booking.payment_status === "paid") {
+    return actionFailure(
+      "This booking is already marked as paid.",
+    );
+  }
+
+  const amount = Number(booking.estimated_price);
+
+  if (!Number.isFinite(amount) || amount <= 0) {
+    return actionFailure(
+      "This booking does not have a valid payment amount.",
+    );
+  }
+
+  const amountInCents = Math.round(amount * 100);
+  const stripe = getStripe();
+  const siteUrl = getSiteUrl();
+
+  try {
+    const { data: payment, error: paymentError } =
+      await admin
+        .from("payments")
+        .insert({
+          customer_id: booking.customer_id,
+          booking_id: booking.id,
+          amount,
+          currency: "usd",
+          status: "pending",
+          provider: "stripe",
+          stripe_customer_id:
+            booking.stripe_customer_id ?? null,
+          description: `Clean Curb Co. service for ${booking.street_address}`,
+          payment_type:
+            booking.frequency === "one_time"
+              ? "one_time"
+              : "service_payment",
+          metadata: {
+            booking_id: booking.id,
+            route_day: booking.confirmed_route_day,
+            created_by: auth.userId,
+            request_id: requestId,
+          },
+        })
+        .select("*")
+        .single();
+
+    if (paymentError || !payment) {
+      logger.error("admin_payment_record_create_failed", {
+        requestId,
+        action: "payment_link_create",
+        bookingId: booking.id,
+        error: paymentError,
+      });
+
+      return actionFailure(
+        "The payment record could not be created.",
+      );
+    }
+
+    const session = await stripe.checkout.sessions.create({
+      mode: "payment",
+      client_reference_id: booking.id,
+
+      customer: booking.stripe_customer_id ?? undefined,
+
+      customer_email: booking.stripe_customer_id
+        ? undefined
+        : booking.email,
+
+      line_items: [
+        {
+          quantity: 1,
+          price_data: {
+            currency: "usd",
+            unit_amount: amountInCents,
+            product_data: {
+              name: "Clean Curb Co. Bin Cleaning",
+              description: `${booking.bin_count} bin${
+                booking.bin_count === 1 ? "" : "s"
+              } | ${humanizeStatus(
+                booking.frequency,
+              )} | Service date: ${
+                booking.confirmed_route_day
+              }`,
+            },
+          },
+        },
+      ],
+
+      metadata: {
+        booking_id: booking.id,
+        payment_id: payment.id,
+        customer_id: booking.customer_id ?? "",
+        payment_type:
+          booking.frequency === "one_time"
+            ? "one_time"
+            : "service_payment",
+      },
+
+      payment_intent_data: {
+        metadata: {
+          booking_id: booking.id,
+          payment_id: payment.id,
+          customer_id: booking.customer_id ?? "",
+        },
+      },
+
+      success_url: `${siteUrl}/portal?payment=success&booking=${booking.id}`,
+      cancel_url: `${siteUrl}/portal?payment=cancelled&booking=${booking.id}`,
+    });
+
+    if (!session.url) {
+      return actionFailure(
+        "Stripe created the session but did not return a checkout URL.",
+      );
+    }
+
+    await admin
+      .from("payments")
+      .update({
+        stripe_checkout_session_id: session.id,
+        checkout_url: session.url,
+        metadata: {
+          booking_id: booking.id,
+          route_day: booking.confirmed_route_day,
+          created_by: auth.userId,
+          request_id: requestId,
+          checkout_session_id: session.id,
+        },
+      })
+      .eq("id", payment.id);
+
+    const { data: updatedBooking, error: updateError } =
+      await admin
+        .from("bookings")
+        .update({
+          payment_link: session.url,
+          payment_status: "pending",
+          payment_provider: "stripe",
+          stripe_checkout_session_id: session.id,
+        })
+        .eq("id", booking.id)
+        .select("*")
+        .single();
+
+    if (updateError || !updatedBooking) {
+      logger.error("admin_booking_payment_link_save_failed", {
+        requestId,
+        action: "payment_link_create",
+        bookingId: booking.id,
+        error: updateError,
+      });
+
+      return actionFailure(
+        "Stripe created the link, but the booking could not be updated.",
+      );
+    }
+
+    await sendPaymentLink(updatedBooking);
+
+    await Promise.allSettled([
+      logActivity(admin, {
+        actor_profile_id: auth.userId,
+        customer_id: updatedBooking.customer_id,
+        booking_id: updatedBooking.id,
+        event_type: "payment_link_created_and_sent",
+        message:
+          "Stripe Checkout payment link created and emailed.",
+        metadata: {
+          paymentId: payment.id,
+          checkoutSessionId: session.id,
+          amount,
+          routeDay: updatedBooking.confirmed_route_day,
+        },
+      }),
+
+      writeAdminAuditLog({
+        action: "payment_link_created",
+        actor_user_id: auth.userId,
+        actor_email: actorEmail(auth),
+        actor_role: auth.profile.role,
+        target_type: "booking",
+        target_id: updatedBooking.id,
+        customer_id: updatedBooking.customer_id,
+        booking_id: updatedBooking.id,
+        before_summary: {
+          paymentLink: booking.payment_link,
+          paymentStatus: booking.payment_status,
+        },
+        after_summary: {
+          paymentLink: session.url,
+          paymentStatus: "pending",
+          amount,
+          checkoutSessionId: session.id,
+        },
+        request_id: requestId,
+        status: "success",
+      }),
+
+      createAdminNotification({
+        type: "payment_link_sent",
+        title: "Payment link sent",
+        message: `Payment link sent to ${updatedBooking.first_name} ${updatedBooking.last_name}.`,
+        href: `/admin/bookings?q=${updatedBooking.id}`,
+        customer_id: updatedBooking.customer_id,
+        booking_id: updatedBooking.id,
+        severity: "info",
+      }),
+    ]);
+
+    logger.info("admin_payment_link_created_and_sent", {
+      requestId,
+      action: "payment_link_create",
+      userId: auth.userId,
+      role: auth.profile.role,
+      customerId: updatedBooking.customer_id,
+      bookingId: updatedBooking.id,
+      metadata: {
+        paymentId: payment.id,
+        checkoutSessionId: session.id,
+        amount,
+      },
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/payments");
+
+    return actionSuccess(
+      "Stripe payment link created and emailed successfully.",
+    );
+  } catch (error) {
+    logger.error("admin_payment_link_create_failed", {
+      requestId,
+      action: "payment_link_create",
+      bookingId: booking.id,
+      error,
+    });
+
+    return actionFailure(
+      error instanceof Error
+        ? `Payment link failed: ${error.message}`
+        : "Payment link creation failed.",
+    );
+  }
 }
 
 export async function sendPaymentSetupInviteAction(formData: FormData) {
