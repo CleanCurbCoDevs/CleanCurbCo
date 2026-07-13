@@ -10,6 +10,6 @@ export function sendPaymentLink(booking: BookingRow) {
     ...template,
     templateKey: "payment_link",
     relatedBookingId: booking.id,
-    idempotencyKey: `payment-link-${booking.id}-${booking.payment_link ?? "missing"}`,
+    idempotencyKey: `payment-link-${booking.id}-${booking.stripe_checkout_session_id ?? "manual"}`,
   });
 }
