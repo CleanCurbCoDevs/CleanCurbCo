@@ -521,6 +521,53 @@ export async function sendPaymentLinkAction(
     );
   }
 
+  if (
+    booking.payment_link &&
+    booking.payment_status === "pending"
+  ) {
+    const emailResult = await sendPaymentLink(booking);
+
+    if (emailResult.status !== "sent") {
+      const reason =
+        emailResult.status === "skipped"
+          ? emailResult.reason
+          : "Resend rejected the email.";
+
+      logger.error("admin_existing_payment_link_email_failed", {
+        requestId,
+        action: "payment_link_resend",
+        bookingId: booking.id,
+        metadata: {
+          emailStatus: emailResult.status,
+          reason,
+        },
+      });
+
+      return actionFailure(
+        `The Stripe payment link already exists, but the email was not sent: ${reason}`,
+      );
+    }
+
+    await logActivity(admin, {
+      actor_profile_id: auth.userId,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      event_type: "payment_link_email_resent",
+      message: "Existing Stripe payment link emailed again.",
+      metadata: {
+        checkoutSessionId:
+          booking.stripe_checkout_session_id,
+      },
+    });
+
+    revalidatePath("/admin/bookings");
+    revalidatePath("/admin/payments");
+
+    return actionSuccess(
+      "Existing Stripe payment link emailed successfully.",
+    );
+  }
+
   const amount = Number(booking.estimated_price);
 
   if (!Number.isFinite(amount) || amount <= 0) {
@@ -673,7 +720,33 @@ export async function sendPaymentLinkAction(
       );
     }
 
-    await sendPaymentLink(updatedBooking);
+    const emailResult =
+      await sendPaymentLink(updatedBooking);
+
+    if (emailResult.status !== "sent") {
+      const reason =
+        emailResult.status === "skipped"
+          ? emailResult.reason
+          : "Resend rejected the email.";
+
+      logger.error("admin_payment_link_email_failed", {
+        requestId,
+        action: "payment_link_create",
+        bookingId: updatedBooking.id,
+        metadata: {
+          emailStatus: emailResult.status,
+          reason,
+          checkoutSessionId: session.id,
+        },
+      });
+
+      revalidatePath("/admin/bookings");
+      revalidatePath("/admin/payments");
+
+      return actionFailure(
+        `The Stripe link was created and saved, but the email was not sent: ${reason}`,
+      );
+    }
 
     await Promise.allSettled([
       logActivity(admin, {
