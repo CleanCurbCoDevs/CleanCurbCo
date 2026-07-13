@@ -117,7 +117,7 @@ function shell(
             </div>
             <div style="background:#111;color:#f8f4e8;padding:20px 26px;font-size:13px;line-height:1.6">
               <p style="margin:0 0 8px;font-weight:800;color:#ffffff">Clean Curb Co.</p>
-              <p style="margin:0 0 10px;color:#d8d2c3">Locally owned, veteran-owned garbage bin cleaning for Cane Bay and nearby Summerville communities.</p>
+              <p style="margin:0 0 10px;color:#d8d2c3">Locally owned, veteran-owned garbage bin cleaning serving Summerville, Goose Creek, Moncks Corner, and surrounding Charleston-area communities.</p>
               <p style="margin:0 0 10px">
                 <a href="${escapeHtml(brand.phoneHref)}" style="color:#00ff38;text-decoration:none">${escapeHtml(brand.phone)}</a>
                 <span style="color:#807b70"> | </span>
@@ -168,7 +168,7 @@ export function bookingConfirmationTemplate(
     );
 
     const body = `
-      <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your Cane Bay route day and final price by email or text when available.</p>
+      <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your service date and final price by email or text.</p>
       <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
       ${
         america250Claimed
