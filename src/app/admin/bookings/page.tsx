@@ -28,6 +28,7 @@ import {
   formatFrequency,
   getFoundingNeighborSpecialStatus,
 } from "@/lib/pricing";
+import { addOns } from "@/lib/site";
 import type { ActionResult } from "@/lib/action-result";
 import type { BookingRow } from "@/types/database";
 
@@ -276,30 +277,158 @@ export default async function AdminBookingsPage({
                   </summary>
 
                   <div className="admin-queue-detail">
-                    <div className="admin-record-overview">
-                      <InfoTile label="Customer" value={bookingCustomerName(booking)} />
-                      <InfoTile label="Email" value={booking.email} />
-                      <InfoTile label="Phone" value={booking.phone} />
-                      <InfoTile
-                        label="Service"
-                        value={`${booking.bin_count} bins | ${formatFrequency(
-                          booking.frequency,
-                        )}`}
-                      />
-                      <InfoTile label="Estimate" value={`$${booking.estimated_price}`} />
-                      <InfoTile
-                        label="Route day"
-                        value={booking.confirmed_route_day ?? "Not assigned"}
-                      />
-                      <InfoTile
-                        label="Payment link"
-                        value={booking.payment_link ? "Attached" : "Not attached"}
-                      />
-                      <InfoTile
-                        label="Special reason"
-                        value={foundingSpecial.reason}
-                      />
-                    </div>
+<div className="admin-record-overview">
+  <InfoTile
+    label="Customer"
+    value={bookingCustomerName(booking)}
+  />
+
+  <InfoTile
+    label="Email"
+    value={booking.email}
+  />
+
+  <InfoTile
+    label="Phone"
+    value={booking.phone}
+  />
+
+  <InfoTile
+    label="Full service address"
+    value={[
+      booking.street_address,
+      booking.city,
+      [booking.state, booking.zip_code]
+        .filter(Boolean)
+        .join(" "),
+    ]
+      .filter(Boolean)
+      .join(", ")}
+  />
+
+  <InfoTile
+    label="Neighborhood"
+    value={booking.neighborhood ?? "Not provided"}
+  />
+
+  <InfoTile
+    label="Frequency"
+    value={formatFrequency(booking.frequency)}
+  />
+
+  <InfoTile
+    label="Number of bins"
+    value={String(booking.bin_count)}
+  />
+
+  <InfoTile
+    label="Bin types"
+    value={
+      booking.bin_types.length
+        ? booking.bin_types.join(", ")
+        : "Not provided"
+    }
+  />
+
+  <InfoTile
+    label="Add-ons"
+    value={formatBookingAddOns(booking.add_ons)}
+  />
+
+  <InfoTile
+    label="Estimated price"
+    value={`$${Number(booking.estimated_price).toFixed(2)}`}
+  />
+
+  <InfoTile
+    label="Scheduling preference"
+    value={humanizeStatus(booking.scheduling_preference)}
+  />
+
+  <InfoTile
+    label="Customer-requested date"
+    value={
+      booking.requested_date
+        ? formatAdminDate(booking.requested_date)
+        : "No specific date requested"
+    }
+  />
+
+  <InfoTile
+    label="Regular trash collection day"
+    value={
+      booking.collection_day
+        ? humanizeStatus(booking.collection_day)
+        : "Not captured on original booking"
+    }
+  />
+
+  <InfoTile
+    label="Confirmed route day"
+    value={
+      booking.confirmed_route_day
+        ? formatAdminDate(booking.confirmed_route_day)
+        : "Not assigned"
+    }
+  />
+
+  <InfoTile
+    label="Where bins will be"
+    value={booking.bin_location ?? "Not provided"}
+  />
+
+  <InfoTile
+    label="Exterior water spigot"
+    value={
+      booking.water_spigot_available
+        ? humanizeStatus(booking.water_spigot_available)
+        : "Not provided"
+    }
+  />
+
+  <InfoTile
+    label="Customer notes"
+    value={booking.customer_notes ?? "None"}
+  />
+
+  <InfoTile
+    label="Referral code"
+    value={booking.referral_code ?? "None"}
+  />
+
+  <InfoTile
+    label="Distance from hub"
+    value={
+      booking.service_distance_miles !== null
+        ? `${Number(booking.service_distance_miles).toFixed(1)} miles`
+        : "Not calculated on original booking"
+    }
+  />
+
+  <InfoTile
+    label="Payment status"
+    value={humanizeStatus(booking.payment_status)}
+  />
+
+  <InfoTile
+    label="Payment link"
+    value={
+      booking.payment_link
+        ? "Created and attached"
+        : "Not created"
+    }
+  />
+
+  <InfoTile
+    label="Booking submitted"
+    value={formatAdminDateTime(booking.created_at)}
+  />
+
+  <InfoTile
+    label="Promotion / special"
+    value={foundingSpecial.reason}
+  />
+</div>
 
                     <div className="admin-detail-layout">
                       <section className="detail-panel">
@@ -619,6 +748,51 @@ function DashboardStat({
       <strong>{value}</strong>
     </Link>
   );
+}
+
+function formatBookingAddOns(addOnIds: string[]) {
+  if (!addOnIds.length) {
+    return "None";
+  }
+
+  return addOnIds
+    .map(
+      (id) =>
+        addOns.find((addOn) => addOn.id === id)?.name ??
+        humanizeStatus(id),
+    )
+    .join(", ");
+}
+
+function formatAdminDate(value: string) {
+  const date = new Date(`${value}T12:00:00`);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "long",
+    day: "numeric",
+    year: "numeric",
+  }).format(date);
+}
+
+function formatAdminDateTime(value: string) {
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
 }
 
 function InfoTile({ label, value }: { label: string; value: string }) {
