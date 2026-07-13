@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import {
   actionFailure,
   actionSuccess,
+  type ActionResult,
 } from "@/lib/action-result";
 import {
   humanizeStatus,
