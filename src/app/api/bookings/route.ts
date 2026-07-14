@@ -7,7 +7,9 @@ import {
 import {
   bookingRowToRequest,
   validCollectionDays,
+  validCollectionTimeWindows,
   validFrequencies,
+  validSameDayPreferences,
   validSchedulingPreferences,
 } from "@/lib/booking-utils";
 import { isSupabaseConfigured } from "@/lib/env";
@@ -43,9 +45,13 @@ import {
 } from "@/lib/validation";
 import type {
   CollectionDay,
+  CollectionTimeWindow,
+  SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
+import { buildBookingSchedulingRecommendation } from "@/lib/server/booking-scheduling";
+
 
 type IncomingBooking = {
   turnstileToken?: unknown;
@@ -73,6 +79,8 @@ type IncomingBooking = {
   scheduling?: {
     preference?: unknown;
     collectionDay?: unknown;
+    collectionTimeWindow?: unknown;
+    sameDayPreference?: unknown;
     requestedDate?: unknown;
   };
   instructions?: {
@@ -223,6 +231,24 @@ export async function POST(request: Request) {
     ? (collectionDayValue as CollectionDay)
     : null;
 
+  const collectionTimeWindowValue = cleanString(
+    body.scheduling?.collectionTimeWindow,
+    40,
+  );
+
+  const collectionTimeWindow =
+    validCollectionTimeWindows.includes(
+      collectionTimeWindowValue as CollectionTimeWindow,
+    )
+      ? (collectionTimeWindowValue as CollectionTimeWindow)
+      : null;
+
+  const sameDayPreference = pickEnum<SameDayPreference>(
+    body.scheduling?.sameDayPreference,
+    validSameDayPreferences,
+    "same_day_when_possible",
+  );
+
   const requestedDate =
     cleanString(body.scheduling?.requestedDate, 30) || null;
   const binTypes = cleanArray(body.service?.binTypes);
@@ -266,6 +292,7 @@ export async function POST(request: Request) {
     !state && "state",
     !zipCode && "ZIP code",
     !collectionDay && "regular collection day",
+    !collectionTimeWindow && "typical collection time",
     !isValidEmail(email) && "valid email",
     !Object.values(agreements).every(Boolean) && "required agreements",
   ].filter(Boolean);
@@ -286,6 +313,14 @@ export async function POST(request: Request) {
     );
   }
 
+  const schedulingRecommendation =
+    buildBookingSchedulingRecommendation({
+      collectionDay,
+      collectionTimeWindow,
+      sameDayPreference,
+      requestedDate,
+    });
+  
   const serviceAreaResult = await evaluateServiceArea({
     streetAddress,
     city,
@@ -399,6 +434,8 @@ export async function POST(request: Request) {
             zip_code: zipCode,
             neighborhood,
             collection_day: collectionDay,
+            collection_time_window: collectionTimeWindow,
+            same_day_preference: sameDayPreference,
             latitude: serviceAreaResult.latitude ?? null,
             longitude: serviceAreaResult.longitude ?? null,
             distance_from_hub_miles:
@@ -446,6 +483,20 @@ export async function POST(request: Request) {
       zip_code: zipCode,
       neighborhood,
       collection_day: collectionDay,
+      collection_time_window: collectionTimeWindow,
+      same_day_preference: sameDayPreference,
+      earliest_safe_service_time:
+        schedulingRecommendation.earliestSafeServiceTime,
+      suggested_service_date:
+        schedulingRecommendation.suggestedServiceDate,
+      
+      approval_status: schedulingRecommendation.requiresManualReview
+        ? "needs_review"
+        : "pending_review",
+      attention_status: "review",
+      manual_review_reason:
+        schedulingRecommendation.manualReviewReason,
+      
       service_latitude: serviceAreaResult.latitude ?? null,
       service_longitude: serviceAreaResult.longitude ?? null,
       service_distance_miles:
@@ -505,6 +556,12 @@ export async function POST(request: Request) {
       frequency,
       binCount,
       collectionDay,
+      collectionTimeWindow,
+      sameDayPreference,
+      suggestedServiceDate:
+        schedulingRecommendation.suggestedServiceDate,
+      earliestSafeServiceTime:
+        schedulingRecommendation.earliestSafeServiceTime,
       serviceDistanceMiles:
         serviceAreaResult.distanceMiles ?? null,
       addOnCount: addOns.length,
