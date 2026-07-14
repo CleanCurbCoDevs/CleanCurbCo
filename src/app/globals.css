@@ -5763,3 +5763,75 @@ form.data-row label textarea,
     transition: none !important;
   }
 }
+
+/* Booking scheduling layout */
+
+.scheduling-section {
+  gap: 16px;
+}
+
+.scheduling-section > .muted {
+  line-height: 1.5;
+  margin: 0;
+  max-width: 760px;
+}
+
+.scheduling-fields {
+  align-items: start;
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  min-width: 0;
+}
+
+.scheduling-fields .field {
+  align-content: start;
+  grid-auto-rows: max-content;
+}
+
+.scheduling-fields .field > span {
+  font-size: 0.94rem;
+  font-weight: 900;
+  line-height: 1.3;
+}
+
+.scheduling-fields .field small {
+  color: var(--muted);
+  line-height: 1.4;
+  margin-top: 1px;
+}
+
+.scheduling-preference-field {
+  grid-column: 1 / -1;
+}
+
+.scheduling-choice-grid {
+  align-items: stretch;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.scheduling-choice-grid .choice-card {
+  height: 100%;
+  padding: 14px;
+}
+
+.scheduling-choice-grid .choice-card span {
+  line-height: 1.25;
+}
+
+.scheduling-choice-grid .choice-card small {
+  font-weight: 700;
+  line-height: 1.4;
+  margin-top: 5px;
+}
+
+@media (max-width: 760px) {
+  .scheduling-fields,
+  .scheduling-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .scheduling-preference-field {
+    grid-column: auto;
+  }
+}
