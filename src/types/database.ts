@@ -1,4 +1,10 @@
-import type { CollectionDay } from "@/types/booking";
+import type {
+  ApprovalStatus,
+  AttentionStatus,
+  CollectionDay,
+  CollectionTimeWindow,
+  SameDayPreference,
+} from "@/types/booking";
 
 export type AppRole = "customer" | "technician" | "admin" | "owner";
 export type ServiceFrequency =
@@ -145,10 +151,26 @@ export type BookingRow = {
   zip_code: string | null;
   neighborhood: string | null;
   collection_day: CollectionDay | null;
+  collection_time_window: CollectionTimeWindow | null;
+  same_day_preference: SameDayPreference;
+  earliest_safe_service_time: string | null;
+  suggested_service_date: string | null;
+
   service_latitude: number | null;
   service_longitude: number | null;
   service_distance_miles: number | null;
   service_area_checked_at: string | null;
+
+  approval_status: ApprovalStatus;
+  attention_status: AttentionStatus;
+  manual_review_reason: string | null;
+  auto_approval_checked_at: string | null;
+  approved_at: string | null;
+  approved_by_user_id: string | null;
+
+  assigned_route_day_id: string | null;
+  assigned_route_stop_id: string | null;
+  route_position: number | null;
   bin_count: number;
   bin_types: string[];
   frequency: ServiceFrequency;
@@ -236,6 +258,8 @@ export type ServiceAddressRow = {
   zip_code: string | null;
   neighborhood: string | null;
   collection_day: CollectionDay | null;
+  collection_time_window: CollectionTimeWindow | null;
+  same_day_preference: SameDayPreference;
   latitude: number | null;
   longitude: number | null;
   distance_from_hub_miles: number | null;
@@ -267,6 +291,13 @@ export type RouteDayRow = {
   route_date: string;
   route_name: string | null;
   service_area: string | null;
+  collection_day: CollectionDay | null;
+  route_start_time: string;
+  max_stops: number;
+  max_bins: number;
+  max_service_minutes: number;
+  max_added_drive_minutes: number;
+  auto_accept_enabled: boolean;
   status: RouteDayStatus;
   assigned_technician_id: string | null;
   notes: string | null;
@@ -285,6 +316,10 @@ export type RouteStopRow = {
   booking_id: string | null;
   service_visit_id: string | null;
   stop_order: number;
+  earliest_service_time: string | null;
+  latest_service_time: string | null;
+  route_score: number | null;
+  attention_status: AttentionStatus;
   status: FieldStopStatus;
   started_at: string | null;
   completed_at: string | null;
