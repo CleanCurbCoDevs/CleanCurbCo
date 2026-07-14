@@ -27,6 +27,8 @@ import {
 import type {
   BookingRequest,
   CollectionDay,
+  CollectionTimeWindow,
+  SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
@@ -54,6 +56,8 @@ type FormState = {
   scheduling: {
     preference: SchedulingPreference;
     collectionDay: CollectionDay | "";
+    collectionTimeWindow: CollectionTimeWindow | "";
+    sameDayPreference: SameDayPreference;
     requestedDate: string;
   };
   instructions: {
@@ -89,6 +93,8 @@ const initialState: FormState = {
   scheduling: {
     preference: "next_available_route_day",
     collectionDay: "",
+    collectionTimeWindow: "",
+    sameDayPreference: "same_day_when_possible",
     requestedDate: "",
   },
   instructions: {
@@ -517,67 +523,142 @@ export function BookingForm({
 
         <section className="form-section">
           <h2>Scheduling</h2>
-
+        
           <p className="muted">
-            Tell us when the garbage truck normally empties your bins. We use
-            that day to quietly place you on the best available cleaning route
-            after collection.
+            Tell us when your bins are normally emptied. We use that
+            information to schedule your cleaning as soon after collection as
+            practical.
           </p>
-
-          <label className="field">
-            <span>
-              What day are your bins normally emptied?
-              <span className="required-mark"> *</span>
-            </span>
-
-            <select
-              value={form.scheduling.collectionDay}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  scheduling: {
-                    ...current.scheduling,
-                    collectionDay: event.target.value as CollectionDay | "",
-                  },
-                }))
-              }
-              required
-            >
-              <option value="" disabled>
-                Select your regular collection day
-              </option>
-              <option value="monday">Monday</option>
-              <option value="tuesday">Tuesday</option>
-              <option value="wednesday">Wednesday</option>
-              <option value="thursday">Thursday</option>
-              <option value="friday">Friday</option>
-              <option value="saturday">Saturday</option>
-              <option value="sunday">Sunday</option>
-              <option value="varies">My collection day varies</option>
-              <option value="not_sure">I’m not sure</option>
-            </select>
-
-            <small>
-              We normally clean after collection, once the bins are empty.
-            </small>
-          </label>
-
+        
+          <div className="form-grid">
+            <label className="field">
+              <span>
+                What day are your bins normally emptied?
+                <span className="required-mark"> *</span>
+              </span>
+        
+              <select
+                value={form.scheduling.collectionDay}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    scheduling: {
+                      ...current.scheduling,
+                      collectionDay:
+                        event.target.value as CollectionDay | "",
+                    },
+                  }))
+                }
+                required
+              >
+                <option value="" disabled>
+                  Select your regular collection day
+                </option>
+                <option value="monday">Monday</option>
+                <option value="tuesday">Tuesday</option>
+                <option value="wednesday">Wednesday</option>
+                <option value="thursday">Thursday</option>
+                <option value="friday">Friday</option>
+                <option value="saturday">Saturday</option>
+                <option value="sunday">Sunday</option>
+                <option value="varies">
+                  My collection day varies
+                </option>
+                <option value="not_sure">I’m not sure</option>
+              </select>
+            </label>
+        
+            <label className="field">
+              <span>
+                What time are your bins usually emptied?
+                <span className="required-mark"> *</span>
+              </span>
+        
+              <select
+                value={form.scheduling.collectionTimeWindow}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    scheduling: {
+                      ...current.scheduling,
+                      collectionTimeWindow:
+                        event.target.value as CollectionTimeWindow | "",
+                    },
+                  }))
+                }
+                required
+              >
+                <option value="" disabled>
+                  Select the typical collection time
+                </option>
+                <option value="before_6_am">Before 6:00 AM</option>
+                <option value="6_8_am">6:00–8:00 AM</option>
+                <option value="8_10_am">8:00–10:00 AM</option>
+                <option value="10_am_12_pm">
+                  10:00 AM–12:00 PM
+                </option>
+                <option value="12_2_pm">12:00–2:00 PM</option>
+                <option value="2_4_pm">2:00–4:00 PM</option>
+                <option value="4_6_pm">4:00–6:00 PM</option>
+                <option value="after_6_pm">After 6:00 PM</option>
+                <option value="varies">The time varies</option>
+                <option value="not_sure">I’m not sure</option>
+              </select>
+        
+              <small>
+                An estimate is completely fine. Collection schedules sometimes
+                change.
+              </small>
+            </label>
+        
+            <label className="field">
+              <span>When would you prefer your bins cleaned?</span>
+        
+              <select
+                value={form.scheduling.sameDayPreference}
+                onChange={(event) =>
+                  setForm((current) => ({
+                    ...current,
+                    scheduling: {
+                      ...current.scheduling,
+                      sameDayPreference:
+                        event.target.value as SameDayPreference,
+                    },
+                  }))
+                }
+              >
+                <option value="same_day_when_possible">
+                  Same day whenever possible
+                </option>
+                <option value="next_day_preferred">
+                  The following day
+                </option>
+                <option value="no_preference">No preference</option>
+              </select>
+        
+              <small>
+                Same-day service happens only after the normal collection window
+                has ended.
+              </small>
+            </label>
+          </div>
+        
           <div className="choice-grid">
             {[
               {
                 value: "next_available_route_day",
-                title: "Clean after my regular collection",
-                note: "Recommended — we’ll place you on the nearest suitable route after your bins are emptied.",
+                title: "Use my regular collection schedule",
+                note: "Recommended — we’ll place you on the best available route after your bins are emptied.",
               },
               {
                 value: "specific_day",
-                title: "I need a specific day",
-                note: "Subject to availability and possible additional fee.",
+                title: "I need a specific date",
+                note: "We’ll review route availability before confirming.",
               },
               {
                 value: "urgent",
-                title: "One-time urgent clean",
-                note: "Subject to availability and possible additional fee.",
+                title: "One-time urgent cleaning",
+                note: "Subject to route availability and possible additional cost.",
               },
             ].map((option) => (
               <label className="choice-card" key={option.value}>
@@ -585,13 +666,17 @@ export function BookingForm({
                   type="radio"
                   name="schedulingPreference"
                   value={option.value}
-                  checked={form.scheduling.preference === option.value}
+                  checked={
+                    form.scheduling.preference === option.value
+                  }
                   onChange={(event) =>
                     setForm((current) => ({
                       ...current,
                       scheduling: {
                         ...current.scheduling,
-                        preference: event.target.value as SchedulingPreference,
+                        preference:
+                          event.target
+                            .value as SchedulingPreference,
                       },
                     }))
                   }
@@ -603,18 +688,23 @@ export function BookingForm({
               </label>
             ))}
           </div>
-
-          {form.scheduling.preference !== "next_available_route_day" ? (
+        
+          {form.scheduling.preference !==
+          "next_available_route_day" ? (
             <TextField
-              label="Requested date"
+              label="Requested service date"
               type="date"
               value={form.scheduling.requestedDate}
               onChange={(value) =>
                 setForm((current) => ({
                   ...current,
-                  scheduling: { ...current.scheduling, requestedDate: value },
+                  scheduling: {
+                    ...current.scheduling,
+                    requestedDate: value,
+                  },
                 }))
               }
+              required
             />
           ) : null}
         </section>
