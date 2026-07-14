@@ -2,7 +2,9 @@ import type {
   BookingRequest,
   BookingStatus,
   CollectionDay,
+  CollectionTimeWindow,
   PaymentStatus,
+  SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
@@ -36,6 +38,25 @@ export const validCollectionDays: readonly CollectionDay[] = [
   "sunday",
   "varies",
   "not_sure",
+];
+
+export const validCollectionTimeWindows: readonly CollectionTimeWindow[] = [
+  "before_6_am",
+  "6_8_am",
+  "8_10_am",
+  "10_am_12_pm",
+  "12_2_pm",
+  "2_4_pm",
+  "4_6_pm",
+  "after_6_pm",
+  "varies",
+  "not_sure",
+];
+
+export const validSameDayPreferences: readonly SameDayPreference[] = [
+  "same_day_when_possible",
+  "next_day_preferred",
+  "no_preference",
 ];
 
 export const validBookingStatuses: readonly BookingStatus[] = [
@@ -116,7 +137,12 @@ export function bookingRowToRequest(row: BookingRow): BookingRequest {
     scheduling: {
       preference: row.scheduling_preference,
       collectionDay: row.collection_day ?? undefined,
+      collectionTimeWindow: row.collection_time_window ?? undefined,
+      sameDayPreference: row.same_day_preference,
       requestedDate: row.requested_date ?? undefined,
+      suggestedServiceDate: row.suggested_service_date ?? undefined,
+      earliestSafeServiceTime:
+        row.earliest_safe_service_time ?? undefined,
       confirmedRouteDay: row.confirmed_route_day ?? undefined,
     },
     instructions: {
