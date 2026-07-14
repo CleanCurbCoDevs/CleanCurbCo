@@ -16,6 +16,7 @@ type AdminFilterBarProps = {
   selects: SelectFilter[];
   resultCount: number;
   resetHref: string;
+  hiddenFields?: Record<string, string>;
 };
 
 export function AdminFilterBar({
@@ -24,9 +25,13 @@ export function AdminFilterBar({
   selects,
   resultCount,
   resetHref,
+  hiddenFields = {},
 }: AdminFilterBarProps) {
   return (
     <form className="filter-bar">
+      {Object.entries(hiddenFields).map(([name, value]) => (
+        <input key={name} type="hidden" name={name} value={value} />
+      ))}
       <label className="field filter-search">
         <span>Search</span>
         <input
