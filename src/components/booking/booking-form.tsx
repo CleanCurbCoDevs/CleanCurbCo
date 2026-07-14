@@ -521,7 +521,7 @@ export function BookingForm({
           </div>
         </section>
 
-        <section className="form-section">
+        <section className="form-section scheduling-section">
           <h2>Scheduling</h2>
         
           <p className="muted">
@@ -530,10 +530,10 @@ export function BookingForm({
             practical.
           </p>
         
-          <div className="form-grid">
+          <div className="scheduling-fields">
             <label className="field">
               <span>
-                What day are your bins normally emptied?
+                Regular collection day
                 <span className="required-mark"> *</span>
               </span>
         
@@ -552,7 +552,7 @@ export function BookingForm({
                 required
               >
                 <option value="" disabled>
-                  Select your regular collection day
+                  Select collection day
                 </option>
                 <option value="monday">Monday</option>
                 <option value="tuesday">Tuesday</option>
@@ -570,7 +570,7 @@ export function BookingForm({
         
             <label className="field">
               <span>
-                What time are your bins usually emptied?
+                Typical collection time
                 <span className="required-mark"> *</span>
               </span>
         
@@ -589,7 +589,7 @@ export function BookingForm({
                 required
               >
                 <option value="" disabled>
-                  Select the typical collection time
+                  Select collection time
                 </option>
                 <option value="before_6_am">Before 6:00 AM</option>
                 <option value="6_8_am">6:00–8:00 AM</option>
@@ -611,8 +611,8 @@ export function BookingForm({
               </small>
             </label>
         
-            <label className="field">
-              <span>When would you prefer your bins cleaned?</span>
+            <label className="field scheduling-preference-field">
+              <span>Preferred cleaning timing</span>
         
               <select
                 value={form.scheduling.sameDayPreference}
@@ -643,7 +643,7 @@ export function BookingForm({
             </label>
           </div>
         
-          <div className="choice-grid">
+          <div className="choice-grid scheduling-choice-grid">
             {[
               {
                 value: "next_available_route_day",
