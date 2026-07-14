@@ -5582,16 +5582,14 @@ form.data-row label textarea,
   transform: translateY(18px);
   transition:
     opacity 520ms ease,
-    transform 520ms ease,
-    filter 520ms ease;
-  filter: blur(2px);
-  will-change: opacity, transform, filter;
+    transform 520ms ease;
+  will-change: opacity, transform;
 }
 
 .scroll-fade-item.is-visible {
   opacity: 1;
-  transform: translateY(0);
-  filter: blur(0);
+  transform: none;
+  will-change: auto;
 }
 
 .book-cta-pop {
