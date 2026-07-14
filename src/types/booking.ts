@@ -30,6 +30,36 @@ export type CollectionDay =
   | "varies"
   | "not_sure";
 
+export type CollectionTimeWindow =
+  | "before_6_am"
+  | "6_8_am"
+  | "8_10_am"
+  | "10_am_12_pm"
+  | "12_2_pm"
+  | "2_4_pm"
+  | "4_6_pm"
+  | "after_6_pm"
+  | "varies"
+  | "not_sure";
+
+export type SameDayPreference =
+  | "same_day_when_possible"
+  | "next_day_preferred"
+  | "no_preference";
+
+export type ApprovalStatus =
+  | "pending_review"
+  | "auto_approved"
+  | "manually_approved"
+  | "needs_review"
+  | "declined_internal";
+
+export type AttentionStatus =
+  | "ready"
+  | "review"
+  | "hold"
+  | "do_not_service";
+
 export type PaymentStatus =
   | "not_sent"
   | "pending"
@@ -66,7 +96,11 @@ export type BookingRequest = {
   scheduling: {
     preference: SchedulingPreference;
     collectionDay?: CollectionDay;
+    collectionTimeWindow?: CollectionTimeWindow;
+    sameDayPreference?: SameDayPreference;
     requestedDate?: string;
+    suggestedServiceDate?: string;
+    earliestSafeServiceTime?: string;
     confirmedRouteDay?: string;
   };
 
