@@ -4,6 +4,7 @@ import type {
   CollectionDay,
   CollectionTimeWindow,
   PaymentPreference,
+  PaymentVerificationStatus,
   SameDayPreference,
 } from "@/types/booking";
 
@@ -196,6 +197,9 @@ export type BookingRow = {
   payment_status: "not_sent" | "pending" | "paid" | "failed" | "refunded";
   payment_preference: PaymentPreference;
   payment_due_at_service: boolean;
+  payment_verification_status: PaymentVerificationStatus;
+  payment_verified_at: string | null;
+  payment_verified_by_user_id: string | null;
   in_person_payment_requested_at: string | null;
   checkout_started_at: string | null;
   paid_at: string | null;
@@ -344,6 +348,15 @@ export type RouteStopRow = {
   payment_collected_at: string | null;
   payment_collected_by_user_id: string | null;
   payment_collected_amount: number | null;
+  payment_collected_method:
+    | "cash"
+    | "stripe"
+    | "paypal"
+    | "venmo_business"
+    | "zelle"
+    | "other"
+    | null;
+  payment_collection_notes: string | null;
   tip_collected_amount: number;
   status: FieldStopStatus;
   started_at: string | null;
