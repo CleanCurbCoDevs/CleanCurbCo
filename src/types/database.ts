@@ -351,7 +351,6 @@ export type RouteStopRow = {
   payment_collected_method:
     | "cash"
     | "stripe"
-    | "paypal"
     | "venmo_business"
     | "zelle"
     | "other"
