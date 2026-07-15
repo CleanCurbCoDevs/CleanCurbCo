@@ -13,7 +13,6 @@ import {
   validSchedulingPreferences,
 } from "@/lib/booking-utils";
 import { isSupabaseConfigured } from "@/lib/env";
-import { sendAccountSetupEmail } from "@/lib/email/sendAccountSetupEmail";
 import { sendAdminBookingNotification } from "@/lib/email/sendAdminBookingNotification";
 import { sendBookingConfirmation } from "@/lib/email/sendBookingConfirmation";
 import {
@@ -660,10 +659,6 @@ if (!customerId) {
       severity: "info",
     }),
   ];
-
-  if (setupLink) {
-    emailJobs.push(sendAccountSetupEmail(booking, setupLink));
-  }
 
   const emailResults = await Promise.allSettled(emailJobs);
 
