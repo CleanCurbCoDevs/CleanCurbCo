@@ -29,6 +29,7 @@ import {
 } from "@/lib/server/request-guards";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { verifyTurnstileToken } from "@/lib/server/turnstile";
+import { createBookingCheckout } from "@/lib/server/booking-checkout";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
 import { america250PromoInternalNote } from "@/lib/promotions";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -575,6 +576,17 @@ export async function POST(request: Request) {
     );
   }
 
+const checkoutResult =
+  paymentPreference === "stripe"
+    ? await createBookingCheckout({
+        booking,
+        requestId,
+      })
+    : {
+        checkoutUrl: null,
+        error: null,
+      };
+  
   logger.info("booking_submission_created", {
     requestId,
     route,
@@ -589,6 +601,8 @@ export async function POST(request: Request) {
       sameDayPreference,
       paymentPreference,
       paymentDueAtService,
+      checkoutStarted: Boolean(checkoutResult.checkoutUrl),
+      checkoutIssue: Boolean(checkoutResult.error),
       suggestedServiceDate:
         schedulingRecommendation.suggestedServiceDate,
       earliestSafeServiceTime:
@@ -665,13 +679,15 @@ if (!customerId) {
     },
   });
 
-  return NextResponse.json(
-    {
-      booking: bookingRowToRequest(booking),
-      redirectTo,
-      message: bookingSuccessLaunchMessage,
-      requestId,
-    },
-    { status: 201 },
-  );
+return NextResponse.json(
+  {
+    booking: bookingRowToRequest(booking),
+    redirectTo,
+    checkoutUrl: checkoutResult.checkoutUrl,
+    checkoutError: checkoutResult.error,
+    message: bookingSuccessLaunchMessage,
+    requestId,
+  },
+  { status: 201 },
+);
 }
