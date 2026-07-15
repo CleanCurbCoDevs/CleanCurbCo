@@ -24,3 +24,16 @@ export function createPaymentSetupLink(bookingId: string, token?: string | null)
   if (token) url.searchParams.set("token", token);
   return url.toString();
 }
+
+export function createLoginClaimLink(
+  bookingId: string,
+  token: string,
+) {
+  const url = new URL("/login", getSiteUrl());
+
+  url.searchParams.set("booking", bookingId);
+  url.searchParams.set("token", token);
+  url.searchParams.set("next", "/portal");
+
+  return url.toString();
+}
