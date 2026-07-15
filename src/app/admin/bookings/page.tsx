@@ -298,6 +298,16 @@ export default async function AdminBookingsPage({
                   <div className="admin-queue-detail">
                     <div className="admin-record-overview">
                       <InfoTile
+                        label="Next action"
+                        value={nextAction.label}
+                      />
+                  
+                      <InfoTile
+                        label="Why"
+                        value={nextAction.reason}
+                      />
+                  
+                      <InfoTile
                         label="Customer"
                         value={bookingCustomerName(booking)}
                       />
@@ -912,6 +922,7 @@ function InfoTile({ label, value }: { label: string; value: string }) {
 function getBookingNextAction(booking: BookingRow): {
   label: string;
   tone: BookingTone;
+  reason: string;
 } {
   if (
     booking.attention_status === "do_not_service" ||
@@ -921,17 +932,62 @@ function getBookingNextAction(booking: BookingRow): {
     return {
       label: "Do not service",
       tone: "neutral",
+      reason:
+        booking.manual_review_reason ??
+        "This booking is cancelled, inactive, or was declined internally.",
+    };
+  }
+
+  if (booking.payment_status === "failed") {
+    return {
+      label: "Payment failed",
+      tone: "danger",
+      reason:
+        booking.payment_failure_message ??
+        (booking.payment_failure_code
+          ? `Payment provider failure code: ${booking.payment_failure_code}.`
+          : "The payment provider reported an unsuccessful transaction attempt."),
+    };
+  }
+
+  if (booking.payment_verification_status === "rejected") {
+    return {
+      label: "Payment not verified",
+      tone: "danger",
+      reason:
+        "The reported manual payment could not be verified. Replacement payment is required.",
+    };
+  }
+
+  if (booking.attention_status === "hold") {
+    return {
+      label: "Booking on hold",
+      tone: "danger",
+      reason:
+        booking.manual_review_reason ??
+        "An administrator placed this booking on hold.",
+    };
+  }
+
+  if (booking.status === "needs_follow_up") {
+    return {
+      label: "Follow-up required",
+      tone: "danger",
+      reason:
+        booking.manual_review_reason ??
+        "The booking or field visit requires administrator follow-up.",
     };
   }
 
   if (
-    booking.attention_status === "hold" ||
-    booking.payment_status === "failed" ||
-    booking.status === "needs_follow_up"
+    booking.status === "completed" &&
+    booking.payment_status !== "paid"
   ) {
     return {
-      label: "Stop and review",
+      label: "Payment still due",
       tone: "danger",
+      reason:
+        "Service is marked completed, but payment has not been confirmed.",
     };
   }
 
@@ -944,6 +1000,33 @@ function getBookingNextAction(booking: BookingRow): {
     return {
       label: "Needs review",
       tone: "warning",
+      reason:
+        booking.manual_review_reason ??
+        "The booking has not completed administrative review.",
+    };
+  }
+
+  if (
+    booking.payment_verification_status === "awaiting_verification"
+  ) {
+    return {
+      label: "Verify payment",
+      tone: "warning",
+      reason:
+        "A Venmo, Zelle, or other manual payment is awaiting verification.",
+    };
+  }
+
+  if (
+    booking.payment_preference === "cash_in_person" &&
+    booking.payment_due_at_service &&
+    booking.payment_status !== "paid"
+  ) {
+    return {
+      label: "Collect in person",
+      tone: "warning",
+      reason:
+        "The customer chose to pay the technician during the service visit.",
     };
   }
 
@@ -951,13 +1034,21 @@ function getBookingNextAction(booking: BookingRow): {
     return {
       label: "Completed",
       tone: "good",
+      reason: "Service and payment are complete.",
     };
   }
 
   if (booking.payment_status !== "paid") {
     return {
-      label: "Payment pending",
+      label:
+        booking.payment_status === "pending"
+          ? "Payment pending"
+          : "Payment required",
       tone: "warning",
+      reason:
+        booking.payment_status === "pending"
+          ? "Payment has started but is not confirmed yet."
+          : "No confirmed payment is attached to this booking.",
     };
   }
 
@@ -965,15 +1056,17 @@ function getBookingNextAction(booking: BookingRow): {
     return {
       label: "Needs route",
       tone: "warning",
+      reason:
+        "Payment is confirmed, but the booking has not been assigned a service date.",
     };
   }
 
   return {
     label: "Ready",
     tone: "good",
+    reason: "Payment, review, and route scheduling are complete.",
   };
 }
-
 function getBookingPriority(booking: BookingRow) {
   const isTerminal = ["cancelled", "completed"].includes(booking.status);
 
@@ -1174,10 +1267,14 @@ function groupBookings(
         ),
         tone,
         statusLabel:
-          tone === "danger"
-            ? `${blockedCount} blocked`
-            : tone === "warning"
-              ? `${reviewCount} review`
+        tone === "danger"
+          ? `${blockedCount} ${
+              blockedCount === 1 ? "blocked booking" : "blocked bookings"
+            }`
+          : tone === "warning"
+            ? `${reviewCount} ${
+                reviewCount === 1 ? "booking to review" : "bookings to review"
+              }`
               : tone === "neutral"
                 ? "Inactive"
                 : "Ready",
