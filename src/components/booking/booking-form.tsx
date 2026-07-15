@@ -28,10 +28,16 @@ import type {
   BookingRequest,
   CollectionDay,
   CollectionTimeWindow,
+  PaymentPreference,
   SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
+
+type CustomerPaymentPreference = Exclude<
+  PaymentPreference,
+  "manual_other"
+>;
 
 type FormState = {
   website: string;
@@ -52,6 +58,9 @@ type FormState = {
     binTypes: string[];
     frequency: ServiceFrequency;
     addOns: string[];
+  };
+  payment: {
+    preference: CustomerPaymentPreference;
   };
   scheduling: {
     preference: SchedulingPreference;
@@ -89,6 +98,9 @@ const initialState: FormState = {
     binTypes: ["Trash bin"],
     frequency: "monthly",
     addOns: [],
+  },
+  payment: {
+    preference: "stripe",
   },
   scheduling: {
     preference: "next_available_route_day",
@@ -775,6 +787,85 @@ export function BookingForm({
         </section>
 
         <section className="form-section">
+          <h2>Payment Method</h2>
+        
+          <p className="muted">
+            Choose how you would like to handle payment. Card checkout is the
+            fastest option, but Venmo Business, Zelle, and in-person payment are
+            also available.
+          </p>
+        
+          <div className="choice-grid">
+            {[
+              {
+                value: "stripe",
+                title: "Card / Apple Pay / Google Pay",
+                note:
+                  "Recommended. Secure checkout is handled through Stripe. Clean Curb Co. never receives your full card number or security code.",
+              },
+              {
+                value: "venmo_business",
+                title: "Venmo Business",
+                note:
+                  "Pay through our business Venmo. The payment must be received and verified before it is treated as paid.",
+              },
+              {
+                value: "zelle",
+                title: "Zelle",
+                note:
+                  "Pay through Zelle using the instructions provided with your booking. The payment is manually verified.",
+              },
+              {
+                value: "cash_in_person",
+                title: "Pay in person",
+                note:
+                  "A quieter backup option. Payment must be collected and recorded during the service visit before the stop is completed.",
+              },
+            ].map((option) => (
+              <label className="choice-card" key={option.value}>
+                <input
+                  type="radio"
+                  name="paymentPreference"
+                  value={option.value}
+                  checked={form.payment.preference === option.value}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      payment: {
+                        preference:
+                          event.target.value as CustomerPaymentPreference,
+                      },
+                    }))
+                  }
+                />
+        
+                <span>
+                  {option.title}
+                  <small>{option.note}</small>
+                </span>
+              </label>
+            ))}
+          </div>
+        
+          {form.payment.preference === "stripe" ? (
+            <p className="muted">
+              Secure card checkout will be the next step after your booking
+              details are saved.
+            </p>
+          ) : form.payment.preference === "cash_in_person" ? (
+            <p className="muted">
+              Your field technician will receive a prominent payment-due alert
+              and must record the service amount and any tip separately.
+            </p>
+          ) : (
+            <p className="muted">
+              Your booking will remain unpaid until the external payment is
+              received and verified.
+            </p>
+          )}
+        </section>
+        
+        <section className="form-section">
           <h2>Required Agreements</h2>
           <Agreement
             checked={form.agreements.waterUse}
@@ -807,8 +898,17 @@ export function BookingForm({
           />
           <Agreement
             checked={form.agreements.payment}
-            onChange={(checked) => setAgreement("payment", checked, setForm)}
-            label="I understand payment is due at booking or upon completion, depending on the service selected."
+            onChange={(checked) =>
+              setAgreement("payment", checked, setForm)
+            }
+            label={
+              form.payment.preference === "cash_in_person"
+                ? "I understand payment must be collected and recorded during the service visit before the stop is completed."
+                : form.payment.preference === "venmo_business" ||
+                    form.payment.preference === "zelle"
+                  ? "I understand my payment is not considered complete until Clean Curb Co. receives and verifies it."
+                  : "I understand secure payment is due during the booking checkout process and recurring services may be billed according to the selected service frequency."
+            }
           />
           <Agreement
             checked={Boolean(form.agreements.launchBilling)}
@@ -853,8 +953,8 @@ export function BookingForm({
           </button>
 
           <p className="muted">
-            No surprise charges. We confirm your route day and final price
-            before service.
+            Your route day remains subject to availability. The payment method
+            selected above will be saved with your booking.
           </p>
         </div>
       </form>
@@ -1019,6 +1119,28 @@ function formatCollectionDay(value?: CollectionDay) {
   return value.charAt(0).toUpperCase() + value.slice(1);
 }
 
+function formatPaymentPreference(
+  value?: PaymentPreference,
+) {
+  if (value === "venmo_business") {
+    return "Venmo Business";
+  }
+
+  if (value === "zelle") {
+    return "Zelle";
+  }
+
+  if (value === "cash_in_person") {
+    return "Pay in person";
+  }
+
+  if (value === "manual_other") {
+    return "Manually arranged";
+  }
+
+  return "Card / Apple Pay / Google Pay";
+}
+
 function BookingSummary({ booking }: { booking: BookingRequest }) {
   return (
     <aside className="estimate-panel">
@@ -1039,6 +1161,9 @@ function BookingSummary({ booking }: { booking: BookingRequest }) {
         <br />
         <strong>Scheduling:</strong>{" "}
         {booking.scheduling.preference.replaceAll("_", " ")}
+        <br />
+        <strong>Payment method:</strong>{" "}
+        {formatPaymentPreference(booking.payment.preference)}
       </p>
       <p>
         We will confirm the route day, final price, and payment timing before
