@@ -69,10 +69,17 @@ export type PaymentStatus =
 
 export type PaymentPreference =
   | "stripe"
+  | "paypal"
   | "zelle"
   | "venmo_business"
   | "cash_in_person"
   | "manual_other";
+
+export type PaymentVerificationStatus =
+  | "not_required"
+  | "awaiting_verification"
+  | "verified"
+  | "rejected";
 
 export type BookingRequest = {
   id: string;
@@ -127,15 +134,16 @@ export type BookingRequest = {
     launchBilling?: boolean;
   };
 
-  payment: {
-    status: PaymentStatus;
-    preference?: PaymentPreference;
-    dueAtService?: boolean;
-    method?: string;
-    paymentLink?: string;
-    provider?: string;
-    reference?: string;
-  };
+    payment: {
+      status: PaymentStatus;
+      preference?: PaymentPreference;
+      verificationStatus?: PaymentVerificationStatus;
+      dueAtService?: boolean;
+      method?: string;
+      paymentLink?: string;
+      provider?: string;
+      reference?: string;
+    };
 
   photos?: {
     before: string[];
