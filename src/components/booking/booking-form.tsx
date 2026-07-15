@@ -156,6 +156,7 @@ export function BookingForm({
   const [submittedBooking, setSubmittedBooking] =
     useState<BookingRequest | null>(null);
   const [setupHref, setSetupHref] = useState<string | null>(null);
+  const [checkoutIssue, setCheckoutIssue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState("");
   const [turnstileToken, setTurnstileToken] = useState("");
@@ -262,6 +263,8 @@ export function BookingForm({
       const data = (await response.json()) as {
         booking?: BookingRequest;
         redirectTo?: string | null;
+        checkoutUrl?: string | null;
+        checkoutError?: string | null;
         error?: string;
         requestId?: string;
       };
@@ -270,9 +273,27 @@ export function BookingForm({
         throw new Error(data.error ?? "Booking request failed");
       }
 
+      if (
+        form.payment.preference === "stripe" &&
+        data.checkoutUrl
+      ) {
+        feedback.success(
+          "Booking saved. Opening secure checkout...",
+        );
+      
+        window.location.assign(data.checkoutUrl);
+        return;
+      }
+      
+      setCheckoutIssue(data.checkoutError ?? "");
       setSubmittedBooking(data.booking);
-      feedback.success("Booking request received.");
       setSetupHref(data.redirectTo ?? null);
+      
+      if (data.checkoutError) {
+        feedback.error(data.checkoutError);
+      } else {
+        feedback.success("Booking request received.");
+      }
     } catch (caughtError) {
       setTurnstileToken("");
       setTurnstileResetKey((current) => current + 1);
@@ -293,6 +314,13 @@ export function BookingForm({
         <div className="confirmation-panel">
           <CheckCircle2 size={34} aria-hidden="true" />
           <h2>Thanks! Your request has been received.</h2>
+          
+          {checkoutIssue ? (
+            <p className="form-error" role="alert">
+              {checkoutIssue}
+            </p>
+          ) : null}
+          
           <p>
             We will email or text you when available to confirm your route day,
             final price, and service details before anything is charged.
@@ -949,7 +977,13 @@ export function BookingForm({
             disabled={isSubmitting || (!turnstileDisabled && !turnstileToken)}
           >
             <Send size={20} aria-hidden="true" />
-            {isSubmitting ? "Sending Request..." : "Request My Cleaning"}
+            {isSubmitting
+              ? form.payment.preference === "stripe"
+                ? "Opening Secure Checkout..."
+                : "Submitting Booking..."
+              : form.payment.preference === "stripe"
+                ? "Continue to Secure Checkout"
+                : "Submit My Booking"}
           </button>
 
           <p className="muted">
