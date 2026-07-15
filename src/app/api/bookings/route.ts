@@ -9,7 +9,6 @@ import {
   validCollectionDays,
   validCollectionTimeWindows,
   validFrequencies,
-  validPaymentPreferences,
   validSameDayPreferences,
   validSchedulingPreferences,
 } from "@/lib/booking-utils";
