@@ -68,6 +68,15 @@ const validBreakReasons: readonly BreakReason[] = [
   "scheduled_break",
   "other",
 ];
+const validFieldPaymentMethods = [
+  "cash",
+  "venmo_business",
+  "zelle",
+  "other",
+] as const;
+
+type FieldPaymentMethod = (typeof validFieldPaymentMethods)[number];
+
 const breakReasonsRequiringNotes: readonly BreakReason[] = [
   "equipment_issue",
   "vehicle_issue",
@@ -108,6 +117,21 @@ function cleanText(formData: FormData, key: string, max = 1200) {
   return String(formData.get(key) ?? "").trim().slice(0, max);
 }
 
+function cleanMoney(formData: FormData, key: string) {
+  const raw = String(formData.get(key) ?? "")
+    .replace(/[$,\s]/g, "")
+    .trim();
+
+  if (!raw) return null;
+
+  const value = Number(raw);
+
+  if (!Number.isFinite(value)) {
+    return null;
+  }
+
+  return Math.round(value * 100) / 100;
+}
 function cleanDate(formData: FormData, key: string) {
   const value = String(formData.get(key) ?? "").trim();
   return /^\d{4}-\d{2}-\d{2}$/.test(value) ? value : "";
@@ -600,11 +624,24 @@ export async function deleteServicePhotoAction(formData: FormData) {
   revalidateField(visitId || photo.service_visit_id);
 }
 
-export async function completeStopAction(formData: FormData) {
+export async function completeStopAction(
+    formData: FormData,
+  ): Promise<ActionResult> {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
   const { admin, stop, visit, booking } = await getStopBundle(visitId);
-  if (!visit || !stop || !booking) return;
+  if (!visit || !stop || !booking) {
+    return actionFailure("This stop could not be loaded.");
+  }
+  
+  if (
+    booking.payment_due_at_service &&
+    booking.payment_status !== "paid"
+  ) {
+    return actionFailure(
+      "Collect and record the in-person payment before completing this stop.",
+    );
+  }
 
   const completedAt = new Date().toISOString();
   const { data: photos } = await admin
@@ -681,6 +718,7 @@ export async function completeStopAction(formData: FormData) {
   });
 
   revalidateField(visit.id);
+  return actionSuccess("Stop completed.");
 }
 
 export async function readyForNextStopAction(formData: FormData) {
@@ -799,50 +837,232 @@ export async function endBreakAction(formData: FormData) {
   }
 }
 
-export async function markManualPaidAction(formData: FormData) {
+export async function markManualPaidAction(
+  formData: FormData,
+): Promise<ActionResult> {
   const auth = await requireFieldUser();
-  if (!isAdminRole(auth.profile.role)) return;
 
-  const bookingId = cleanId(formData, "bookingId");
   const visitId = cleanId(formData, "visitId");
-  const method = cleanText(formData, "manualPaymentMethod", 80) || "manual";
-  const notes = cleanText(formData, "manualPaymentNotes", 500);
-  const admin = getSupabaseAdmin();
+  const requestedMethod = cleanId(formData, "paymentMethod");
+  const method = validFieldPaymentMethods.find(
+    (value) => value === requestedMethod,
+  );
+
+  const serviceAmount = cleanMoney(formData, "serviceAmount");
+  const enteredTipAmount = cleanMoney(formData, "tipAmount");
+  const tipAmount = enteredTipAmount ?? 0;
+  const notes = cleanText(formData, "paymentNotes", 500);
+
+  if (!visitId) {
+    return actionFailure("The service visit could not be identified.");
+  }
+
+  if (!method) {
+    return actionFailure("Choose a valid payment method.");
+  }
+
+  if (serviceAmount === null || serviceAmount <= 0) {
+    return actionFailure("Enter a valid service amount.");
+  }
+
+  if (tipAmount < 0) {
+    return actionFailure("The tip amount cannot be negative.");
+  }
+
+  if (serviceAmount > 5000 || tipAmount > 5000) {
+    return actionFailure("Review the amounts before recording this payment.");
+  }
+
+  if (method === "other" && !notes) {
+    return actionFailure(
+      "Add a payment note when recording another payment method.",
+    );
+  }
+
+  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+
+  if (!visit || !stop || !booking) {
+    return actionFailure("This stop could not be loaded.");
+  }
+
+  const expectedAtStop =
+    booking.payment_preference === "cash_in_person" &&
+    booking.payment_due_at_service;
+
+  if (!expectedAtStop && !isAdminRole(auth.profile.role)) {
+    return actionFailure(
+      "Only an admin or owner may override the scheduled payment method.",
+    );
+  }
+
+  if (booking.payment_status === "paid") {
+    return actionFailure("This booking is already marked paid.");
+  }
+
   const paidAt = new Date().toISOString();
+  const totalAmount =
+    Math.round((serviceAmount + tipAmount) * 100) / 100;
+
+  const provider =
+    method === "cash"
+      ? "cash"
+      : method === "venmo_business"
+        ? "venmo"
+        : method === "zelle"
+          ? "zelle"
+          : "manual";
+
+  const paymentPreference =
+    method === "cash"
+      ? "cash_in_person"
+      : method === "venmo_business"
+        ? "venmo_business"
+        : method === "zelle"
+          ? "zelle"
+          : "manual_other";
+
+  const paymentMethodLabel =
+    method === "cash"
+      ? "Cash"
+      : method === "venmo_business"
+        ? "Venmo Business"
+        : method === "zelle"
+          ? "Zelle"
+          : "Other";
+
+  const verificationStatus =
+    method === "cash" ? "not_required" : "verified";
+
+  const paymentReference =
+    `field:${method}:${stop.id}:${paidAt}`;
+
+  const { data: payment, error: paymentError } = await admin
+    .from("payments")
+    .insert({
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      service_visit_id: visit.id,
+      amount: totalAmount,
+      service_amount: serviceAmount,
+      tip_amount: tipAmount,
+      total_amount: totalAmount,
+      tip_source: tipAmount > 0 ? "in_person" : null,
+      received_at: paidAt,
+      recorded_by_user_id: auth.userId,
+      currency: "usd",
+      status: "paid",
+      provider,
+      description:
+        `${paymentMethodLabel} collected during service visit`,
+      payment_type: "service_payment",
+      metadata: {
+        source: "field_app",
+        route_stop_id: stop.id,
+        service_visit_id: visit.id,
+        payment_method: method,
+        service_amount: serviceAmount,
+        tip_amount: tipAmount,
+        total_amount: totalAmount,
+        notes,
+        collected_by: auth.userId,
+        collected_at: paidAt,
+      },
+    })
+    .select("*")
+    .single();
+
+  if (paymentError || !payment) {
+    return actionFailure(
+      "The payment record could not be saved. Nothing was marked paid.",
+    );
+  }
 
   await Promise.all([
     admin
       .from("bookings")
       .update({
         payment_status: "paid",
-        payment_method: method,
-        payment_provider: "manual",
-        payment_reference: `manual:${auth.userId}:${paidAt}`,
+        payment_preference: paymentPreference,
+        payment_due_at_service: false,
+        payment_verification_status: verificationStatus,
+        payment_verified_at:
+          verificationStatus === "verified" ? paidAt : null,
+        payment_verified_by_user_id:
+          verificationStatus === "verified" ? auth.userId : null,
+        payment_method: paymentMethodLabel,
+        payment_provider: provider,
+        payment_reference: paymentReference,
+        paid_at: paidAt,
+        payment_failed_at: null,
+        payment_failure_code: null,
+        payment_failure_message: null,
       })
-      .eq("id", bookingId),
+      .eq("id", booking.id),
+
     admin
-      .from("payments")
+      .from("route_stops")
       .update({
-        status: "paid",
-        provider: "manual",
-        metadata: {
-          marked_paid_by: auth.userId,
-          marked_paid_at: paidAt,
-          method,
-          notes,
-        },
+        payment_collection_required: false,
+        payment_collection_status: "collected",
+        payment_collected_at: paidAt,
+        payment_collected_by_user_id: auth.userId,
+        payment_collected_amount: serviceAmount,
+        payment_collected_method: method,
+        payment_collection_notes: notes || null,
+        tip_collected_amount: tipAmount,
       })
-      .eq("booking_id", bookingId),
+      .eq("id", stop.id),
   ]);
 
-  await recordServiceEvent({
-    actorId: auth.userId,
-    eventType: "manual_payment_marked_paid",
-    message: `Manual payment marked paid by ${auth.email ?? "admin/owner"}.`,
-    metadata: { bookingId, method, notes, paidAt },
-  });
+  await Promise.allSettled([
+    recordServiceEvent({
+      actorId: auth.userId,
+      booking,
+      visit,
+      stop,
+      eventType: "field_payment_collected",
+      message:
+        `${paymentMethodLabel} payment of $${totalAmount.toFixed(2)} collected in the field.`,
+      metadata: {
+        paymentId: payment.id,
+        method,
+        serviceAmount,
+        tipAmount,
+        totalAmount,
+        notes,
+      },
+    }),
 
-  revalidateField(visitId);
+    createAdminNotification({
+      type: "field_payment_collected",
+      title: "Field payment collected",
+      message:
+        `${booking.first_name} ${booking.last_name}: ` +
+        `$${serviceAmount.toFixed(2)} service` +
+        `${tipAmount > 0 ? ` + $${tipAmount.toFixed(2)} tip` : ""}.`,
+      href: `/admin/bookings?q=${booking.id}`,
+      customer_id: booking.customer_id,
+      booking_id: booking.id,
+      severity: "info",
+      metadata: {
+        paymentId: payment.id,
+        visitId: visit.id,
+        routeStopId: stop.id,
+        method,
+        serviceAmount,
+        tipAmount,
+        totalAmount,
+      },
+    }),
+  ]);
+
+  revalidateField(visit.id);
+
+  return actionSuccess(
+    tipAmount > 0
+      ? `Payment recorded: $${serviceAmount.toFixed(2)} service and $${tipAmount.toFixed(2)} tip.`
+      : `Payment recorded: $${serviceAmount.toFixed(2)}.`,
+  );
 }
 
 export async function sendPaymentLinkFromFieldAction(
