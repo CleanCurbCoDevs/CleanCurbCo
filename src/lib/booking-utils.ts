@@ -3,7 +3,9 @@ import type {
   BookingStatus,
   CollectionDay,
   CollectionTimeWindow,
+  PaymentPreference,
   PaymentStatus,
+  PaymentVerificationStatus,
   SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
@@ -77,7 +79,22 @@ export const validPaymentStatuses: readonly PaymentStatus[] = [
   "failed",
   "refunded",
 ];
+export const validPaymentPreferences: readonly PaymentPreference[] = [
+  "stripe",
+  "paypal",
+  "zelle",
+  "venmo_business",
+  "cash_in_person",
+  "manual_other",
+];
 
+export const validPaymentVerificationStatuses:
+  readonly PaymentVerificationStatus[] = [
+    "not_required",
+    "awaiting_verification",
+    "verified",
+    "rejected",
+  ];
 export const validRequestTypes: readonly RequestType[] = [
   "pause_service",
   "cancel_service",
@@ -160,6 +177,9 @@ export function bookingRowToRequest(row: BookingRow): BookingRequest {
     },
     payment: {
       status: row.payment_status,
+      preference: row.payment_preference,
+      verificationStatus: row.payment_verification_status,
+      dueAtService: row.payment_due_at_service,
       method: row.payment_method ?? undefined,
       paymentLink: row.payment_link ?? undefined,
       provider: row.payment_provider ?? undefined,
