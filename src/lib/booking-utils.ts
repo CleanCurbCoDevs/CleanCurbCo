@@ -81,7 +81,6 @@ export const validPaymentStatuses: readonly PaymentStatus[] = [
 ];
 export const validPaymentPreferences: readonly PaymentPreference[] = [
   "stripe",
-  "paypal",
   "zelle",
   "venmo_business",
   "cash_in_person",
