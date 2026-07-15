@@ -32,6 +32,8 @@ export function LoginForm({
           email,
           password,
           next: searchParams.get("next") ?? nextPath ?? undefined,
+          bookingId: searchParams.get("booking") ?? undefined,
+          claimToken: searchParams.get("token") ?? undefined,
         }),
       });
       const data = (await response.json()) as {
