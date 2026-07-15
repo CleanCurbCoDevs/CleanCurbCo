@@ -23,7 +23,7 @@ export default async function BillingSuccessPage({
   const returnPath =
     sanitizeInternalRedirectPath(params.returnPath, {
       allowedPrefixes: ["/portal", "/field", "/admin"],
-    }) ?? "/portal/billing";
+    }) ?? "/";
   const copy = getPaymentCopy(status);
 
   return (
