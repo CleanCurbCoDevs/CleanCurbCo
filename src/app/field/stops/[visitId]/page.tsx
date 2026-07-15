@@ -81,8 +81,6 @@ export default async function FieldStopPage({
   const signedChecklistDocuments = serviceChecklistBundle
     ? await createSignedChecklistDocuments(serviceChecklistBundle.documents)
     : [];
-  const manualPaymentAllowed =
-    context.auth.status === "ok" && isAdminRole(context.auth.profile.role);
 
   if (!visit || !stop || !booking) {
     return (
@@ -109,8 +107,21 @@ export default async function FieldStopPage({
     (photo) => photo.photo_type === "issue" || photo.photo_type === "other",
   );
   const currentPaymentLink = latestPayment?.checkout_url ?? booking.payment_link ?? "";
-  const isPaid = (latestPayment?.status ?? booking.payment_status) === "paid";
-  const clearance = getServiceClearanceStatus(booking, latestPayment);
+  const isPaid =
+    booking.payment_status === "paid" ||
+    latestPayment?.status === "paid";
+  
+  const clearance = getServiceClearanceStatus(
+    booking,
+    latestPayment,
+  );
+  
+  const paymentCollectionAllowed =
+    context.auth.status === "ok" &&
+    (
+      clearance.requiresCollection ||
+      isAdminRole(context.auth.profile.role)
+    );
   const displayStopNumber = stop.optimoroute_stop_sequence ?? stop.stop_order ?? 1;
   const scheduledTime = stop.optimoroute_scheduled_at
     ? formatFieldTime(stop.optimoroute_scheduled_at)
@@ -134,9 +145,15 @@ export default async function FieldStopPage({
             <span className={`status-badge status-${stop.status}`}>
               {humanizeStatus(stop.status)}
             </span>
-            <span className={`status-badge status-${booking.payment_status}`}>
-              {humanizeStatus(booking.payment_status)}
+          <span className={`status-badge status-${booking.payment_status}`}>
+            {humanizeStatus(booking.payment_status)}
+          </span>
+          
+          {clearance.requiresCollection ? (
+            <span className="status-badge status-pending">
+              PAYMENT DUE AT STOP
             </span>
+          ) : null}
           </div>
           <Link className="button button-outline" href="/field/today">
             Today
@@ -294,7 +311,13 @@ export default async function FieldStopPage({
         <p>
           Estimated service price: <strong>${booking.estimated_price}</strong>{" "}
           | Raw payment status:{" "}
-          <strong>{humanizeStatus(latestPayment?.status ?? booking.payment_status)}</strong>
+          <strong>
+            {humanizeStatus(
+              isPaid
+                ? "paid"
+                : latestPayment?.status ?? booking.payment_status,
+            )}
+          </strong>
         </p>
         {currentPaymentLink ? (
           <a className="button button-outline" href={currentPaymentLink} target="_blank" rel="noreferrer">
@@ -324,25 +347,90 @@ export default async function FieldStopPage({
             routeStopId={stop.id}
             visitId={visit.id}
           />
-          {!isPaid && manualPaymentAllowed ? (
-            <FeedbackForm
-              action={markManualPaidAction}
-              className="field-form inline-payment-form"
-              pendingMessage="Marking payment..."
-              successMessage="Manual payment marked paid."
-            >
-              <input type="hidden" name="bookingId" value={booking.id} />
-              <input type="hidden" name="visitId" value={visit.id} />
+        {!isPaid && paymentCollectionAllowed ? (
+          <FeedbackForm
+            action={markManualPaidAction}
+            className="field-form inline-payment-form"
+            pendingMessage="Recording payment..."
+            successMessage="Payment and tip recorded."
+          >
+            <input
+              type="hidden"
+              name="visitId"
+              value={visit.id}
+            />
+        
+            <label>
+              Service amount
               <input
-                name="manualPaymentMethod"
-                placeholder="Cash, Zelle, Venmo, check"
+                name="serviceAmount"
+                type="number"
+                min="0.01"
+                max="5000"
+                step="0.01"
+                defaultValue={Number(
+                  booking.estimated_price,
+                ).toFixed(2)}
+                required
               />
-              <input name="manualPaymentNotes" placeholder="Optional payment note" />
-              <ActionSubmitButton className="button button-outline" pendingLabel="Saving...">
-                Mark Manual Paid
-              </ActionSubmitButton>
-            </FeedbackForm>
-          ) : null}
+            </label>
+        
+            <label>
+              Tip amount
+              <input
+                name="tipAmount"
+                type="number"
+                min="0"
+                max="5000"
+                step="0.01"
+                defaultValue="0.00"
+              />
+            </label>
+        
+            <label>
+              Payment method
+              <select
+                name="paymentMethod"
+                defaultValue={
+                  booking.payment_preference === "venmo_business"
+                    ? "venmo_business"
+                    : booking.payment_preference === "zelle"
+                      ? "zelle"
+                      : "cash"
+                }
+              >
+                <option value="cash">Cash</option>
+                <option value="venmo_business">
+                  Venmo Business — confirmed received
+                </option>
+                <option value="zelle">
+                  Zelle — confirmed received
+                </option>
+                <option value="other">Other</option>
+              </select>
+            </label>
+        
+            <label>
+              Payment notes
+              <textarea
+                name="paymentNotes"
+                placeholder="Optional for cash, Venmo, or Zelle. Required when choosing Other."
+              />
+            </label>
+        
+            <p className="muted">
+              The service charge and tip are recorded separately.
+              Confirm that the money was actually received before submitting.
+            </p>
+        
+            <ActionSubmitButton
+              className="button button-primary"
+              pendingLabel="Recording..."
+            >
+              Record Collected Payment
+            </ActionSubmitButton>
+          </FeedbackForm>
+        ) : null}
         </div>
       </section>
 
