@@ -45,7 +45,9 @@ export function getServiceClearanceStatus(
   payment?: PaymentLike,
 ): ServiceClearanceStatus {
   const paymentStatus =
-    payment?.status ?? booking?.payment_status ?? "not_sent";
+    booking?.payment_status === "paid" || payment?.status === "paid"
+      ? "paid"
+      : payment?.status ?? booking?.payment_status ?? "not_sent";
 
   const hasPaymentLink = Boolean(
     payment?.checkout_url || booking?.payment_link,
