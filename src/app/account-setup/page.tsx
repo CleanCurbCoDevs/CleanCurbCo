@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { AccountSetupForm } from "@/components/account-setup-form";
-import { hashClaimToken } from "@/lib/booking-claims";
+import {
+  createLoginClaimLink,
+  hashClaimToken,
+} from "@/lib/booking-claims";
 import { isSupabaseConfigured } from "@/lib/env";
 import { brand } from "@/lib/site";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -48,6 +51,29 @@ export default async function AccountSetupPage({
               email={setupContext.email}
               customerName={setupContext.customerName}
             />
+          ) : setupContext.status === "existing" ? (
+            <section className="placeholder-panel">
+              <p className="section-kicker">Welcome Back</p>
+          
+              <h2>You already have a personal account.</h2>
+          
+              <p>
+                Sign in to securely connect this booking to your
+                existing Clean Curb Co. account.
+              </p>
+          
+              <Link
+                className="button button-dark"
+                href={setupContext.loginUrl}
+              >
+                Sign In and Connect My Booking
+              </Link>
+          
+              <p className="auth-help-note">
+                Use the same email address that you entered while
+                booking.
+              </p>
+            </section>
           ) : (
             <section className="placeholder-panel">
               <p className="section-kicker">Setup Link Needed</p>
@@ -124,9 +150,26 @@ async function getSetupContext(bookingId: string, token: string) {
     };
   }
 
+  const { data: existingProfile } = await admin
+    .from("profiles")
+    .select("id")
+    .ilike("email", booking.email.trim())
+    .maybeSingle();
+  
+  if (booking.customer_id || existingProfile?.id) {
+    return {
+      status: "existing" as const,
+      loginUrl: createLoginClaimLink(
+        bookingId,
+        token,
+      ),
+    };
+  }
+  
   return {
     status: "ok" as const,
     email: booking.email,
-    customerName: `${booking.first_name} ${booking.last_name}`,
+    customerName:
+      `${booking.first_name} ${booking.last_name}`,
   };
 }
