@@ -66,10 +66,17 @@ export function FieldStopCard({
           <span className={`status-badge status-${stop.status}`}>
             {humanizeStatus(stop.status)}
           </span>
-          <span className={`status-badge status-${paymentStatus}`}>
-            {humanizeStatus(paymentStatus)}
-          </span>
-          {isOptimized ? (
+            <span className={`status-badge status-${paymentStatus}`}>
+              {humanizeStatus(paymentStatus)}
+            </span>
+            
+            {clearance.requiresCollection ? (
+              <span className="status-badge status-pending">
+                PAYMENT DUE AT STOP
+              </span>
+            ) : null}
+            
+            {isOptimized ? (
             <span className="status-badge status-imported">Optimized by OptimoRoute</span>
           ) : (
             <span className="status-badge status-neutral">Clean Curb Order</span>
