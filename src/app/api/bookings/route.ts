@@ -9,6 +9,7 @@ import {
   validCollectionDays,
   validCollectionTimeWindows,
   validFrequencies,
+  validPaymentPreferences,
   validSameDayPreferences,
   validSchedulingPreferences,
 } from "@/lib/booking-utils";
@@ -46,6 +47,7 @@ import {
 import type {
   CollectionDay,
   CollectionTimeWindow,
+  PaymentPreference,
   SameDayPreference,
   SchedulingPreference,
   ServiceFrequency,
@@ -76,6 +78,9 @@ type IncomingBooking = {
     frequency?: unknown;
     addOns?: unknown;
   };
+  payment?: {
+    preference?: unknown;
+  };
   scheduling?: {
     preference?: unknown;
     collectionDay?: unknown;
@@ -100,6 +105,12 @@ type IncomingBooking = {
 };
 
 const validWaterSpigotValues = ["yes", "no", "not_sure"] as const;
+const customerPaymentPreferences = [
+  "stripe",
+  "venmo_business",
+  "zelle",
+  "cash_in_person",
+] as const satisfies readonly PaymentPreference[];
 const expectedTopLevelFields = new Set([
   "turnstileToken",
   "referralCode",
@@ -107,6 +118,7 @@ const expectedTopLevelFields = new Set([
   "company",
   "customer",
   "service",
+  "payment",
   "scheduling",
   "instructions",
   "agreements",
@@ -260,6 +272,18 @@ export async function POST(request: Request) {
     "not_sure",
   );
 
+  const paymentPreference = pickEnum<PaymentPreference>(
+    body.payment?.preference,
+    customerPaymentPreferences,
+    "stripe",
+  );
+  
+  const paymentDueAtService =
+    paymentPreference === "cash_in_person";
+  
+  const inPersonPaymentRequestedAt =
+    paymentDueAtService ? new Date().toISOString() : null;
+  
   const limited = rejectLimitedRequest(request, {
     requestId,
     route,
@@ -518,6 +542,12 @@ export async function POST(request: Request) {
       agreement_weather_access: agreements.weatherAccess,
       agreement_photos: agreements.photos,
       agreement_payment: agreements.payment,
+      
+      payment_preference: paymentPreference,
+      payment_due_at_service: paymentDueAtService,
+      payment_verification_status: "not_required",
+      in_person_payment_requested_at:
+        inPersonPaymentRequestedAt,
       payment_status: "not_sent",
       payment_setup_status: existingPaymentMethodOnFile ? "completed" : "not_started",
       stripe_customer_id: existingStripeCustomerId,
@@ -558,6 +588,8 @@ export async function POST(request: Request) {
       collectionDay,
       collectionTimeWindow,
       sameDayPreference,
+      paymentPreference,
+      paymentDueAtService,
       suggestedServiceDate:
         schedulingRecommendation.suggestedServiceDate,
       earliestSafeServiceTime:
