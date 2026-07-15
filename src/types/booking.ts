@@ -69,7 +69,6 @@ export type PaymentStatus =
 
 export type PaymentPreference =
   | "stripe"
-  | "paypal"
   | "zelle"
   | "venmo_business"
   | "cash_in_person"
