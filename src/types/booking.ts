@@ -67,6 +67,13 @@ export type PaymentStatus =
   | "failed"
   | "refunded";
 
+export type PaymentPreference =
+  | "stripe"
+  | "zelle"
+  | "venmo_business"
+  | "cash_in_person"
+  | "manual_other";
+
 export type BookingRequest = {
   id: string;
   createdAt: string;
@@ -122,6 +129,8 @@ export type BookingRequest = {
 
   payment: {
     status: PaymentStatus;
+    preference?: PaymentPreference;
+    dueAtService?: boolean;
     method?: string;
     paymentLink?: string;
     provider?: string;
