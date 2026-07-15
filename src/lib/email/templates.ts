@@ -380,25 +380,153 @@ export function paymentLinkTemplate(
 export function paymentReceivedTemplate(
   booking: BookingRow,
   amount: number,
+  options: {
+    accountMode: "new" | "existing";
+    accountUrl: string;
+    loginUrl: string;
+  },
 ): EmailTemplate {
+  const amountLabel =
+    Number(amount).toFixed(2);
+
+  const accountSection =
+    options.accountMode === "existing"
+      ? `
+        <p>
+          Hey ${escapeHtml(
+            booking.first_name,
+          )}, welcome back!
+        </p>
+
+        <p>
+          Your existing Clean Curb Co. account is the
+          easiest place to view this booking, check route
+          updates, manage your service details, and access
+          your before-and-after photos once service is
+          complete.
+        </p>
+
+        <p>
+          ${emailButton(
+            options.accountUrl,
+            "Sign In to My Account",
+          )}
+        </p>
+
+        <p>
+          Nothing else is required right now unless you
+          need to update something.
+        </p>
+      `
+      : `
+        <p>
+          Hey ${escapeHtml(booking.first_name)}!
+          Thank you for choosing Clean Curb Co.
+        </p>
+
+        <p>
+          You do not have a personal Clean Curb Co.
+          account yet, and we strongly recommend creating
+          one. It is the easiest way to:
+        </p>
+
+        <ul style="line-height:1.7;padding-left:18px">
+          <li>
+            View your confirmed route day and service
+            updates
+          </li>
+          <li>
+            Manage recurring service and future bookings
+          </li>
+          <li>
+            Update your contact and service information
+          </li>
+          <li>
+            View payment history and before-and-after
+            photos
+          </li>
+        </ul>
+
+        <p>
+          ${emailButton(
+            options.accountUrl,
+            "Create My Personal Account",
+          )}
+        </p>
+
+        <p>
+          Already created an account?
+          <a href="${escapeHtml(
+            options.loginUrl,
+          )}">Sign in here</a>.
+        </p>
+      `;
+
   const body = `
-    <p>Hi ${escapeHtml(booking.first_name)},</p>
-    <p>Payment received. Thank you for trusting Clean Curb Co. with your bins.</p>
+    <p>
+      Payment received. Thank you for trusting Clean Curb
+      Co. with your bins.
+    </p>
+
     <ul style="line-height:1.7;padding-left:18px">
-      <li><strong>Amount paid:</strong> $${amount}</li>
-      <li><strong>Service address:</strong> ${escapeHtml(booking.street_address)}, ${escapeHtml(booking.city)}, ${escapeHtml(booking.state)} ${escapeHtml(booking.zip_code)}</li>
-      <li><strong>Service:</strong> ${escapeHtml(formatFrequency(booking.frequency))} | ${booking.bin_count} bin(s)</li>
-      <li><strong>Add-ons:</strong> ${escapeHtml(addOnLabels(booking.add_ons))}</li>
+      <li>
+        <strong>Amount paid:</strong>
+        $${amountLabel}
+      </li>
+      <li>
+        <strong>Service address:</strong>
+        ${escapeHtml(booking.street_address)},
+        ${escapeHtml(booking.city)},
+        ${escapeHtml(booking.state)}
+        ${escapeHtml(booking.zip_code)}
+      </li>
+      <li>
+        <strong>Service:</strong>
+        ${escapeHtml(formatFrequency(booking.frequency))}
+        | ${booking.bin_count} bin(s)
+      </li>
+      <li>
+        <strong>Add-ons:</strong>
+        ${escapeHtml(addOnLabels(booking.add_ons))}
+      </li>
     </ul>
-    <p>Your customer portal will show updated payment status after Stripe finishes syncing.</p>
-    <p><strong>Fresh Starts at the Curb.</strong></p>
+
+    ${accountSection}
+
+    <p>
+      <strong>Fresh Starts at the Curb.</strong>
+    </p>
   `;
 
+  const subject =
+    options.accountMode === "existing"
+      ? `Payment received — welcome back, ${booking.first_name}!`
+      : "Thanks for choosing Clean Curb Co. — set up your account";
+
+  const accountText =
+    options.accountMode === "existing"
+      ? [
+          `Hey ${booking.first_name}, welcome back!`,
+          "Your booking and payment have been received.",
+          `Sign in and connect this booking: ${options.accountUrl}`,
+        ]
+      : [
+          `Hey ${booking.first_name}! Thank you for choosing Clean Curb Co.`,
+          "Create your personal account to view route updates, manage service, update your information, and access before-and-after photos.",
+          `Create your account: ${options.accountUrl}`,
+          `Already have one? Sign in: ${options.loginUrl}`,
+        ];
+
   return {
-    subject: "Payment received - Clean Curb Co.",
+    subject,
     html: shell("Payment received", body),
     text: customerText(
-      `Payment received for Clean Curb Co. Amount paid: $${amount}. Fresh Starts at the Curb.`,
+      [
+        `Payment received: $${amountLabel}.`,
+        `Service address: ${booking.street_address}, ${booking.city}, ${booking.state} ${booking.zip_code}.`,
+        ...accountText,
+        "Fresh Starts at the Curb.",
+      ].join("\n\n"),
     ),
   };
 }
