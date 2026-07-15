@@ -99,24 +99,30 @@ async function updatePaymentState(input: {
   subscriptionId?: string | null;
   paymentStatus: PaymentStatus;
   bookingPaymentStatus?: BookingPaymentStatus;
+  failureCode?: string | null;
+  failureMessage?: string | null;
   sendReceipt?: boolean;
   eventType: string;
   metadata?: Record<string, unknown>;
 }) {
   const admin = getSupabaseAdmin();
+  const now = new Date().toISOString();
+
+  const existingPayment = await findPayment(input);
+  const paymentId = input.paymentId ?? existingPayment?.id ?? null;
+
   const paymentUpdate = {
     status: input.paymentStatus,
     stripe_checkout_session_id: input.checkoutSessionId ?? undefined,
     stripe_payment_intent_id: input.paymentIntentId ?? undefined,
     stripe_subscription_id: input.subscriptionId ?? undefined,
+    received_at: input.paymentStatus === "paid" ? now : undefined,
     metadata: {
+      ...(existingPayment?.metadata ?? {}),
       ...(input.metadata ?? {}),
       last_stripe_event: input.eventType,
     },
   };
-
-  const existingPayment = await findPayment(input);
-  const paymentId = input.paymentId ?? existingPayment?.id ?? null;
 
   if (paymentId) {
     await admin.from("payments").update(paymentUpdate).eq("id", paymentId);
@@ -143,22 +149,73 @@ async function updatePaymentState(input: {
     paymentIntentId: input.paymentIntentId,
     subscriptionId: input.subscriptionId,
   });
+
   const bookingId = input.bookingId || payment?.booking_id || "";
   let booking: BookingRow | null = null;
 
   if (bookingId) {
-    const { data } = await admin
+    const { data: previousBooking } = await admin
       .from("bookings")
-      .update({
-        payment_status: input.bookingPaymentStatus ?? undefined,
-        stripe_checkout_session_id: input.checkoutSessionId ?? undefined,
-        stripe_payment_intent_id: input.paymentIntentId ?? undefined,
-        stripe_subscription_id: input.subscriptionId ?? undefined,
-      })
-      .eq("id", bookingId)
       .select("*")
+      .eq("id", bookingId)
       .maybeSingle();
-    booking = data ?? null;
+
+    if (previousBooking) {
+      const preserveExistingPaidBooking =
+        previousBooking.payment_status === "paid" &&
+        input.bookingPaymentStatus !== "refunded";
+
+      const bookingUpdate: Record<string, unknown> = {
+        stripe_checkout_session_id:
+          input.checkoutSessionId ??
+          previousBooking.stripe_checkout_session_id,
+        stripe_payment_intent_id:
+          input.paymentIntentId ??
+          previousBooking.stripe_payment_intent_id,
+        stripe_subscription_id:
+          input.subscriptionId ??
+          previousBooking.stripe_subscription_id,
+      };
+
+      if (!preserveExistingPaidBooking && input.bookingPaymentStatus) {
+        bookingUpdate.payment_status = input.bookingPaymentStatus;
+        bookingUpdate.payment_provider = "stripe";
+        bookingUpdate.payment_preference = "stripe";
+        bookingUpdate.payment_due_at_service = false;
+        bookingUpdate.payment_verification_status = "not_required";
+      }
+
+      if (
+        !preserveExistingPaidBooking &&
+        input.bookingPaymentStatus === "paid"
+      ) {
+        bookingUpdate.paid_at = now;
+        bookingUpdate.payment_failed_at = null;
+        bookingUpdate.payment_failure_code = null;
+        bookingUpdate.payment_failure_message = null;
+      }
+
+      if (
+        !preserveExistingPaidBooking &&
+        input.bookingPaymentStatus === "failed"
+      ) {
+        bookingUpdate.payment_failed_at = now;
+        bookingUpdate.payment_failure_code =
+          input.failureCode ?? null;
+        bookingUpdate.payment_failure_message =
+          input.failureMessage ??
+          "Stripe reported an unsuccessful payment attempt.";
+      }
+
+      const { data } = await admin
+        .from("bookings")
+        .update(bookingUpdate)
+        .eq("id", bookingId)
+        .select("*")
+        .maybeSingle();
+
+      booking = data ?? previousBooking;
+    }
   }
 
   await recordPaymentEvent({
@@ -166,14 +223,17 @@ async function updatePaymentState(input: {
     booking,
     eventType: `stripe_${input.eventType}`,
     message: `Stripe payment status updated to ${input.paymentStatus}.`,
-    metadata: input.metadata,
+    metadata: {
+      ...(input.metadata ?? {}),
+      failureCode: input.failureCode ?? null,
+      failureMessage: input.failureMessage ?? null,
+    },
   });
 
   if (input.sendReceipt && booking && payment?.amount) {
     await sendPaymentReceived(booking, payment.amount);
   }
 }
-
 async function updatePaymentSetupState(input: {
   session: Stripe.Checkout.Session;
   requestId: string;
@@ -359,7 +419,7 @@ export async function POST(request: Request) {
           paymentIntentId: getStringId(session.payment_intent),
           subscriptionId: getStringId(session.subscription),
           paymentStatus: "cancelled",
-          bookingPaymentStatus: "failed",
+          bookingPaymentStatus: "pending",
           eventType: event.type,
           metadata: session.metadata ?? {},
         });
@@ -386,6 +446,8 @@ export async function POST(request: Request) {
           paymentIntentId: intent.id,
           paymentStatus: "failed",
           bookingPaymentStatus: "failed",
+          failureCode: intent.last_payment_error?.code ?? null,
+          failureMessage: intent.last_payment_error?.message ?? null,
           eventType: event.type,
           metadata: intent.metadata ?? {},
         });
@@ -418,7 +480,6 @@ export async function POST(request: Request) {
           bookingId: subscription.metadata?.booking_id ?? null,
           subscriptionId: subscription.id,
           paymentStatus: "cancelled",
-          bookingPaymentStatus: "failed",
           eventType: event.type,
           metadata: subscription.metadata ?? {},
         });
