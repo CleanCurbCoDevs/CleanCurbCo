@@ -3,6 +3,7 @@ import type {
   AttentionStatus,
   CollectionDay,
   CollectionTimeWindow,
+  PaymentPreference,
   SameDayPreference,
 } from "@/types/booking";
 
@@ -193,6 +194,14 @@ export type BookingRow = {
   agreement_photos: boolean;
   agreement_payment: boolean;
   payment_status: "not_sent" | "pending" | "paid" | "failed" | "refunded";
+  payment_preference: PaymentPreference;
+  payment_due_at_service: boolean;
+  in_person_payment_requested_at: string | null;
+  checkout_started_at: string | null;
+  paid_at: string | null;
+  payment_failed_at: string | null;
+  payment_failure_code: string | null;
+  payment_failure_message: string | null;
   payment_method: string | null;
   payment_link: string | null;
   payment_provider: string | null;
@@ -220,6 +229,10 @@ export type BookingRow = {
   stripe_setup_session_id: string | null;
   payment_method_on_file: boolean;
   payment_setup_completed_at: string | null;
+  route_confirmation_sent_at: string | null;
+  route_confirmation_sent_by_user_id: string | null;
+  review_request_sent_at: string | null;
+  tip_request_sent_at: string | null;
 };
 
 export type ProfileRow = {
@@ -320,6 +333,18 @@ export type RouteStopRow = {
   latest_service_time: string | null;
   route_score: number | null;
   attention_status: AttentionStatus;
+  payment_collection_required: boolean;
+  payment_collection_status:
+    | "not_required"
+    | "due"
+    | "collected"
+    | "customer_will_pay_electronically"
+    | "waived"
+    | "issue";
+  payment_collected_at: string | null;
+  payment_collected_by_user_id: string | null;
+  payment_collected_amount: number | null;
+  tip_collected_amount: number;
   status: FieldStopStatus;
   started_at: string | null;
   completed_at: string | null;
@@ -495,6 +520,17 @@ export type PaymentRow = {
   booking_id: string | null;
   service_visit_id: string | null;
   amount: number;
+  service_amount: number;
+  tip_amount: number;
+  total_amount: number;
+  tip_source:
+    | "checkout"
+    | "follow_up"
+    | "in_person"
+    | "manual"
+    | null;
+  received_at: string | null;
+  recorded_by_user_id: string | null;
   currency: string;
   status: PaymentStatus;
   provider: string;
