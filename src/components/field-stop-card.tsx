@@ -48,7 +48,10 @@ export function FieldStopCard({
   const appleMaps = `https://maps.apple.com/?q=${encodedAddress}`;
   const googleMaps = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
   const addOns = booking.add_ons.length ? booking.add_ons.join(", ") : "None";
-  const paymentStatus = payment?.status ?? booking.payment_status;
+  const paymentStatus =
+    booking.payment_status === "paid" || payment?.status === "paid"
+      ? "paid"
+      : payment?.status ?? booking.payment_status;
   const clearance = getServiceClearanceStatus(booking, payment);
   const actionLabel = getStopActionLabel(stop.status, clearance.cleared);
   const displayStopNumber = stop.optimoroute_stop_sequence ?? stop.stop_order ?? 1;
