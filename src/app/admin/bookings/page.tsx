@@ -40,6 +40,19 @@ type AdminBookingsPageProps = {
   searchParams: Promise<Record<string, string | undefined>>;
 };
 
+type BookingGroupView = "service" | "collection";
+type BookingTone = "good" | "warning" | "danger" | "neutral";
+
+type BookingGroup = {
+  key: string;
+  label: string;
+  bookings: BookingRow[];
+  customerCount: number;
+  binCount: number;
+  tone: BookingTone;
+  statusLabel: string;
+};
+
 const dateOptions = [
   { label: "Any date", value: "" },
   { label: "Created this week", value: "week" },
@@ -73,23 +86,12 @@ export default async function AdminBookingsPage({
 }: AdminBookingsPageProps) {
   const params = await searchParams;
   const context = await getAdminContext("/admin/bookings");
+  
+  const viewMode: BookingGroupView =
+    params.view === "collection" ? "collection" : "service";
+  
   const bookings = filterAndSortBookings(context.bookings, params);
-
-  const stats = {
-    new: context.bookings.filter((booking) => booking.status === "new").length,
-    needsPayment: context.bookings.filter(
-      (booking) =>
-        booking.payment_status !== "paid" && booking.status !== "cancelled",
-    ).length,
-    needsRoute: context.bookings.filter(
-      (booking) =>
-        !booking.confirmed_route_day &&
-        !["cancelled", "completed"].includes(booking.status),
-    ).length,
-    failedPayment: context.bookings.filter(
-      (booking) => booking.payment_status === "failed",
-    ).length,
-  };
+  const bookingGroups = groupBookings(bookings, viewMode);
 
   return (
     <AdminShell title="Bookings" auth={context.auth}>
@@ -106,43 +108,42 @@ export default async function AdminBookingsPage({
           <span className="status-badge">{context.bookings.length} total</span>
         </div>
 
-        <div className="admin-command-grid">
-          <DashboardStat
-            label="New"
-            value={stats.new}
-            href="/admin/bookings?needs=new"
-          />
-          <DashboardStat
-            label="Needs payment"
-            value={stats.needsPayment}
-            href="/admin/bookings?needs=needs_payment"
-          />
-          <DashboardStat
-            label="Needs route"
-            value={stats.needsRoute}
-            href="/admin/bookings?needs=needs_route"
-          />
-          <DashboardStat
-            label="Failed payment"
-            value={stats.failedPayment}
-            href="/admin/bookings?needs=payment_failed"
-          />
-        </div>
-
-        <nav className="status-tabs" aria-label="Booking status tabs">
-          <Link href="/admin/bookings">All</Link>
-          <Link href="/admin/bookings?needs=new">New</Link>
-          <Link href="/admin/bookings?needs=needs_payment">Needs payment</Link>
-          <Link href="/admin/bookings?needs=needs_route">Needs route</Link>
-          <Link href="/admin/bookings?needs=needs_follow_up">Follow-up</Link>
-          <Link href="/admin/bookings?needs=payment_failed">Failed payment</Link>
+        <nav
+          className="booking-view-switch"
+          aria-label="Booking grouping"
+        >
+          <Link
+            className={
+              viewMode === "service"
+                ? "booking-view-link is-active"
+                : "booking-view-link"
+            }
+            href="/admin/bookings?view=service"
+          >
+            Upcoming service
+          </Link>
+        
+          <Link
+            className={
+              viewMode === "collection"
+                ? "booking-view-link is-active"
+                : "booking-view-link"
+            }
+            href="/admin/bookings?view=collection"
+          >
+            Collection schedule
+          </Link>
         </nav>
 
+        <details className="admin-filter-drawer">
+          <summary>Search &amp; filters</summary>
+        
         <AdminFilterBar
           searchValue={params.q}
           searchPlaceholder="Customer, email, phone, address, booking ID"
           resultCount={bookings.length}
-          resetHref="/admin/bookings"
+          resetHref={`/admin/bookings?view=${viewMode}`}
+            hiddenFields={{ view: viewMode }}
           selects={[
             {
               name: "needs",
@@ -214,10 +215,33 @@ export default async function AdminBookingsPage({
             },
           ]}
         />
-
-        {bookings.length ? (
-          <div className="admin-queue-list">
-            {bookings.map((booking) => {
+      </details>
+      {bookings.length ? (
+        <div className="booking-group-list">
+          {bookingGroups.map((group) => (
+            <details
+              className={`booking-group booking-tone-${group.tone}`}
+              key={group.key}
+              name="booking-groups"
+            >
+              <summary className="booking-group-summary">
+                <span className="booking-group-heading">
+                  <strong>{group.label}</strong>
+                  <small>
+                    {group.customerCount}{" "}
+                    {group.customerCount === 1 ? "customer" : "customers"}
+                    {" · "}
+                    {group.binCount} {group.binCount === 1 ? "bin" : "bins"}
+                  </small>
+                </span>
+      
+                <span className="booking-group-status">
+                  {group.statusLabel}
+                </span>
+              </summary>
+      
+              <div className="admin-queue-list booking-group-customers">
+                {group.bookings.map((booking) => {
               const referral = context.referrals.find(
                 (item) => item.referred_booking_id === booking.id,
               );
@@ -228,6 +252,19 @@ export default async function AdminBookingsPage({
               const visit = context.visits.find(
                 (item) => item.booking_id === booking.id,
               );
+
+              const routeStop = context.routeStops.find(
+                (item) => item.booking_id === booking.id,
+              );
+              
+              const routeDay = context.routeDays.find(
+                (item) => item.id === routeStop?.route_day_id,
+              );
+              
+              const assignedTechnician = context.profiles.find(
+                (item) => item.id === routeDay?.assigned_technician_id,
+              );
+                            
               const foundingSpecial = getFoundingNeighborSpecialStatus({
                 binCount: booking.bin_count,
                 frequency: booking.frequency,
@@ -239,196 +276,253 @@ export default async function AdminBookingsPage({
               const nextAction = getBookingNextAction(booking);
 
               return (
-                <details className="admin-queue-card" key={booking.id}>
-                  <summary className="admin-queue-summary">
-                    <div className="admin-queue-main">
-                      <span className={`needs-dot needs-dot-${nextAction.tone}`} />
-                      <div>
-                        <h2>{bookingCustomerName(booking)}</h2>
-                        <p>
-                          {booking.street_address}
-                          {booking.neighborhood
-                            ? ` | ${booking.neighborhood}`
-                            : ""}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="admin-queue-meta">
-                      <span className={`status-badge status-${booking.status}`}>
-                        {humanizeStatus(booking.status)}
-                      </span>
-                      <span
-                        className={`status-badge status-${booking.payment_status}`}
-                      >
-                        {humanizeStatus(booking.payment_status)}
-                      </span>
-                      <span
-                        className={`status-badge status-${foundingSpecial.status}`}
-                      >
-                        Special: {foundingSpecialLabel(foundingSpecial.status)}
-                      </span>
-                    </div>
-
-                    <div className="admin-queue-next">
-                      <strong>{nextAction.label}</strong>
-                      <span>Open</span>
-                    </div>
+                <details
+                  className={`admin-queue-card booking-tone-${nextAction.tone}`}
+                  key={booking.id}
+                  name={`booking-${group.key}`}
+                >
+                  <summary className="admin-queue-summary admin-booking-row">
+                    <strong className="admin-booking-name">
+                      {bookingCustomerName(booking)}
+                    </strong>
+                
+                    <span className="admin-booking-summary">
+                      {formatBookingRowSummary(booking)}
+                    </span>
+                
+                    <span className="admin-booking-status">
+                      {nextAction.label}
+                    </span>
                   </summary>
 
                   <div className="admin-queue-detail">
-<div className="admin-record-overview">
-  <InfoTile
-    label="Customer"
-    value={bookingCustomerName(booking)}
-  />
-
-  <InfoTile
-    label="Email"
-    value={booking.email}
-  />
-
-  <InfoTile
-    label="Phone"
-    value={booking.phone}
-  />
-
-  <InfoTile
-    label="Full service address"
-    value={[
-      booking.street_address,
-      booking.city,
-      [booking.state, booking.zip_code]
-        .filter(Boolean)
-        .join(" "),
-    ]
-      .filter(Boolean)
-      .join(", ")}
-  />
-
-  <InfoTile
-    label="Neighborhood"
-    value={booking.neighborhood ?? "Not provided"}
-  />
-
-  <InfoTile
-    label="Frequency"
-    value={formatFrequency(booking.frequency)}
-  />
-
-  <InfoTile
-    label="Number of bins"
-    value={String(booking.bin_count)}
-  />
-
-  <InfoTile
-    label="Bin types"
-    value={
-      booking.bin_types.length
-        ? booking.bin_types.join(", ")
-        : "Not provided"
-    }
-  />
-
-  <InfoTile
-    label="Add-ons"
-    value={formatBookingAddOns(booking.add_ons)}
-  />
-
-  <InfoTile
-    label="Estimated price"
-    value={`$${Number(booking.estimated_price).toFixed(2)}`}
-  />
-
-  <InfoTile
-    label="Scheduling preference"
-    value={humanizeStatus(booking.scheduling_preference)}
-  />
-
-  <InfoTile
-    label="Customer-requested date"
-    value={
-      booking.requested_date
-        ? formatAdminDate(booking.requested_date)
-        : "No specific date requested"
-    }
-  />
-
-  <InfoTile
-    label="Regular trash collection day"
-    value={
-      booking.collection_day
-        ? humanizeStatus(booking.collection_day)
-        : "Not captured on original booking"
-    }
-  />
-
-  <InfoTile
-    label="Confirmed route day"
-    value={
-      booking.confirmed_route_day
-        ? formatAdminDate(booking.confirmed_route_day)
-        : "Not assigned"
-    }
-  />
-
-  <InfoTile
-    label="Where bins will be"
-    value={booking.bin_location ?? "Not provided"}
-  />
-
-  <InfoTile
-    label="Exterior water spigot"
-    value={
-      booking.water_spigot_available
-        ? humanizeStatus(booking.water_spigot_available)
-        : "Not provided"
-    }
-  />
-
-  <InfoTile
-    label="Customer notes"
-    value={booking.customer_notes ?? "None"}
-  />
-
-  <InfoTile
-    label="Referral code"
-    value={booking.referral_code ?? "None"}
-  />
-
-  <InfoTile
-    label="Distance from hub"
-    value={
-      booking.service_distance_miles !== null
-        ? `${Number(booking.service_distance_miles).toFixed(1)} miles`
-        : "Not calculated on original booking"
-    }
-  />
-
-  <InfoTile
-    label="Payment status"
-    value={humanizeStatus(booking.payment_status)}
-  />
-
-  <InfoTile
-    label="Payment link"
-    value={
-      booking.payment_link
-        ? "Created and attached"
-        : "Not created"
-    }
-  />
-
-  <InfoTile
-    label="Booking submitted"
-    value={formatAdminDateTime(booking.created_at)}
-  />
-
-  <InfoTile
-    label="Promotion / special"
-    value={foundingSpecial.reason}
-  />
-</div>
+                    <div className="admin-record-overview">
+                      <InfoTile
+                        label="Customer"
+                        value={bookingCustomerName(booking)}
+                      />
+                    
+                      <InfoTile
+                        label="Email"
+                        value={booking.email}
+                      />
+                    
+                      <InfoTile
+                        label="Phone"
+                        value={booking.phone}
+                      />
+                    
+                      <InfoTile
+                        label="Full service address"
+                        value={[
+                          booking.street_address,
+                          booking.city,
+                          [booking.state, booking.zip_code]
+                            .filter(Boolean)
+                            .join(" "),
+                        ]
+                          .filter(Boolean)
+                          .join(", ")}
+                      />
+                    
+                      <InfoTile
+                        label="Neighborhood"
+                        value={booking.neighborhood ?? "Not provided"}
+                      />
+                    
+                      <InfoTile
+                        label="Frequency"
+                        value={formatFrequency(booking.frequency)}
+                      />
+                    
+                      <InfoTile
+                        label="Number of bins"
+                        value={String(booking.bin_count)}
+                      />
+                    
+                      <InfoTile
+                        label="Bin types"
+                        value={
+                          booking.bin_types.length
+                            ? booking.bin_types.join(", ")
+                            : "Not provided"
+                        }
+                      />
+                    
+                      <InfoTile
+                        label="Add-ons"
+                        value={formatBookingAddOns(booking.add_ons)}
+                      />
+                    
+                      <InfoTile
+                        label="Estimated price"
+                        value={`$${Number(booking.estimated_price).toFixed(2)}`}
+                      />
+                    
+                      <InfoTile
+                        label="Scheduling preference"
+                        value={humanizeStatus(booking.scheduling_preference)}
+                      />
+                    
+                      <InfoTile
+                        label="Customer-requested date"
+                        value={
+                          booking.requested_date
+                            ? formatAdminDate(booking.requested_date)
+                            : "No specific date requested"
+                        }
+                      />
+                    
+                      <InfoTile
+                        label="Regular trash collection day"
+                        value={
+                          booking.collection_day
+                            ? humanizeStatus(booking.collection_day)
+                            : "Not captured on original booking"
+                        }
+                      />
+                      
+                    <InfoTile
+                      label="Typical collection time"
+                      value={
+                        booking.collection_time_window
+                          ? formatCollectionWindow(booking.collection_time_window)
+                          : "Not captured on original booking"
+                      }
+                    />
+                    
+                    <InfoTile
+                      label="Preferred cleaning timing"
+                      value={humanizeStatus(booking.same_day_preference)}
+                    />
+                    
+                    <InfoTile
+                      label="Suggested service date"
+                      value={
+                        booking.suggested_service_date
+                          ? formatAdminDate(booking.suggested_service_date)
+                          : "Needs scheduling"
+                      }
+                    />
+                    
+                    <InfoTile
+                      label="Earliest safe service time"
+                      value={
+                        booking.earliest_safe_service_time
+                          ? formatAdminTime(booking.earliest_safe_service_time)
+                          : "Needs review"
+                      }
+                    />
+                      <InfoTile
+                        label="Confirmed route day"
+                        value={
+                          booking.confirmed_route_day
+                            ? formatAdminDate(booking.confirmed_route_day)
+                            : "Not assigned"
+                        }
+                      />
+                      <InfoTile
+                        label="Assigned route"
+                        value={
+                          routeDay
+                            ? routeDay.route_name ??
+                              `${formatAdminDate(routeDay.route_date)} route`
+                            : "Not assigned"
+                        }
+                      />
+                      
+                      <InfoTile
+                        label="Route position"
+                        value={
+                          routeStop
+                            ? `Stop ${routeStop.stop_order}`
+                            : booking.route_position
+                              ? `Stop ${booking.route_position}`
+                              : "Not assigned"
+                        }
+                      />
+                      
+                      <InfoTile
+                        label="Assigned technician"
+                        value={
+                          assignedTechnician
+                            ? formatProfileName(assignedTechnician)
+                            : "Unassigned"
+                        }
+                      />
+                      
+                      <InfoTile
+                        label="Internal attention status"
+                        value={humanizeStatus(booking.attention_status)}
+                      />
+                      
+                      <InfoTile
+                        label="Approval status"
+                        value={humanizeStatus(booking.approval_status)}
+                      />
+                      
+                      <InfoTile
+                        label="Review reason"
+                        value={booking.manual_review_reason ?? "None"}
+                      />
+                      
+                      <InfoTile
+                        label="Where bins will be"
+                        value={booking.bin_location ?? "Not provided"}
+                      />
+                    
+                      <InfoTile
+                        label="Exterior water spigot"
+                        value={
+                          booking.water_spigot_available
+                            ? humanizeStatus(booking.water_spigot_available)
+                            : "Not provided"
+                        }
+                      />
+                    
+                      <InfoTile
+                        label="Customer notes"
+                        value={booking.customer_notes ?? "None"}
+                      />
+                    
+                      <InfoTile
+                        label="Referral code"
+                        value={booking.referral_code ?? "None"}
+                      />
+                    
+                      <InfoTile
+                        label="Distance from hub"
+                        value={
+                          booking.service_distance_miles !== null
+                            ? `${Number(booking.service_distance_miles).toFixed(1)} miles`
+                            : "Not calculated on original booking"
+                        }
+                      />
+                    
+                      <InfoTile
+                        label="Payment status"
+                        value={humanizeStatus(booking.payment_status)}
+                      />
+                    
+                      <InfoTile
+                        label="Payment link"
+                        value={
+                          booking.payment_link
+                            ? "Created and attached"
+                            : "Not created"
+                        }
+                      />
+                    
+                      <InfoTile
+                        label="Booking submitted"
+                        value={formatAdminDateTime(booking.created_at)}
+                      />
+                    
+                      <InfoTile
+                        label="Promotion / special"
+                        value={foundingSpecial.reason}
+                      />
+                    </div>
 
                     <div className="admin-detail-layout">
                       <section className="detail-panel">
@@ -615,6 +709,14 @@ export default async function AdminBookingsPage({
                         </div>
 
                         <div className="admin-secondary-links">
+                          <a
+                            className="button button-outline"
+                            href={googleMapsHref(booking)}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            Open in Google Maps
+                          </a>
                           {booking.customer_id ? (
                             <Link
                               className="button button-outline"
@@ -689,9 +791,12 @@ export default async function AdminBookingsPage({
                   </div>
                 </details>
               );
-            })}
-          </div>
-        ) : (
+              })}
+            </div>
+          </details>
+        ))}
+      </div>
+    ) : (
           <div className="empty-state-card">
             <h2>No booking requests match this view.</h2>
             <p>
@@ -804,40 +909,69 @@ function InfoTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function getBookingNextAction(booking: BookingRow) {
-  if (booking.payment_status === "failed") {
-    return { label: "Payment failed", tone: "danger" as const };
+function getBookingNextAction(booking: BookingRow): {
+  label: string;
+  tone: BookingTone;
+} {
+  if (
+    booking.attention_status === "do_not_service" ||
+    booking.approval_status === "declined_internal" ||
+    booking.status === "cancelled"
+  ) {
+    return {
+      label: "Do not service",
+      tone: "neutral",
+    };
   }
 
-  if (booking.payment_status !== "paid" && !booking.payment_link) {
-    return { label: "Send payment link", tone: "warning" as const };
+  if (
+    booking.attention_status === "hold" ||
+    booking.payment_status === "failed" ||
+    booking.status === "needs_follow_up"
+  ) {
+    return {
+      label: "Stop and review",
+      tone: "danger",
+    };
   }
 
-  if (booking.payment_status !== "paid") {
-    return { label: "Waiting on payment", tone: "warning" as const };
-  }
-
-  if (!booking.confirmed_route_day && !["cancelled", "completed"].includes(booking.status)) {
-    return { label: "Add to route", tone: "warning" as const };
-  }
-
-  if (booking.status === "new") {
-    return { label: "Review booking", tone: "warning" as const };
-  }
-
-  if (booking.status === "needs_follow_up") {
-    return { label: "Follow up", tone: "danger" as const };
-  }
-
-  if (booking.status === "cancelled") {
-    return { label: "Cancelled", tone: "neutral" as const };
+  if (
+    booking.attention_status === "review" ||
+    booking.approval_status === "pending_review" ||
+    booking.approval_status === "needs_review" ||
+    booking.status === "new"
+  ) {
+    return {
+      label: "Needs review",
+      tone: "warning",
+    };
   }
 
   if (booking.status === "completed") {
-    return { label: "Completed", tone: "good" as const };
+    return {
+      label: "Completed",
+      tone: "good",
+    };
   }
 
-  return { label: "Looks okay", tone: "good" as const };
+  if (booking.payment_status !== "paid") {
+    return {
+      label: "Payment pending",
+      tone: "warning",
+    };
+  }
+
+  if (!booking.confirmed_route_day) {
+    return {
+      label: "Needs route",
+      tone: "warning",
+    };
+  }
+
+  return {
+    label: "Ready",
+    tone: "good",
+  };
 }
 
 function getBookingPriority(booking: BookingRow) {
@@ -951,6 +1085,251 @@ function filterAndSortBookings(
 
       return b.created_at.localeCompare(a.created_at);
     });
+}
+
+const collectionDayOrder = [
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+  "sunday",
+  "varies",
+  "not_sure",
+  "unknown",
+];
+
+const collectionWindowOrder = [
+  "before_6_am",
+  "6_8_am",
+  "8_10_am",
+  "10_am_12_pm",
+  "12_2_pm",
+  "2_4_pm",
+  "4_6_pm",
+  "after_6_pm",
+  "varies",
+  "not_sure",
+];
+
+function groupBookings(
+  bookings: BookingRow[],
+  viewMode: BookingGroupView,
+): BookingGroup[] {
+  const grouped = new Map<string, BookingRow[]>();
+
+  for (const booking of bookings) {
+    const serviceDate =
+      booking.confirmed_route_day ??
+      booking.suggested_service_date ??
+      booking.requested_date;
+
+    const key =
+      viewMode === "collection"
+        ? booking.collection_day ?? "unknown"
+        : serviceDate
+          ? `date:${serviceDate}`
+          : "unscheduled";
+
+    const existing = grouped.get(key) ?? [];
+    existing.push(booking);
+    grouped.set(key, existing);
+  }
+
+  return Array.from(grouped.entries())
+    .map(([key, groupedBookings]) => {
+      const sortedBookings = [...groupedBookings].sort(
+        compareGroupedBookings,
+      );
+
+      const tones = sortedBookings.map(
+        (booking) => getBookingNextAction(booking).tone,
+      );
+
+      const tone: BookingTone = tones.includes("danger")
+        ? "danger"
+        : tones.includes("warning")
+          ? "warning"
+          : tones.every((item) => item === "neutral")
+            ? "neutral"
+            : "good";
+
+      const reviewCount = tones.filter(
+        (item) => item === "warning",
+      ).length;
+
+      const blockedCount = tones.filter(
+        (item) => item === "danger",
+      ).length;
+
+      return {
+        key,
+        label: bookingGroupLabel(key, viewMode),
+        bookings: sortedBookings,
+        customerCount: sortedBookings.length,
+        binCount: sortedBookings.reduce(
+          (total, booking) => total + booking.bin_count,
+          0,
+        ),
+        tone,
+        statusLabel:
+          tone === "danger"
+            ? `${blockedCount} blocked`
+            : tone === "warning"
+              ? `${reviewCount} review`
+              : tone === "neutral"
+                ? "Inactive"
+                : "Ready",
+      };
+    })
+    .sort((a, b) => compareBookingGroups(a, b, viewMode));
+}
+
+function compareGroupedBookings(a: BookingRow, b: BookingRow) {
+  const aWindow = collectionWindowOrder.indexOf(
+    a.collection_time_window ?? "not_sure",
+  );
+
+  const bWindow = collectionWindowOrder.indexOf(
+    b.collection_time_window ?? "not_sure",
+  );
+
+  if (aWindow !== bWindow) {
+    return aWindow - bWindow;
+  }
+
+  const aTime = a.earliest_safe_service_time ?? "99:99:99";
+  const bTime = b.earliest_safe_service_time ?? "99:99:99";
+
+  if (aTime !== bTime) {
+    return aTime.localeCompare(bTime);
+  }
+
+  return bookingCustomerName(a).localeCompare(
+    bookingCustomerName(b),
+  );
+}
+
+function compareBookingGroups(
+  a: BookingGroup,
+  b: BookingGroup,
+  viewMode: BookingGroupView,
+) {
+  if (viewMode === "service") {
+    if (a.key === "unscheduled") return 1;
+    if (b.key === "unscheduled") return -1;
+
+    return a.key.localeCompare(b.key);
+  }
+
+  return (
+    collectionDayOrder.indexOf(a.key) -
+    collectionDayOrder.indexOf(b.key)
+  );
+}
+
+function bookingGroupLabel(
+  key: string,
+  viewMode: BookingGroupView,
+) {
+  if (viewMode === "service") {
+    if (key === "unscheduled") {
+      return "Needs scheduling";
+    }
+
+    return formatAdminDate(key.replace("date:", ""));
+  }
+
+  if (key === "unknown") {
+    return "Collection day not captured";
+  }
+
+  return `${humanizeStatus(key)} collection`;
+}
+
+function formatBookingRowSummary(booking: BookingRow) {
+  const time = booking.earliest_safe_service_time
+    ? formatAdminTime(booking.earliest_safe_service_time)
+    : "Time pending";
+
+  const bins = `${booking.bin_count} ${
+    booking.bin_count === 1 ? "bin" : "bins"
+  }`;
+
+  return [
+    time,
+    bins,
+    formatFrequency(booking.frequency),
+    humanizeStatus(booking.payment_status),
+  ].join(" · ");
+}
+
+function formatAdminTime(value: string) {
+  const [hoursValue, minutesValue] = value
+    .split(":")
+    .map(Number);
+
+  if (
+    !Number.isFinite(hoursValue) ||
+    !Number.isFinite(minutesValue)
+  ) {
+    return value;
+  }
+
+  const date = new Date();
+  date.setHours(hoursValue, minutesValue, 0, 0);
+
+  return new Intl.DateTimeFormat("en-US", {
+    hour: "numeric",
+    minute: "2-digit",
+  }).format(date);
+}
+
+function formatCollectionWindow(value: string) {
+  const labels: Record<string, string> = {
+    before_6_am: "Before 6:00 AM",
+    "6_8_am": "6:00–8:00 AM",
+    "8_10_am": "8:00–10:00 AM",
+    "10_am_12_pm": "10:00 AM–12:00 PM",
+    "12_2_pm": "12:00–2:00 PM",
+    "2_4_pm": "2:00–4:00 PM",
+    "4_6_pm": "4:00–6:00 PM",
+    after_6_pm: "After 6:00 PM",
+    varies: "Varies",
+    not_sure: "Not sure",
+  };
+
+  return labels[value] ?? humanizeStatus(value);
+}
+
+function formatProfileName(profile: {
+  first_name: string | null;
+  last_name: string | null;
+  email: string | null;
+}) {
+  return (
+    [profile.first_name, profile.last_name]
+      .filter(Boolean)
+      .join(" ") ||
+    profile.email ||
+    "Unnamed technician"
+  );
+}
+
+function googleMapsHref(booking: BookingRow) {
+  const address = [
+    booking.street_address,
+    booking.city,
+    booking.state,
+    booking.zip_code,
+  ]
+    .filter(Boolean)
+    .join(", ");
+
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(
+    address,
+  )}`;
 }
 
 function foundingSpecialLabel(
