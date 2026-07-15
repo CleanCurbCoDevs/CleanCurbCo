@@ -165,7 +165,7 @@ async function updatePaymentState(input: {
         previousBooking.payment_status === "paid" &&
         input.bookingPaymentStatus !== "refunded";
 
-      const bookingUpdate: Record<string, unknown> = {
+      const bookingUpdate: Partial<BookingRow> = {
         stripe_checkout_session_id:
           input.checkoutSessionId ??
           previousBooking.stripe_checkout_session_id,
