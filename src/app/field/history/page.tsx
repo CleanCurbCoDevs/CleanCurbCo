@@ -26,6 +26,15 @@ export const metadata: Metadata = {
 type HistoryPageProps = {
   searchParams?: Promise<{
     q?: string;
+    year?: string;
+    month?: string;
+    day?: string;
+    status?: string;
+    technician?: string;
+    time?: string;
+    proof?: string;
+    issues?: string;
+    sort?: string;
   }>;
 };
 
@@ -75,7 +84,17 @@ export default async function FieldHistoryPage({
 }: HistoryPageProps) {
   const context = await getFieldContext("/field/history");
   const query = await searchParams;
+  
   const searchTerm = query?.q?.trim().toLowerCase() ?? "";
+  const selectedYear = query?.year ?? "";
+  const selectedMonth = query?.month ?? "";
+  const selectedDay = query?.day ?? "";
+  const selectedStatus = query?.status ?? "";
+  const selectedTechnician = query?.technician ?? "";
+  const selectedTime = query?.time ?? "";
+  const selectedProof = query?.proof ?? "";
+  const issuesOnly = query?.issues === "true";
+  const selectedSort = query?.sort ?? "newest";
 
   if (context.auth.status !== "ok") {
     return (
@@ -213,10 +232,45 @@ export default async function FieldHistoryPage({
         );
       });
 
-  const filteredRecords = searchTerm
-    ? visibleRecords.filter((record) => {
-        const booking = record.booking;
-
+  const availableYears = Array.from(
+    new Set(
+      visibleRecords.map((record) =>
+        getEasternDateParts(record.eventDate).year,
+      ),
+    ),
+  ).sort((a, b) => Number(b) - Number(a));
+  
+  const availableTechnicians = Array.from(
+    new Map(
+      visibleRecords
+        .filter((record) => record.technician)
+        .map((record) => {
+          const technician = record.technician!;
+  
+          const name =
+            [technician.first_name, technician.last_name]
+              .filter(Boolean)
+              .join(" ") ||
+            technician.email ||
+            "Technician";
+  
+          return [
+            technician.id,
+            {
+              id: technician.id,
+              name,
+            },
+          ] as const;
+        }),
+    ).values(),
+  ).sort((a, b) => a.name.localeCompare(b.name));
+  
+  const filteredRecords = visibleRecords
+    .filter((record) => {
+      const booking = record.booking;
+      const dateParts = getEasternDateParts(record.eventDate);
+  
+      if (searchTerm) {
         const searchableText = [
           booking?.first_name,
           booking?.last_name,
@@ -234,11 +288,105 @@ export default async function FieldHistoryPage({
           .filter(Boolean)
           .join(" ")
           .toLowerCase();
-
-        return searchableText.includes(searchTerm);
-      })
-    : visibleRecords;
-
+  
+        if (!searchableText.includes(searchTerm)) {
+          return false;
+        }
+      }
+  
+      if (
+        selectedYear &&
+        dateParts.year !== selectedYear
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedMonth &&
+        dateParts.month !== selectedMonth
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedDay &&
+        dateParts.date !== selectedDay
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedStatus &&
+        record.stop.status !== selectedStatus
+      ) {
+        return false;
+      }
+  
+      if (
+        canViewAllHistory &&
+        selectedTechnician &&
+        record.technician?.id !== selectedTechnician
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedTime &&
+        getTimeOfDay(record.eventDate) !== selectedTime
+      ) {
+        return false;
+      }
+  
+      const checklistComplete =
+        record.checklist?.status === "submitted";
+  
+      const proofComplete =
+        record.beforePhotoCount > 0 &&
+        checklistComplete &&
+        record.afterPhotoCount > 0;
+  
+      if (
+        selectedProof === "complete" &&
+        !proofComplete
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedProof === "missing_before" &&
+        record.beforePhotoCount > 0
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedProof === "missing_checklist" &&
+        checklistComplete
+      ) {
+        return false;
+      }
+  
+      if (
+        selectedProof === "missing_after" &&
+        record.afterPhotoCount > 0
+      ) {
+        return false;
+      }
+  
+      const hasIssue =
+        record.stop.status === "needs_follow_up" ||
+        record.stop.issue_flags.length > 0 ||
+        record.issuePhotoCount > 0;
+  
+      if (issuesOnly && !hasIssue) {
+        return false;
+      }
+  
+      return true;
+    })
+    .sort((a, b) =>
+      sortHistoryRecords(a, b, selectedSort),
+    );
   const completedRecords = visibleRecords.filter(
     (record) => record.stop.status === "completed",
   );
@@ -273,6 +421,32 @@ export default async function FieldHistoryPage({
     filteredRecords,
   );
 
+  const hasActiveFilters = Boolean(
+    searchTerm ||
+      selectedYear ||
+      selectedMonth ||
+      selectedDay ||
+      selectedStatus ||
+      selectedTechnician ||
+      selectedTime ||
+      selectedProof ||
+      issuesOnly ||
+      selectedSort !== "newest",
+  );
+  
+  const activeFilterCount = [
+    searchTerm,
+    selectedYear,
+    selectedMonth,
+    selectedDay,
+    selectedStatus,
+    selectedTechnician,
+    selectedTime,
+    selectedProof,
+    issuesOnly ? "issues" : "",
+    selectedSort !== "newest" ? selectedSort : "",
+  ].filter(Boolean).length;
+  
   return (
     <FieldShell
       title={
