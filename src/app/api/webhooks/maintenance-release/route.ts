@@ -169,6 +169,7 @@ export async function POST(request: Request) {
   }
 
   if (
+    event.type !== "deployment.promoted" &&
     event.type !== "deployment.ready" &&
     event.type !== "deployment.succeeded"
   ) {
