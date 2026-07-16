@@ -11,7 +11,16 @@ export const metadata: Metadata = {
   description: "Clean Curb Co. customer portal.",
 };
 
-export default async function PortalPage() {
+type PortalPageProps = {
+  searchParams: Promise<{
+    bookingLink?: string;
+  }>;
+};
+
+export default async function PortalPage({
+  searchParams,
+}: PortalPageProps) {
+  const params = await searchParams;
   const context = await getPortalContext("/portal");
   const latestBooking = context.bookings[0];
   const profilePaymentMethodOnFile =
@@ -30,6 +39,30 @@ export default async function PortalPage() {
 
   return (
     <PortalShell title="Customer portal" auth={context.auth}>
+      {params.bookingLink === "success" ? (
+        <section
+          className="confirmation-panel dashboard-banner"
+          role="status"
+        >
+          <h2>Booking connected successfully.</h2>
+          <p>
+            This booking is now attached to your personal Clean
+            Curb Co. account.
+          </p>
+        </section>
+      ) : params.bookingLink === "failed" ? (
+        <section
+          className="placeholder-panel dashboard-banner"
+          role="alert"
+        >
+          <h2>The booking could not be connected.</h2>
+          <p>
+            Your login worked, but the booking access link was
+            invalid, expired, or already attached to another
+            account. Please contact us so we can reconnect it.
+          </p>
+        </section>
+      ) : null}
       <section className="dashboard-grid">
         {paymentSetupBooking ? (
           <article className="placeholder-panel dashboard-banner">
