@@ -94,9 +94,51 @@ export async function createBookingCheckout({
   let paymentId: string | null = null;
 
   try {
-    let stripeCustomerId = booking.stripe_customer_id;
+let stripeCustomerId = booking.stripe_customer_id;
 
-    if (!stripeCustomerId) {
+if (stripeCustomerId) {
+  try {
+    const existingCustomer =
+      await stripe.customers.retrieve(
+        stripeCustomerId,
+      );
+
+    if (existingCustomer.deleted) {
+      stripeCustomerId = null;
+    }
+  } catch (error) {
+    const code =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error
+        ? String(
+            (error as { code?: unknown }).code ?? "",
+          )
+        : "";
+
+    if (code === "resource_missing") {
+      logger.warn(
+        "booking_checkout_stale_stripe_customer",
+        {
+          requestId,
+          route: "/api/bookings",
+          bookingId: booking.id,
+          customerId: booking.customer_id,
+          metadata: {
+            staleStripeCustomerId:
+              booking.stripe_customer_id,
+          },
+        },
+      );
+
+      stripeCustomerId = null;
+    } else {
+      throw error;
+    }
+  }
+}
+
+if (!stripeCustomerId) {
       const customer = await stripe.customers.create({
         email: booking.email,
         name: `${booking.first_name} ${booking.last_name}`.trim(),
