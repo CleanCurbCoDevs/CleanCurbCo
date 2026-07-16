@@ -9,6 +9,7 @@ import {
   startBreakAction,
   uploadServicePhotosAction,
 } from "@/app/field/actions";
+import { FieldServiceProgress } from "@/components/field-service-progress";
 import {
   ActionSubmitButton,
   FeedbackForm,
@@ -25,6 +26,7 @@ import { ensureServiceChecklistBundle } from "@/lib/service-checklists";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isAdminRole } from "@/lib/supabase/roles";
 import type { ServicePhotoRow } from "@/types/database";
+import { FieldStopOverview } from "@/components/field-stop-overview";
 
 export const metadata: Metadata = {
   title: "Field Stop",
@@ -103,6 +105,7 @@ export default async function FieldStopPage({
   const googleMaps = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
   const beforePhotos = signedPhotos.filter((photo) => photo.photo_type === "before");
   const afterPhotos = signedPhotos.filter((photo) => photo.photo_type === "after");
+  const checklistComplete = stop.status === "completed";
   const issuePhotos = signedPhotos.filter(
     (photo) => photo.photo_type === "issue" || photo.photo_type === "other",
   );
@@ -130,92 +133,22 @@ export default async function FieldStopPage({
 
   return (
     <FieldShell title={`Stop #${displayStopNumber}`} auth={context.auth}>
-      <section className="field-card field-summary-card">
-        <div className="field-card-top">
-          <div className="status-stack">
-            {stop.optimoroute_stop_sequence ? (
-              <span className="status-badge status-imported">
-                Optimized #{stop.optimoroute_stop_sequence}
-              </span>
-            ) : (
-              <span className="status-badge status-neutral">
-                Manual #{stop.stop_order || 1}
-              </span>
-            )}
-            <span className={`status-badge status-${stop.status}`}>
-              {humanizeStatus(stop.status)}
-            </span>
-          <span className={`status-badge status-${booking.payment_status}`}>
-            {humanizeStatus(booking.payment_status)}
-          </span>
-          
-          {clearance.requiresCollection ? (
-            <span className="status-badge status-pending">
-              PAYMENT DUE AT STOP
-            </span>
-          ) : null}
-          </div>
-          <Link className="button button-outline" href="/field/today">
-            Today
-          </Link>
-        </div>
-        <h2>
-          {booking.first_name} {booking.last_name}
-        </h2>
-        <p className="field-address">{addressText}</p>
-        <div className="field-actions">
-          <a className="button button-outline" href={appleMaps} target="_blank" rel="noreferrer">
-            Apple Maps
-          </a>
-          <a className="button button-outline" href={googleMaps} target="_blank" rel="noreferrer">
-            Google Maps
-          </a>
-          <a className="button button-outline" href={`tel:${booking.phone}`}>
-            Call
-          </a>
-          <a className="button button-outline" href={`mailto:${booking.email}`}>
-            Email
-          </a>
-        </div>
-        <div className="field-meta-grid">
-          <span>Neighborhood: {booking.neighborhood ?? "Not listed"}</span>
-          <span>Bins: {booking.bin_count}</span>
-          <span>Types: {booking.bin_types.join(", ") || "Not listed"}</span>
-          <span>Add-ons: {booking.add_ons.join(", ") || "None"}</span>
-          <span>Route day: {routeDay?.route_date ?? visit.route_day ?? "Not set"}</span>
-          <span>Arrival: {formatArrivalWindow(visit.arrival_window_start, visit.arrival_window_end)}</span>
-          <span>Gate: {address?.gate_code ?? "None"}</span>
-          <span>Water: {booking.water_spigot_available ?? "not sure"}</span>
-          <span>
-            OptimoRoute:{" "}
-            {stop.optimoroute_stop_sequence
-              ? `Stop ${stop.optimoroute_stop_sequence}`
-              : "not imported"}
-          </span>
-          <span>
-            Schedule:{" "}
-            {scheduledTime
-              ? `${scheduledTime}${eta && eta !== scheduledTime ? ` ETA ${eta}` : ""}`
-              : "not imported"}
-          </span>
-          <span>
-            Travel:{" "}
-            {stop.optimoroute_travel_time_seconds
-              ? formatDuration(stop.optimoroute_travel_time_seconds)
-              : "not imported"}
-            {stop.optimoroute_distance_meters
-              ? ` / ${formatDistance(stop.optimoroute_distance_meters)}`
-              : ""}
-          </span>
-          <span>Driver: {stop.optimoroute_driver_name ?? "not assigned"}</span>
-        </div>
-        {booking.customer_notes || address?.notes || stop.technician_notes ? (
-          <div className="field-note">
-            <strong>Notes:</strong>{" "}
-            {booking.customer_notes ?? address?.notes ?? stop.technician_notes}
-          </div>
-        ) : null}
-      </section>
+      <FieldStopOverview
+        address={address}
+        booking={booking}
+        clearance={clearance}
+        payment={latestPayment}
+        routeDay={routeDay}
+        stop={stop}
+        visit={visit}
+      />
+
+      <FieldServiceProgress
+        status={stop.status}
+        beforePhotoCount={beforePhotos.length}
+        afterPhotoCount={afterPhotos.length}
+        checklistComplete={checklistComplete}
+      />
 
       <FieldStopActions
         clearance={clearance}
@@ -516,52 +449,172 @@ function PhotoSection({
   visitId: string;
   photos: Array<ServicePhotoRow & { signedUrl: string | null }>;
 }) {
+  const isBefore = photoType === "before";
+  const isAfter = photoType === "after";
+  const isIssue = photoType === "issue";
+
+  const heading = isBefore
+    ? "Before Photos"
+    : isAfter
+      ? "After Photos"
+      : "Issue Photos";
+
+  const description = isBefore
+    ? "Document the condition before cleaning begins."
+    : isAfter
+      ? "Show the finished result before leaving the stop."
+      : "Capture anything unusual, damaged, blocked, or unsafe.";
+
+  const emptyMessage = isBefore
+    ? "No before photos yet."
+    : isAfter
+      ? "No after photos yet."
+      : "No issue photos uploaded.";
+
   return (
-    <section className="field-card">
-      <p className="section-kicker">{title}</p>
+    <section
+      className={[
+        "photo-stage",
+        `photo-stage-${photoType}`,
+        photos.length ? "has-photos" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="photo-stage-heading">
+        <div>
+          <p className="section-kicker">{heading}</p>
+          <h2>{title}</h2>
+          <p>{description}</p>
+        </div>
+
+        <div className="photo-stage-count">
+          <strong>{photos.length}</strong>
+          <span>{photos.length === 1 ? "photo" : "photos"}</span>
+        </div>
+      </div>
+
       <FeedbackForm
         action={uploadServicePhotosAction}
-        className="field-form"
+        className="photo-stage-form"
         pendingMessage="Uploading photos..."
-        successMessage={`${title} uploaded.`}
+        successMessage={`${heading} uploaded.`}
       >
         <input type="hidden" name="visitId" value={visitId} />
         <input type="hidden" name="photoType" value={photoType} />
-        <input accept="image/*" capture="environment" multiple name="photos" type="file" />
-        <ActionSubmitButton className="button button-dark" pendingLabel="Uploading...">
-          {actionLabel}
+
+        <label className="photo-upload-control">
+          <span className="photo-upload-icon" aria-hidden="true">
+            📷
+          </span>
+
+          <span className="photo-upload-copy">
+            <strong>{actionLabel}</strong>
+            <small>
+              Open the camera or choose multiple photos from the device.
+            </small>
+          </span>
+
+          <input
+            accept="image/*"
+            capture="environment"
+            multiple
+            name="photos"
+            type="file"
+          />
+        </label>
+
+        <ActionSubmitButton
+          className="photo-upload-submit"
+          pendingLabel="Uploading..."
+        >
+          Upload Selected Photos
         </ActionSubmitButton>
       </FeedbackForm>
+
       {photos.length ? (
-        <div className="field-photo-grid">
-          {photos.map((photo) => (
-            <figure key={photo.id}>
-              {photo.signedUrl ? (
-                // Supabase signed service-photo URLs are short-lived and intentionally rendered directly.
-                // eslint-disable-next-line @next/next/no-img-element
-                <img alt={`${photo.photo_type} service upload`} src={photo.signedUrl} />
-              ) : (
-                <div className="field-photo-placeholder">Photo unavailable</div>
-              )}
-              <FeedbackForm
-                action={deleteServicePhotoAction}
-                pendingMessage="Deleting photo..."
-                successMessage="Photo deleted."
-              >
-                <input type="hidden" name="photoId" value={photo.id} />
-                <input type="hidden" name="visitId" value={visitId} />
-                <ActionSubmitButton
-                  className="link-button destructive"
-                  pendingLabel="Deleting..."
+        <>
+          <div className="photo-stage-success">
+            <span aria-hidden="true">✓</span>
+
+            <div>
+              <strong>
+                {photos.length} {photoType}{" "}
+                {photos.length === 1 ? "photo" : "photos"} saved
+              </strong>
+
+              <small>
+                Add more at any time before completing the stop.
+              </small>
+            </div>
+          </div>
+
+          <div className="field-photo-grid photo-stage-grid">
+            {photos.map((photo, index) => (
+              <figure className="photo-stage-item" key={photo.id}>
+                <div className="photo-stage-image">
+                  {photo.signedUrl ? (
+                    // Supabase signed service-photo URLs are short-lived and intentionally rendered directly.
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      alt={`${photo.photo_type} service upload ${index + 1}`}
+                      src={photo.signedUrl}
+                    />
+                  ) : (
+                    <div className="field-photo-placeholder">
+                      Photo unavailable
+                    </div>
+                  )}
+
+                  <span className="photo-stage-index">
+                    {index + 1}
+                  </span>
+                </div>
+
+                <FeedbackForm
+                  action={deleteServicePhotoAction}
+                  pendingMessage="Deleting photo..."
+                  successMessage="Photo deleted."
                 >
-                  Delete / Retry
-                </ActionSubmitButton>
-              </FeedbackForm>
-            </figure>
-          ))}
-        </div>
+                  <input
+                    type="hidden"
+                    name="photoId"
+                    value={photo.id}
+                  />
+
+                  <input
+                    type="hidden"
+                    name="visitId"
+                    value={visitId}
+                  />
+
+                  <ActionSubmitButton
+                    className="photo-delete-button"
+                    pendingLabel="Deleting..."
+                  >
+                    Delete
+                  </ActionSubmitButton>
+                </FeedbackForm>
+              </figure>
+            ))}
+          </div>
+        </>
       ) : (
-        <p className="muted">No {photoType} photos uploaded yet.</p>
+        <div className="photo-stage-empty">
+          <span aria-hidden="true">
+            {isIssue ? "⚠" : "📷"}
+          </span>
+
+          <div>
+            <strong>{emptyMessage}</strong>
+
+            <small>
+              {isIssue
+                ? "Only upload these when something needs documentation."
+                : "At least one photo should be taken for this stage."}
+            </small>
+          </div>
+        </div>
       )}
     </section>
   );

@@ -1,105 +1,123 @@
+import type { ReactNode } from "react";
 import Link from "next/link";
-import { LogoutButton } from "@/components/logout-button";
-import { requireField, type AuthResult } from "@/lib/supabase/auth";
-import { isAdminRole } from "@/lib/supabase/roles";
+import { LayoutDashboard } from "lucide-react";
+import { FieldBottomNav } from "@/components/field-bottom-nav";
 import { humanizeStatus } from "@/lib/booking-utils";
+import {
+  requireField,
+  type AuthResult,
+} from "@/lib/supabase/auth";
+import { isAdminRole } from "@/lib/supabase/roles";
 
-const fieldLinks = [
-  { label: "Today", href: "/field/today" },
-  { label: "Routes", href: "/field/routes" },
-  { label: "Breaks", href: "/field/breaks" },
-  { label: "History", href: "/field/history" },
-];
+type FieldShellProps = {
+  title: string;
+  subtitle?: string;
+  children?: ReactNode;
+  auth?: AuthResult;
+};
 
 export async function FieldShell({
   title,
+  subtitle,
   children,
   auth,
-}: {
-  title: string;
-  children?: React.ReactNode;
-  auth?: AuthResult;
-}) {
+}: FieldShellProps) {
   const currentAuth = auth ?? (await requireField("/field/today"));
 
   if (currentAuth.status !== "ok") {
     return (
-      <main className="field-app">
-        <div className="field-shell">
-          <section className="field-access-card">
-            <p className="section-kicker">Clean Curb Co.</p>
-            <h1>Field App Access</h1>
-            <p>
-              This area is for Clean Curb Co. service team members only.
-            </p>
-            <div className="field-actions">
-              <Link className="button button-primary" href="/portal">
-                Go to Customer Portal
-              </Link>
-              <LogoutButton />
-            </div>
-          </section>
-        </div>
+      <main className="field-app field-app-access">
+        <section className="field-access-card">
+          <p className="section-kicker">Clean Curb Co.</p>
+
+          <h1>Field App Access</h1>
+
+          <p>
+            This area is reserved for Clean Curb Co. service team members.
+          </p>
+
+          <div className="field-actions">
+            <Link className="button button-primary" href="/login">
+              Employee Login
+            </Link>
+
+            <Link className="button button-outline" href="/portal">
+              Customer Portal
+            </Link>
+          </div>
+        </section>
       </main>
     );
   }
 
   const canSeeAdminLinks = isAdminRole(currentAuth.profile.role);
+
+  const technicianName =
+    [
+      currentAuth.profile.first_name,
+      currentAuth.profile.last_name,
+    ]
+      .filter(Boolean)
+      .join(" ") ||
+    currentAuth.email ||
+    "Clean Curb Technician";
+
   const today = new Intl.DateTimeFormat("en-US", {
-    weekday: "short",
+    weekday: "long",
     month: "short",
     day: "numeric",
-    year: "numeric",
   }).format(new Date());
 
   return (
     <main className="field-app">
-      <div className="field-shell">
-        <header className="field-header">
-          <div className="field-header-main">
+      <div className="field-shell field-shell-v2">
+        <header className="field-topbar">
+          <div className="field-topbar-brand">
+            <span className="field-brand-mark" aria-hidden="true">
+              CCC
+            </span>
+
             <div>
-              <p className="section-kicker">Clean Curb Co.</p>
-              <h1>Field Command</h1>
-              <p>
-                Route operations, service photos, checklists, and payments.
-              </p>
-            </div>
-            <div className="field-header-meta">
-              <span className={`status-badge status-${currentAuth.profile.role}`}>
-                {humanizeStatus(currentAuth.profile.role)}
-              </span>
-              <span className="field-date-pill">{today}</span>
-              <span className="field-online-pill">Online</span>
+              <p>Clean Curb Co.</p>
+              <strong>Field Operations</strong>
             </div>
           </div>
-          <div className="field-header-actions">
+
+          <div className="field-topbar-actions">
             {canSeeAdminLinks ? (
-              <>
-                <Link className="button button-outline light" href="/admin">
-                  Back to Admin
-                </Link>
-                <Link className="button button-outline light" href="/admin/routes">
-                  Admin Routes
-                </Link>
-              </>
+            <Link
+              className="field-admin-link"
+              href="/admin"
+              aria-label="Open admin dashboard"
+            >
+              <LayoutDashboard size={19} aria-hidden="true" />
+              <span>Admin</span>
+            </Link>
             ) : null}
-            <LogoutButton />
           </div>
         </header>
-        <section className="field-title-strip">
+
+        <section className="field-welcome-strip">
           <div>
-            <p className="section-kicker">Current View</p>
-            <h2>{title}</h2>
+            <p className="field-welcome-date">{today}</p>
+
+            <h1>{title}</h1>
+
+            {subtitle ? <p>{subtitle}</p> : null}
+          </div>
+
+          <div className="field-user-chip">
+            <span>{technicianName}</span>
+
+            <small>
+              {humanizeStatus(currentAuth.profile.role)}
+            </small>
           </div>
         </section>
-        <nav className="field-nav" aria-label="Field app navigation">
-          {fieldLinks.map((link) => (
-            <Link href={link.href} key={link.href}>
-              {link.label}
-            </Link>
-          ))}
-        </nav>
-        {children}
+
+        <div className="field-content">{children}</div>
+
+        <FieldBottomNav />
       </div>
     </main>
   );
