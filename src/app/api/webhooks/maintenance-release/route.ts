@@ -120,15 +120,17 @@ async function sendReleaseEmail(row: WaitlistRow) {
   }
 
   const reason =
-    "reason" in result
+    "reason" in result && result.reason
       ? result.reason
-      : "error" in result
+      : "error" in result && result.error
         ? String(result.error)
         : "Unknown email failure";
-
+  
   await admin
     .from("maintenance_waitlist")
-    .update({ notification_error: reason.slice(0, 1000) })
+    .update({
+      notification_error: reason.slice(0, 1000),
+    })
     .eq("id", row.id);
 
   return { sent: false };
