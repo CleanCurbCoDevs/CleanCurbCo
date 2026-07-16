@@ -105,7 +105,8 @@ export default async function FieldStopPage({
   const googleMaps = `https://www.google.com/maps/search/?api=1&query=${encodedAddress}`;
   const beforePhotos = signedPhotos.filter((photo) => photo.photo_type === "before");
   const afterPhotos = signedPhotos.filter((photo) => photo.photo_type === "after");
-  const checklistComplete = stop.status === "completed";
+  const checklistComplete =
+  serviceChecklistBundle?.checklist.status === "submitted";
   const issuePhotos = signedPhotos.filter(
     (photo) => photo.photo_type === "issue" || photo.photo_type === "other",
   );
@@ -164,19 +165,20 @@ export default async function FieldStopPage({
         visitId={visit.id}
       />
 
-      <section className="field-card">
-        <p className="section-kicker">Service Checklist</p>
-        {serviceChecklistBundle ? (
-          <ServiceChecklistPanel
-            bundle={serviceChecklistBundle}
-            documents={signedChecklistDocuments}
-            notice={query.checklist}
-            returnTo={`/field/stops/${visit.id}`}
-          />
-        ) : (
-          <p className="muted">Full checklist is not available for this stop yet.</p>
-        )}
-      </section>
+      {serviceChecklistBundle ? (
+        <ServiceChecklistPanel
+          bundle={serviceChecklistBundle}
+          documents={signedChecklistDocuments}
+          notice={query.checklist}
+          returnTo={`/field/stops/${visit.id}`}
+        />
+      ) : (
+        <section className="field-card">
+          <p className="muted">
+            Checklist is not available for this stop yet.
+          </p>
+        </section>
+      )}
 
       <PhotoSection
         actionLabel="Upload After Photos"
