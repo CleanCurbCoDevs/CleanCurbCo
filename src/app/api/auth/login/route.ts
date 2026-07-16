@@ -27,13 +27,12 @@ async function claimBookingAfterLogin(input: {
   bookingId: string;
   claimToken: string;
   userId: string;
-  userEmail: string;
   requestId: string;
 }) {
   const admin = getSupabaseAdmin();
   const now = new Date().toISOString();
 
-  const { data: claim } = await admin
+  const { data: claim, error: claimError } = await admin
     .from("booking_claims")
     .select("*")
     .eq("booking_id", input.bookingId)
@@ -41,41 +40,57 @@ async function claimBookingAfterLogin(input: {
     .is("used_at", null)
     .gt("expires_at", now)
     .maybeSingle();
-
-  if (
-    !claim ||
-    String(claim.email).trim().toLowerCase() !== input.userEmail
-  ) {
+  
+  if (claimError || !claim) {
     logger.warn("login_booking_claim_invalid", {
       requestId: input.requestId,
       route: "/api/auth/login",
       userId: input.userId,
       bookingId: input.bookingId,
+      error: claimError,
     });
-
+  
     return false;
   }
 
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("*")
-    .eq("id", input.bookingId)
-    .maybeSingle();
-
-  if (
-    !booking ||
-    String(booking.email).trim().toLowerCase() !== input.userEmail
-  ) {
-    logger.warn("login_booking_claim_email_mismatch", {
+  const { data: booking, error: bookingLookupError } =
+    await admin
+      .from("bookings")
+      .select("*")
+      .eq("id", input.bookingId)
+      .maybeSingle();
+  
+  if (bookingLookupError || !booking) {
+    logger.warn("login_booking_claim_booking_missing", {
       requestId: input.requestId,
       route: "/api/auth/login",
       userId: input.userId,
       bookingId: input.bookingId,
+      error: bookingLookupError,
     });
-
+  
     return false;
   }
 
+  if (booking.customer_id === input.userId) {
+    await admin
+      .from("booking_claims")
+      .update({
+        used_at: now,
+      })
+      .eq("id", claim.id);
+  
+    logger.info("login_booking_claim_already_connected", {
+      requestId: input.requestId,
+      route: "/api/auth/login",
+      userId: input.userId,
+      customerId: input.userId,
+      bookingId: booking.id,
+    });
+  
+    return true;
+  }
+    
   if (
     booking.customer_id &&
     booking.customer_id !== input.userId
@@ -301,20 +316,12 @@ export async function POST(request: Request) {
     );
   }
 
-  const authenticatedEmail =
-    String(data.user.email ?? "")
-      .trim()
-      .toLowerCase();
-  
   const bookingClaimed =
-    bookingId &&
-    claimToken &&
-    authenticatedEmail
+    bookingId && claimToken
       ? await claimBookingAfterLogin({
           bookingId,
           claimToken,
           userId: data.user.id,
-          userEmail: authenticatedEmail,
           requestId,
         })
       : false;
@@ -340,5 +347,15 @@ export async function POST(request: Request) {
     },
   });
 
-  return NextResponse.json({ redirectTo, requestId });
+    const finalRedirectTo =
+    bookingId && claimToken
+      ? bookingClaimed
+        ? "/portal?bookingLink=success"
+        : "/portal?bookingLink=failed"
+      : redirectTo;
+  
+  return NextResponse.json({
+    redirectTo: finalRedirectTo,
+    requestId,
+  });
 }
