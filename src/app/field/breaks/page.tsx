@@ -645,10 +645,10 @@ export default async function FieldBreaksPage({
                           routeBreak.route_day_id,
                       );
 
-                    const technicianName =
-                      technicianNames.get(
-                        routeBreak.technician_id,
-                      ) ?? "Technician";
+                    const technicianName = routeBreak.technician_id
+                      ? technicianNames.get(routeBreak.technician_id) ??
+                        "Technician"
+                      : "Technician not recorded";
 
                     return (
                       <details
