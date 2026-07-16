@@ -1,178 +1,316 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  AlertTriangle,
+  CalendarDays,
+  CheckCircle2,
+  ChevronRight,
+  Clock3,
+  MapPinned,
+  Route,
+} from "lucide-react";
+import Link from "next/link";
+
 import { FieldShell } from "@/components/shells/field-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { businessToday, getFieldContext } from "@/lib/field-data";
-import { isAdminRole } from "@/lib/supabase/roles";
+import { sortStopsForField } from "@/lib/optimoroute/route-sync";
 
 export const metadata: Metadata = {
-  title: "Field Routes",
+  title: "Routes | CCC Field",
 };
 
 export default async function FieldRoutesPage() {
   const context = await getFieldContext("/field/routes");
   const today = businessToday();
-  const canUseAdminTools =
-    context.auth.status === "ok" && isAdminRole(context.auth.profile.role);
-  const upcomingRoutes = context.routeDays.filter(
-    (routeDay) => routeDay.route_date >= today && routeDay.status !== "cancelled",
+
+  const visibleRoutes = context.routeDays
+    .filter((routeDay) => routeDay.status !== "cancelled")
+    .sort((a, b) => a.route_date.localeCompare(b.route_date));
+
+  const todaysRoutes = visibleRoutes.filter(
+    (routeDay) => routeDay.route_date === today,
   );
-  const activeRoutes = context.routeDays.filter((routeDay) => routeDay.status === "active");
-  const completedRoutes = context.routeDays.filter((routeDay) => routeDay.status === "completed");
-  const cancelledRoutes = context.routeDays.filter((routeDay) => routeDay.status === "cancelled");
+
+  const upcomingRoutes = visibleRoutes.filter(
+    (routeDay) => routeDay.route_date > today,
+  );
+
+  const completedRoutes = visibleRoutes
+    .filter(
+      (routeDay) =>
+        routeDay.route_date < today ||
+        routeDay.status === "completed",
+    )
+    .sort((a, b) => b.route_date.localeCompare(a.route_date))
+    .slice(0, 6);
 
   return (
-    <FieldShell title="Routes" auth={context.auth}>
-      <section className="field-dashboard-hero compact">
+    <FieldShell
+      title="Routes"
+      subtitle="Today, upcoming work, and recently completed routes."
+      auth={context.auth}
+    >
+      <section className="field-routes-hero">
         <div>
           <p className="section-kicker">Route Board</p>
-          <h2>Upcoming and recent route days.</h2>
+          <h2>Your work, without the clutter.</h2>
+
           <p>
-            Review assigned routes, check progress, and jump into the stops
-            that need attention.
+            Resume today’s route, preview upcoming service days, or
+            review recently completed work.
           </p>
         </div>
-        <div className="field-actions">
-          {canUseAdminTools ? (
-            <>
-              <Link className="button button-primary" href="/admin/routes">
-                Create Route Day
-              </Link>
-              <Link className="button button-outline" href="/admin/routes">
-                Admin Route Builder
-              </Link>
-            </>
-          ) : (
-            <Link className="button button-primary" href="/field/today">
-              Today&apos;s Route
-            </Link>
-          )}
-        </div>
+
+        <Link
+          className="button button-primary"
+          href="/field/today"
+        >
+          <MapPinned size={20} aria-hidden="true" />
+          Open Today
+        </Link>
       </section>
 
-      <section className="field-stat-grid">
-        <Metric label="Upcoming Routes" value={upcomingRoutes.length} />
-        <Metric label="Today" value={context.routeDays.filter((route) => route.route_date === today).length} />
-        <Metric label="Active" value={activeRoutes.length} tone="warning" />
-        <Metric label="Completed" value={completedRoutes.length} tone="success" />
-        <Metric label="Cancelled" value={cancelledRoutes.length} tone="danger" />
-      </section>
+      <RouteGroup
+        emptyDescription="Nothing is assigned for today."
+        emptyTitle="No route today"
+        icon={Route}
+        routes={todaysRoutes}
+        title="Today’s Route"
+        today={today}
+        context={context}
+      />
 
-      {context.routeDays.length ? (
-        <section className="field-route-grid">
-          {context.routeDays.map((routeDay) => {
-            const stops = context.routeStops
-              .filter((stop) => stop.route_day_id === routeDay.id)
-              .sort((a, b) => a.stop_order - b.stop_order);
-            const completed = stops.filter((stop) => stop.status === "completed").length;
-            const unpaid = stops.filter((stop) => {
-              const booking = context.bookings.find((item) => item.id === stop.booking_id);
-              const payment = context.payments.find((item) => item.booking_id === booking?.id);
-              return (payment?.status ?? booking?.payment_status) !== "paid";
-            }).length;
-            const technician = context.profiles.find(
-              (profile) => profile.id === routeDay.assigned_technician_id,
-            );
+      <RouteGroup
+        emptyDescription="New route days will appear here when they are assigned."
+        emptyTitle="No upcoming routes"
+        icon={CalendarDays}
+        routes={upcomingRoutes}
+        title="Upcoming Routes"
+        today={today}
+        context={context}
+      />
 
-            return (
-              <article className="field-route-card" key={routeDay.id}>
-                <div className="field-card-top">
-                  <span className={`status-badge status-${routeDay.status}`}>
-                    {humanizeStatus(routeDay.status)}
-                  </span>
-                  <span className="status-badge">
-                    {completed}/{stops.length} complete
-                  </span>
-                </div>
-                <h2>{routeDay.route_name ?? `${routeDay.service_area} route`}</h2>
-                <p>
-                  {routeDay.route_date} | {routeDay.service_area ?? "Cane Bay"}
-                </p>
-                <div className="field-meta-grid">
-                  <span>
-                    Technician:{" "}
-                    {technician
-                      ? [technician.first_name, technician.last_name]
-                          .filter(Boolean)
-                          .join(" ") || technician.email
-                      : "Unassigned"}
-                  </span>
-                  <span>{stops.length} stop(s)</span>
-                  <span>{unpaid} unpaid</span>
-                  <span>{routeDay.notes ?? "No route notes"}</span>
-                </div>
-                <div className="field-actions">
-                  {stops[0]?.service_visit_id ? (
-                    <Link
-                      className="button button-dark"
-                      href={`/field/stops/${stops[0].service_visit_id}`}
-                    >
-                      Open Route
-                    </Link>
-                  ) : null}
-                  <Link className="button button-outline" href="/field/today">
-                    Today
-                  </Link>
-                  {canUseAdminTools ? (
-                    <Link className="button button-outline" href="/admin/routes">
-                      Edit in Admin
-                    </Link>
-                  ) : null}
-                </div>
-              </article>
-            );
-          })}
-        </section>
-      ) : (
-        <section className="field-empty-state">
-          <div>
-            <p className="section-kicker">Assigned Routes</p>
-            <h2>No route days are built yet.</h2>
-            <p>
-              Routes will appear here after admin creates a route day and adds
-              booking stops.
-            </p>
-          </div>
-          <div className="field-actions">
-            {canUseAdminTools ? (
-              <>
-                <Link className="button button-primary" href="/admin/routes">
-                  Create Route Day
-                </Link>
-                <Link className="button button-outline" href="/admin">
-                  Back to Admin
-                </Link>
-              </>
-            ) : (
-              <>
-                <Link className="button button-primary" href="/field/today">
-                  Check Today
-                </Link>
-                <Link className="button button-outline" href="/field/history">
-                  Recent Routes
-                </Link>
-              </>
-            )}
-          </div>
-        </section>
-      )}
+      <RouteGroup
+        emptyDescription="Completed route days will collect here."
+        emptyTitle="No completed routes yet"
+        icon={CheckCircle2}
+        routes={completedRoutes}
+        title="Recently Completed"
+        today={today}
+        context={context}
+      />
     </FieldShell>
   );
 }
 
-function Metric({
-  label,
-  value,
-  tone = "default",
+function RouteGroup({
+  title,
+  emptyTitle,
+  emptyDescription,
+  routes,
+  context,
+  today,
+  icon: Icon,
 }: {
-  label: string;
-  value: number;
-  tone?: "default" | "success" | "warning" | "danger";
+  title: string;
+  emptyTitle: string;
+  emptyDescription: string;
+  routes: Awaited<
+    ReturnType<typeof getFieldContext>
+  >["routeDays"];
+  context: Awaited<ReturnType<typeof getFieldContext>>;
+  today: string;
+  icon: typeof Route;
 }) {
   return (
-    <article className={`field-metric field-metric-${tone}`}>
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </article>
+    <section className="field-route-group">
+      <div className="field-route-group-heading">
+        <div>
+          <Icon size={22} aria-hidden="true" />
+          <h2>{title}</h2>
+        </div>
+
+        <span>{routes.length}</span>
+      </div>
+
+      {routes.length ? (
+        <div className="field-route-list">
+          {routes.map((routeDay) => {
+            const stops = context.routeStops
+              .filter(
+                (stop) =>
+                  stop.route_day_id === routeDay.id &&
+                  stop.status !== "cancelled",
+              )
+              .sort(sortStopsForField);
+
+            const completedStops = stops.filter(
+              (stop) => stop.status === "completed",
+            );
+
+            const remainingStops = stops.filter(
+              (stop) =>
+                ![
+                  "completed",
+                  "cancelled",
+                  "skipped",
+                  "rescheduled",
+                ].includes(stop.status),
+            );
+
+            const problemStops = stops.filter(
+              (stop) => stop.status === "needs_follow_up",
+            );
+
+            const nextStop = remainingStops[0] ?? null;
+
+            const progress =
+              stops.length > 0
+                ? Math.round(
+                    (completedStops.length / stops.length) * 100,
+                  )
+                : 0;
+
+            const isComplete =
+              stops.length > 0 &&
+              remainingStops.length === 0;
+
+            const routeHref = nextStop?.service_visit_id
+              ? `/field/stops/${nextStop.service_visit_id}`
+              : routeDay.route_date === today
+                ? "/field/today"
+                : "/field/history";
+
+            return (
+              <article
+                className={[
+                  "field-route-summary-card",
+                  isComplete ? "is-complete" : "",
+                  problemStops.length ? "needs-attention" : "",
+                ]
+                  .filter(Boolean)
+                  .join(" ")}
+                key={routeDay.id}
+              >
+                <div className="field-route-summary-top">
+                  <div>
+                    <p className="section-kicker">
+                      {formatRouteDate(
+                        routeDay.route_date,
+                        today,
+                      )}
+                    </p>
+
+                    <h3>
+                      {routeDay.route_name ??
+                        `${routeDay.service_area ?? "Service"} Route`}
+                    </h3>
+
+                    <p>
+                      {routeDay.service_area ??
+                        "Service area not listed"}
+                    </p>
+                  </div>
+
+                  <span
+                    className={`status-badge status-${routeDay.status}`}
+                  >
+                    {humanizeStatus(routeDay.status)}
+                  </span>
+                </div>
+
+                <div className="field-route-progress">
+                  <span style={{ width: `${progress}%` }} />
+                </div>
+
+                <div className="field-route-summary-stats">
+                  <div>
+                    <Route size={20} aria-hidden="true" />
+                    <span>Total</span>
+                    <strong>{stops.length}</strong>
+                  </div>
+
+                  <div>
+                    <CheckCircle2
+                      size={20}
+                      aria-hidden="true"
+                    />
+                    <span>Done</span>
+                    <strong>{completedStops.length}</strong>
+                  </div>
+
+                  <div>
+                    <Clock3 size={20} aria-hidden="true" />
+                    <span>Left</span>
+                    <strong>{remainingStops.length}</strong>
+                  </div>
+
+                  <div>
+                    <AlertTriangle
+                      size={20}
+                      aria-hidden="true"
+                    />
+                    <span>Issues</span>
+                    <strong>{problemStops.length}</strong>
+                  </div>
+                </div>
+
+                {routeDay.notes ? (
+                  <p className="field-route-note">
+                    {routeDay.notes}
+                  </p>
+                ) : null}
+
+                <Link
+                  className={
+                    isComplete
+                      ? "field-route-open-button is-complete"
+                      : "field-route-open-button"
+                  }
+                  href={routeHref}
+                >
+                  <span>
+                    {isComplete
+                      ? "View Completed Route"
+                      : nextStop
+                        ? "Resume Route"
+                        : "View Route"}
+                  </span>
+
+                  <ChevronRight
+                    size={22}
+                    aria-hidden="true"
+                  />
+                </Link>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <div className="field-route-group-empty">
+          <Icon size={34} aria-hidden="true" />
+
+          <div>
+            <strong>{emptyTitle}</strong>
+            <p>{emptyDescription}</p>
+          </div>
+        </div>
+      )}
+    </section>
   );
+}
+
+function formatRouteDate(
+  routeDate: string,
+  today: string,
+) {
+  if (routeDate === today) return "Today";
+
+  const date = new Date(`${routeDate}T12:00:00`);
+
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+  }).format(date);
 }
