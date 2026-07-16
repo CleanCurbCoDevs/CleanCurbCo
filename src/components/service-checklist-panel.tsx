@@ -37,6 +37,205 @@ export function ServiceChecklistPanel({
   const progress = checklistProgress(bundle.items);
   const isSubmitted = bundle.checklist.status === "submitted";
 
+  function FieldChecklist({
+    bundle,
+    groupedItems,
+    isSubmitted,
+    notice,
+    progress,
+    returnTo,
+  }: {
+    bundle: ServiceChecklistBundle;
+    groupedItems: ReturnType<typeof groupChecklistItems>;
+    isSubmitted: boolean;
+    notice?: string;
+    progress: ReturnType<typeof checklistProgress>;
+    returnTo: string;
+  }) {
+    const percent =
+      progress.total > 0
+        ? Math.round((progress.resolved / progress.total) * 100)
+        : 0;
+  
+    return (
+      <section className="field-fast-checklist">
+        <div className="field-checklist-heading">
+          <div>
+            <p className="section-kicker">Cleaning Checklist</p>
+            <h2>
+              {isSubmitted ? "Checklist complete" : "Tap it. Clean it. Move on."}
+            </h2>
+            <p>
+              Mark each item done, note an issue, or choose N/A.
+            </p>
+          </div>
+  
+          <div className="field-checklist-progress-count">
+            <strong>{progress.resolved}</strong>
+            <span>of {progress.total}</span>
+          </div>
+        </div>
+  
+        <div
+          className="field-checklist-progress-bar"
+          aria-label={`${percent}% checklist complete`}
+        >
+          <span style={{ width: `${percent}%` }} />
+        </div>
+  
+        {notice ? <ChecklistNotice notice={notice} /> : null}
+  
+        {isSubmitted ? (
+          <div className="field-checklist-complete-banner">
+            <span aria-hidden="true">✓</span>
+  
+            <div>
+              <strong>Checklist submitted</strong>
+              <small>
+                The service record is locked and the PDF was generated automatically.
+              </small>
+            </div>
+          </div>
+        ) : null}
+  
+        <form
+          action={saveServiceChecklistDraftAction}
+          className="field-fast-checklist-form"
+        >
+          <input type="hidden" name="visitId" value={bundle.visit.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+  
+          {groupedItems.map((section) => {
+            const resolved = section.items.filter(
+              (item) => item.status !== "pending",
+            ).length;
+  
+            return (
+              <section
+                className="field-checklist-group"
+                key={section.sectionKey}
+              >
+                <div className="field-checklist-group-heading">
+                  <h3>{section.sectionName}</h3>
+                  <span>
+                    {resolved}/{section.items.length}
+                  </span>
+                </div>
+  
+                <div className="field-checklist-quick-items">
+                  {section.items.map((item) => (
+                    <article
+                      className={`field-checklist-quick-item status-${item.status}`}
+                      key={item.id}
+                    >
+                      <input
+                        type="hidden"
+                        name="itemId"
+                        value={item.id}
+                      />
+  
+                      <strong>{item.label}</strong>
+  
+                      <fieldset
+                        className="field-checklist-tap-options"
+                        disabled={isSubmitted}
+                      >
+                        <legend className="sr-only">
+                          Status for {item.label}
+                        </legend>
+  
+                        <label className="check-option check-option-done">
+                          <input
+                            defaultChecked={item.status === "completed"}
+                            name={`status-${item.id}`}
+                            type="radio"
+                            value="completed"
+                          />
+                          <span>
+                            <b>✓</b>
+                            Done
+                          </span>
+                        </label>
+  
+                        <label className="check-option check-option-issue">
+                          <input
+                            defaultChecked={item.status === "issue_found"}
+                            name={`status-${item.id}`}
+                            type="radio"
+                            value="issue_found"
+                          />
+                          <span>
+                            <b>!</b>
+                            Issue
+                          </span>
+                        </label>
+  
+                        <label className="check-option check-option-na">
+                          <input
+                            defaultChecked={item.status === "not_applicable"}
+                            name={`status-${item.id}`}
+                            type="radio"
+                            value="not_applicable"
+                          />
+                          <span>
+                            <b>—</b>
+                            N/A
+                          </span>
+                        </label>
+  
+                        <label className="field-checklist-issue-note">
+                          <span>What happened?</span>
+                          <textarea
+                            defaultValue={item.notes ?? ""}
+                            disabled={isSubmitted}
+                            name={`notes-${item.id}`}
+                            placeholder="Briefly describe the issue or limitation."
+                          />
+                        </label>
+                      </fieldset>
+                    </article>
+                  ))}
+                </div>
+              </section>
+            );
+          })}
+  
+          <details className="field-checklist-overall-notes">
+            <summary>Add an overall service note</summary>
+  
+            <label>
+              Notes
+              <textarea
+                defaultValue={bundle.checklist.overall_notes ?? ""}
+                disabled={isSubmitted}
+                name="overallNotes"
+                placeholder="Optional notes for the customer or admin."
+              />
+            </label>
+          </details>
+  
+          {!isSubmitted ? (
+            <div className="field-checklist-submit-actions">
+              <button className="button button-outline" type="submit">
+                Save Progress
+              </button>
+  
+              <button
+                className="field-checklist-finish-button"
+                formAction={submitServiceChecklistAction}
+                name="finalizeAck"
+                type="submit"
+                value="on"
+              >
+                Finish Checklist
+              </button>
+            </div>
+          ) : null}
+        </form>
+      </section>
+    );
+  }
+  
   return (
     <section className="service-checklist-shell">
       <div className="service-checklist-hero">
