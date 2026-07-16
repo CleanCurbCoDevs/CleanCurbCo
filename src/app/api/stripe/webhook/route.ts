@@ -99,6 +99,7 @@ async function updatePaymentState(input: {
   subscriptionId?: string | null;
   paymentStatus: PaymentStatus;
   bookingPaymentStatus?: BookingPaymentStatus;
+  receivedAmount?: number | null;
   failureCode?: string | null;
   failureMessage?: string | null;
   sendReceipt?: boolean;
@@ -111,7 +112,7 @@ async function updatePaymentState(input: {
   const existingPayment = await findPayment(input);
   const paymentId = input.paymentId ?? existingPayment?.id ?? null;
 
-  const paymentUpdate = {
+  const paymentUpdate: Partial<PaymentRow> = {
     status: input.paymentStatus,
     stripe_checkout_session_id: input.checkoutSessionId ?? undefined,
     stripe_payment_intent_id: input.paymentIntentId ?? undefined,
@@ -124,6 +125,14 @@ async function updatePaymentState(input: {
     },
   };
 
+  if (
+    input.receivedAmount !== undefined &&
+    input.receivedAmount !== null
+  ) {
+    paymentUpdate.amount = input.receivedAmount;
+    paymentUpdate.total_amount = input.receivedAmount;
+  }
+  
   if (paymentId) {
     await admin.from("payments").update(paymentUpdate).eq("id", paymentId);
   } else if (input.checkoutSessionId) {
@@ -384,10 +393,16 @@ export async function POST(request: Request) {
           });
           break;
         }
-        const paymentStatus: PaymentStatus =
-          session.payment_status === "paid" ? "paid" : "pending";
-        const bookingStatus: BookingPaymentStatus =
-          session.payment_status === "paid" ? "paid" : "pending";
+          const checkoutPaid =
+            session.payment_status === "paid" ||
+            session.payment_status === "no_payment_required";
+          
+          const paymentStatus: PaymentStatus =
+            checkoutPaid ? "paid" : "pending";
+          
+          const bookingStatus: BookingPaymentStatus =
+            checkoutPaid ? "paid" : "pending";
+        
         await updatePaymentState({
           paymentId: session.metadata?.payment_id ?? null,
           bookingId: session.metadata?.booking_id ?? null,
@@ -396,9 +411,19 @@ export async function POST(request: Request) {
           subscriptionId: getStringId(session.subscription),
           paymentStatus,
           bookingPaymentStatus: bookingStatus,
+          receivedAmount:
+            (session.amount_total ?? 0) / 100,
           sendReceipt: paymentStatus === "paid",
           eventType: event.type,
-          metadata: session.metadata ?? {},
+          metadata: {
+            ...(session.metadata ?? {}),
+            amount_subtotal:
+              (session.amount_subtotal ?? 0) / 100,
+            amount_total:
+              (session.amount_total ?? 0) / 100,
+            amount_discount:
+              (session.total_details?.amount_discount ?? 0) / 100,
+          },
         });
         break;
       }
