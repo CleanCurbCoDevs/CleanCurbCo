@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordBookingEvent } from "@/lib/server/booking-events";
 import Stripe from "stripe";
 import { getStripeEnv } from "@/lib/env";
 import { sendPaymentSetupCompleted } from "@/lib/email/sendOperationsEmail";
@@ -92,6 +93,8 @@ async function recordPaymentEvent(input: {
 }
 
 async function updatePaymentState(input: {
+  requestId: string;
+  stripeEventId: string;
   paymentId?: string | null;
   bookingId?: string | null;
   checkoutSessionId?: string | null;
@@ -239,6 +242,75 @@ async function updatePaymentState(input: {
     },
   });
 
+if (booking) {
+  const bookingEvent =
+    input.paymentStatus === "paid"
+      ? {
+          eventType: "PAYMENT_RECEIVED",
+          outcome: "success" as const,
+          message: "Stripe confirmed payment.",
+        }
+      : input.paymentStatus === "failed"
+        ? {
+            eventType: "PAYMENT_FAILED",
+            outcome: "failure" as const,
+            message: "Stripe reported a failed payment.",
+          }
+        : input.paymentStatus === "refunded"
+          ? {
+              eventType: "PAYMENT_REFUNDED",
+              outcome: "warning" as const,
+              message: "Stripe confirmed a payment refund.",
+            }
+          : input.paymentStatus === "cancelled"
+            ? {
+                eventType:
+                  input.eventType === "checkout.session.expired"
+                    ? "CHECKOUT_EXPIRED"
+                    : "PAYMENT_CANCELLED",
+                outcome: "warning" as const,
+                message:
+                  input.eventType === "checkout.session.expired"
+                    ? "Stripe checkout expired before payment."
+                    : "Stripe payment was cancelled.",
+              }
+            : {
+                eventType: "PAYMENT_PENDING",
+                outcome: "info" as const,
+                message: "Stripe payment remains pending.",
+              };
+
+  await recordBookingEvent({
+    bookingId: booking.id,
+    customerId: booking.customer_id,
+    requestId: input.requestId,
+    route: "/api/stripe/webhook",
+    source: "stripe",
+    eventType: bookingEvent.eventType,
+    outcome: bookingEvent.outcome,
+    message: bookingEvent.message,
+    idempotencyKey: `stripe:${input.stripeEventId}`,
+    metadata: {
+      stripeEventId: input.stripeEventId,
+      stripeEventType: input.eventType,
+      paymentId: payment?.id ?? null,
+      paymentStatus: input.paymentStatus,
+      bookingPaymentStatus:
+        input.bookingPaymentStatus ?? null,
+      checkoutSessionId:
+        input.checkoutSessionId ?? null,
+      paymentIntentId:
+        input.paymentIntentId ?? null,
+      subscriptionId:
+        input.subscriptionId ?? null,
+      receivedAmount:
+        input.receivedAmount ?? null,
+      failureCode:
+        input.failureCode ?? null,
+    },
+  });
+}
+  
   if (input.sendReceipt && booking && payment?.amount) {
     await sendPaymentReceived(booking, payment.amount);
   }
@@ -404,6 +476,8 @@ export async function POST(request: Request) {
             checkoutPaid ? "paid" : "pending";
         
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentId: session.metadata?.payment_id ?? null,
           bookingId: session.metadata?.booking_id ?? null,
           checkoutSessionId: session.id,
@@ -438,6 +512,8 @@ export async function POST(request: Request) {
           break;
         }
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,          
           paymentId: session.metadata?.payment_id ?? null,
           bookingId: session.metadata?.booking_id ?? null,
           checkoutSessionId: session.id,
@@ -453,6 +529,8 @@ export async function POST(request: Request) {
       case "payment_intent.succeeded": {
         const intent = event.data.object as Stripe.PaymentIntent;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentId: intent.metadata?.payment_id ?? null,
           bookingId: intent.metadata?.booking_id ?? null,
           paymentIntentId: intent.id,
@@ -466,6 +544,8 @@ export async function POST(request: Request) {
       case "payment_intent.payment_failed": {
         const intent = event.data.object as Stripe.PaymentIntent;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentId: intent.metadata?.payment_id ?? null,
           bookingId: intent.metadata?.booking_id ?? null,
           paymentIntentId: intent.id,
@@ -482,6 +562,8 @@ export async function POST(request: Request) {
       case "customer.subscription.updated": {
         const subscription = event.data.object as Stripe.Subscription;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentId: subscription.metadata?.payment_id ?? null,
           bookingId: subscription.metadata?.booking_id ?? null,
           subscriptionId: subscription.id,
@@ -501,6 +583,8 @@ export async function POST(request: Request) {
       case "customer.subscription.deleted": {
         const subscription = event.data.object as Stripe.Subscription;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentId: subscription.metadata?.payment_id ?? null,
           bookingId: subscription.metadata?.booking_id ?? null,
           subscriptionId: subscription.id,
@@ -513,6 +597,8 @@ export async function POST(request: Request) {
       case "invoice.payment_succeeded": {
         const invoice = event.data.object as Stripe.Invoice;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           subscriptionId: getInvoiceSubscriptionId(invoice),
           paymentStatus: "paid",
           bookingPaymentStatus: "paid",
@@ -524,6 +610,8 @@ export async function POST(request: Request) {
       case "invoice.payment_failed": {
         const invoice = event.data.object as Stripe.Invoice;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           subscriptionId: getInvoiceSubscriptionId(invoice),
           paymentStatus: "failed",
           bookingPaymentStatus: "failed",
@@ -535,6 +623,8 @@ export async function POST(request: Request) {
       case "charge.refunded": {
         const charge = event.data.object as Stripe.Charge;
         await updatePaymentState({
+          requestId,
+          stripeEventId: event.id,
           paymentIntentId: getStringId(charge.payment_intent),
           paymentStatus: "refunded",
           bookingPaymentStatus: "refunded",
