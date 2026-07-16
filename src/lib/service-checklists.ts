@@ -44,92 +44,76 @@ export const checklistStatuses: readonly ChecklistItemStatus[] = [
 
 const sections = {
   arrival: {
-    name: "Arrival Checklist",
+    name: "Arrival",
     items: [
-      "Confirm correct customer, address, and scheduled service.",
-      "Confirm access to bins/service area.",
-      "Check for locked gates, pets, blocked access, or safety hazards.",
-      "Review visible pre-service condition.",
-      "Confirm equipment/supplies are ready.",
-      "Document any arrival issues.",
+      "Correct address and bins confirmed.",
+      "Bins are accessible and safe to service.",
+      "Before photos taken.",
     ],
   },
+
   bin_cleaning: {
-    name: "Bin Cleaning Checklist",
+    name: "Bin Cleaning",
     items: [
-      "Confirm number of bins to be serviced.",
-      "Inspect bins for damage, biohazards, excessive weight, or blocked access.",
-      "Clean/rinse bin interior.",
-      "Clean exterior touchpoints/handles/lid area as applicable.",
-      "Remove visible residue as reasonably possible.",
-      "Apply deodorizer if included in service.",
-      "Return bins to proper location.",
-      "Document any unserviceable bin, remaining stuck-on debris, damage, or issue.",
+      "Bin interiors cleaned and rinsed.",
+      "Lids, handles, and exterior touchpoints cleaned.",
+      "Visible residue removed as reasonably possible.",
+      "Deodorizer applied if included.",
+      "Bins returned to the proper location.",
     ],
   },
+
   trash_pad_refresh: {
-    name: "Trash Pad Refresh Checklist",
+    name: "Trash Pad Refresh",
     items: [
-      "Inspect trash pad/service area condition.",
-      "Remove loose debris from service area.",
-      "Rinse/clean pad or designated area.",
-      "Treat odor/staining as applicable.",
-      "Confirm area is left tidy.",
-      "Document remaining stains, damage, or access issues.",
+      "Loose debris removed.",
+      "Service area cleaned and rinsed.",
+      "Area left tidy.",
     ],
   },
+
   deodorizer_boost: {
-    name: "Deodorizer Boost Checklist",
+    name: "Deodorizer Boost",
     items: [
-      "Confirm deodorizer service is included.",
-      "Apply deodorizer to appropriate bins/areas.",
-      "Avoid over-application or customer property exposure.",
-      "Confirm odor-control treatment is complete.",
-      "Document any odor concerns or unusual conditions.",
+      "Deodorizer applied to the appropriate bins or areas.",
+      "Treatment completed without overspray or property exposure.",
     ],
   },
+
   heavy_grime_cleanup: {
-    name: "Heavy Grime Cleanup Checklist",
+    name: "Heavy Grime Cleanup",
     items: [
-      "Confirm heavy grime cleanup was booked/approved.",
-      "Document excessive buildup before service.",
-      "Pre-treat affected areas as applicable.",
-      "Perform extra cleaning/agitation/rinse as needed.",
-      "Confirm improved condition after cleaning.",
-      "Document any permanent staining, stuck-on material, or remaining issue.",
+      "Heavy buildup documented before service.",
+      "Affected areas pre-treated and agitated as needed.",
+      "Improved condition confirmed after cleaning.",
     ],
   },
+
   driveway_sidewalk_spot_clean: {
-    name: "Driveway/Sidewalk Spot Clean Checklist",
+    name: "Driveway / Sidewalk Spot Clean",
     items: [
-      "Confirm target spot/area.",
-      "Inspect surface before cleaning.",
-      "Clean/rinse designated spot area.",
-      "Manage runoff as reasonably possible.",
-      "Confirm surrounding area is left clean.",
-      "Document remaining stains, surface damage, or limitations.",
+      "Target area confirmed.",
+      "Target area cleaned and rinsed.",
+      "Surrounding area left clean.",
     ],
   },
+
   pet_waste_cleanup: {
-    name: "Pet Waste Cleanup Checklist",
+    name: "Pet Waste Cleanup",
     items: [
-      "Walk the designated cleanup area.",
-      "Remove visible pet waste from agreed area.",
-      "Dispose of collected waste appropriately.",
-      "Apply odor/sanitation treatment if included.",
-      "Confirm area is completed.",
-      "Document inaccessible areas, excessive waste, hazards, or limitations.",
+      "Agreed cleanup area checked.",
+      "Visible pet waste removed.",
+      "Collected waste disposed of appropriately.",
+      "Area confirmed complete.",
     ],
   },
+
   departure: {
-    name: "Departure Checklist",
+    name: "Finish Up",
     items: [
-      "Confirm all booked services were completed or properly marked with issues.",
-      "Confirm bins/items were returned to proper location.",
-      "Confirm service area was left clean/tidy.",
-      "Confirm gates/access points were closed/secured if applicable.",
-      "Record final notes/issues for customer/admin.",
-      "Technician final sign-off.",
+      "All booked services completed or an issue recorded.",
+      "After photos taken.",
+      "Gates and service area left secure and tidy.",
     ],
   },
 } as const;
