@@ -92,6 +92,17 @@ async function recordPaymentEvent(input: {
   }
 }
 
+function throwIfDatabaseWriteFailed(
+  operation: string,
+  error: { message: string; code?: string } | null,
+) {
+  if (!error) return;
+
+  throw new Error(
+    `${operation}${error.code ? ` (${error.code})` : ""}: ${error.message}`,
+  );
+}
+
 async function updatePaymentState(input: {
   requestId: string;
   stripeEventId: string;
@@ -137,22 +148,54 @@ async function updatePaymentState(input: {
   }
   
   if (paymentId) {
-    await admin.from("payments").update(paymentUpdate).eq("id", paymentId);
+    const { error } = await admin
+      .from("payments")
+      .update(paymentUpdate)
+      .eq("id", paymentId);
+  
+    throwIfDatabaseWriteFailed(
+      "Stripe payment update by payment ID failed",
+      error,
+    );
   } else if (input.checkoutSessionId) {
-    await admin
+    const { error } = await admin
       .from("payments")
       .update(paymentUpdate)
-      .eq("stripe_checkout_session_id", input.checkoutSessionId);
+      .eq(
+        "stripe_checkout_session_id",
+        input.checkoutSessionId,
+      );
+  
+    throwIfDatabaseWriteFailed(
+      "Stripe payment update by checkout session failed",
+      error,
+    );
   } else if (input.paymentIntentId) {
-    await admin
+    const { error } = await admin
       .from("payments")
       .update(paymentUpdate)
-      .eq("stripe_payment_intent_id", input.paymentIntentId);
+      .eq(
+        "stripe_payment_intent_id",
+        input.paymentIntentId,
+      );
+  
+    throwIfDatabaseWriteFailed(
+      "Stripe payment update by payment intent failed",
+      error,
+    );
   } else if (input.subscriptionId) {
-    await admin
+    const { error } = await admin
       .from("payments")
       .update(paymentUpdate)
-      .eq("stripe_subscription_id", input.subscriptionId);
+      .eq(
+        "stripe_subscription_id",
+        input.subscriptionId,
+      );
+  
+    throwIfDatabaseWriteFailed(
+      "Stripe payment update by subscription failed",
+      error,
+    );
   }
 
   const payment = await findPayment({
@@ -219,14 +262,28 @@ async function updatePaymentState(input: {
           "Stripe reported an unsuccessful payment attempt.";
       }
 
-      const { data } = await admin
+      const {
+        data,
+        error: bookingUpdateError,
+      } = await admin
         .from("bookings")
         .update(bookingUpdate)
         .eq("id", bookingId)
         .select("*")
         .maybeSingle();
-
-      booking = data ?? previousBooking;
+      
+      throwIfDatabaseWriteFailed(
+        "Stripe booking payment-state update failed",
+        bookingUpdateError,
+      );
+      
+      if (!data) {
+        throw new Error(
+          `Stripe booking update returned no row for booking ${bookingId}.`,
+        );
+      }
+      
+      booking = data;
     }
   }
 
