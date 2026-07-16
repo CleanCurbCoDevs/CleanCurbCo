@@ -814,16 +814,22 @@ export type Database = {
           email: string;
           created_at: string;
           source: string;
+          notified_at: string | null;
+          notification_error: string | null;
         };
         Insert: {
           id?: string;
           email: string;
           created_at?: string;
           source?: string;
+          notified_at?: string | null;
+          notification_error?: string | null;
         };
         Update: Partial<{
           email: string;
           source: string;
+          notified_at: string | null;
+          notification_error: string | null;
         }>;
         Relationships: [];
       };
