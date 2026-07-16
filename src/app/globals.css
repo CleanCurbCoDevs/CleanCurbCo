@@ -8175,3 +8175,241 @@ form.data-row label textarea,
   }
 }
 
+/* =========================================================
+   FIELD ROUTES V2
+   ========================================================= */
+
+.field-routes-hero {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 20px;
+  color: white;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  padding: clamp(20px, 5vw, 30px);
+}
+
+.field-routes-hero h2 {
+  color: white;
+  font-size: clamp(1.8rem, 8vw, 3rem);
+  letter-spacing: -0.05em;
+  line-height: 0.95;
+  margin: 4px 0 10px;
+}
+
+.field-routes-hero p {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.5;
+  margin: 0;
+  max-width: 620px;
+}
+
+.field-routes-hero .section-kicker {
+  color: var(--lime);
+}
+
+.field-route-group {
+  display: grid;
+  gap: 13px;
+}
+
+.field-route-group-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.field-route-group-heading > div {
+  align-items: center;
+  display: flex;
+  gap: 9px;
+}
+
+.field-route-group-heading svg {
+  color: var(--purple);
+}
+
+.field-route-group-heading h2 {
+  font-size: 1.2rem;
+  margin: 0;
+}
+
+.field-route-group-heading > span {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 999px;
+  color: var(--lime);
+  display: flex;
+  font-size: 0.78rem;
+  font-weight: 950;
+  height: 30px;
+  justify-content: center;
+  min-width: 30px;
+  padding: 0 9px;
+}
+
+.field-route-list {
+  display: grid;
+  gap: 13px;
+}
+
+.field-route-summary-card {
+  background: white;
+  border: 1px solid var(--line);
+  border-left: 6px solid var(--purple);
+  border-radius: 18px;
+  box-shadow: 0 15px 34px rgba(5, 5, 5, 0.07);
+  display: grid;
+  gap: 15px;
+  padding: clamp(16px, 4vw, 22px);
+}
+
+.field-route-summary-card.is-complete {
+  border-left-color: var(--lime);
+}
+
+.field-route-summary-card.needs-attention {
+  border-left-color: var(--gold);
+}
+
+.field-route-summary-top {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.field-route-summary-top h3 {
+  font-size: clamp(1.35rem, 6vw, 2rem);
+  line-height: 1;
+  margin: 4px 0 7px;
+}
+
+.field-route-summary-top p {
+  color: var(--muted);
+  margin: 0;
+}
+
+.field-route-progress {
+  background: rgba(17, 17, 17, 0.1);
+  border-radius: 999px;
+  height: 9px;
+  overflow: hidden;
+}
+
+.field-route-progress span {
+  background: var(--lime);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 200ms ease;
+}
+
+.field-route-summary-stats {
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.field-route-summary-stats > div {
+  align-items: center;
+  background: #f7f7f3;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  display: grid;
+  gap: 3px;
+  justify-items: center;
+  min-width: 0;
+  padding: 10px 5px;
+  text-align: center;
+}
+
+.field-route-summary-stats svg {
+  color: var(--purple);
+}
+
+.field-route-summary-stats span {
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.field-route-summary-stats strong {
+  font-size: 1.1rem;
+}
+
+.field-route-note {
+  background: rgba(215, 169, 40, 0.1);
+  border: 1px solid rgba(215, 169, 40, 0.3);
+  border-radius: 12px;
+  color: #604c15;
+  line-height: 1.45;
+  margin: 0;
+  padding: 11px 13px;
+}
+
+.field-route-open-button {
+  align-items: center;
+  background: var(--lime);
+  border-radius: 14px;
+  color: var(--ink);
+  display: flex;
+  font-weight: 950;
+  gap: 12px;
+  justify-content: space-between;
+  min-height: 56px;
+  padding: 12px 15px;
+}
+
+.field-route-open-button.is-complete {
+  background: var(--ink);
+  color: white;
+}
+
+.field-route-group-empty {
+  align-items: center;
+  background: white;
+  border: 1px dashed rgba(17, 17, 17, 0.2);
+  border-radius: 16px;
+  color: var(--muted);
+  display: flex;
+  gap: 13px;
+  padding: 18px;
+}
+
+.field-route-group-empty svg {
+  color: var(--muted);
+  flex: 0 0 auto;
+}
+
+.field-route-group-empty div {
+  display: grid;
+  gap: 3px;
+}
+
+.field-route-group-empty strong {
+  color: var(--ink);
+}
+
+.field-route-group-empty p {
+  line-height: 1.4;
+  margin: 0;
+}
+
+@media (max-width: 600px) {
+  .field-routes-hero {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .field-routes-hero .button {
+    width: 100%;
+  }
+
+  .field-route-summary-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
