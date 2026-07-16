@@ -107,6 +107,27 @@ export default async function FieldStopPage({
   const afterPhotos = signedPhotos.filter((photo) => photo.photo_type === "after");
   const checklistComplete =
   serviceChecklistBundle?.checklist.status === "submitted";
+  const hasBeforePhotos = beforePhotos.length > 0;
+  const hasAfterPhotos = afterPhotos.length > 0;
+  
+  const completionRequirements = [
+    {
+      label: "Before photo uploaded",
+      complete: hasBeforePhotos,
+    },
+    {
+      label: "Cleaning checklist submitted",
+      complete: checklistComplete,
+    },
+    {
+      label: "After photo uploaded",
+      complete: hasAfterPhotos,
+    },
+  ];
+  
+  const canCompleteStop = completionRequirements.every(
+    (requirement) => requirement.complete,
+  );
   const issuePhotos = signedPhotos.filter(
     (photo) => photo.photo_type === "issue" || photo.photo_type === "other",
   );
@@ -369,42 +390,134 @@ export default async function FieldStopPage({
         </div>
       </section>
 
-      <section className="field-card">
-        <p className="section-kicker">End Service</p>
-        <h2>Complete this stop.</h2>
-        <p>
-          This saves completion, marks the visit complete, updates the booking,
-          and sends the completion email if email is configured.
-        </p>
-        <FeedbackForm
-          action={completeStopAction}
-          pendingMessage="Completing stop..."
-          successMessage="Stop completed."
-        >
-          <input type="hidden" name="visitId" value={visit.id} />
-          <ActionSubmitButton
-            className="button button-primary field-big-button"
-            pendingLabel="Completing..."
+      <section
+        className={[
+          "field-completion-card",
+          canCompleteStop ? "is-ready" : "is-blocked",
+        ].join(" ")}
+      >
+        <div className="field-completion-heading">
+          <div>
+            <p className="section-kicker">Finish Service</p>
+      
+            <h2>
+              {stop.status === "completed"
+                ? "Stop complete"
+                : canCompleteStop
+                  ? "Ready to complete"
+                  : "A few things left"}
+            </h2>
+      
+            <p>
+              {stop.status === "completed"
+                ? "This stop has been completed and recorded."
+                : canCompleteStop
+                  ? "Everything required is finished. Complete the stop when you are ready."
+                  : "Complete the required steps below before closing this stop."}
+            </p>
+          </div>
+      
+          <div className="field-completion-score">
+            <strong>
+              {
+                completionRequirements.filter(
+                  (requirement) => requirement.complete,
+                ).length
+              }
+            </strong>
+      
+            <span>of {completionRequirements.length}</span>
+          </div>
+        </div>
+      
+        <div className="field-completion-requirements">
+          {completionRequirements.map((requirement) => (
+            <div
+              className={
+                requirement.complete
+                  ? "requirement-complete"
+                  : "requirement-missing"
+              }
+              key={requirement.label}
+            >
+              <span aria-hidden="true">
+                {requirement.complete ? "✓" : "○"}
+              </span>
+      
+              <strong>{requirement.label}</strong>
+            </div>
+          ))}
+        </div>
+      
+        {stop.status !== "completed" ? (
+          <FeedbackForm
+            action={completeStopAction}
+            pendingMessage="Completing stop..."
+            successMessage="Stop completed."
           >
-            End Service / Complete Stop
-          </ActionSubmitButton>
-        </FeedbackForm>
+            <input type="hidden" name="visitId" value={visit.id} />
+      
+            <ActionSubmitButton
+              className={[
+                "field-complete-stop-button",
+                canCompleteStop ? "is-ready" : "is-disabled",
+              ].join(" ")}
+              pendingLabel="Completing..."
+              disabled={!canCompleteStop}
+            >
+              {canCompleteStop
+                ? "Complete Stop"
+                : "Finish Required Steps First"}
+            </ActionSubmitButton>
+          </FeedbackForm>
+        ) : null}
+      
         {stop.status === "completed" ? (
           <div className="field-complete-panel">
-            <h3>Stop completed</h3>
-            <p>Would you like to move to the next stop now?</p>
-            <div className="field-actions">
+            <h3>Nice work. What’s next?</h3>
+      
+            <p>
+              Move directly to the next stop, take a break, or stay here
+              to review the completed record.
+            </p>
+      
+            <div className="field-completion-next-actions">
               <form action={readyForNextStopAction}>
-                <input type="hidden" name="routeStopId" value={stop.id} />
-                <button className="button button-dark" type="submit">
+                <input
+                  type="hidden"
+                  name="routeStopId"
+                  value={stop.id}
+                />
+      
+                <button
+                  className="field-next-stop-button"
+                  type="submit"
+                >
                   Ready for Next Stop
                 </button>
               </form>
+      
               <details className="field-break-details">
-                <summary className="button button-outline">Take a Break</summary>
-                <form action={startBreakAction} className="field-form">
-                  <input type="hidden" name="routeDayId" value={stop.route_day_id ?? ""} />
-                  <input type="hidden" name="routeStopId" value={stop.id} />
+                <summary className="button button-outline">
+                  Take a Break
+                </summary>
+      
+                <form
+                  action={startBreakAction}
+                  className="field-form"
+                >
+                  <input
+                    type="hidden"
+                    name="routeDayId"
+                    value={stop.route_day_id ?? ""}
+                  />
+      
+                  <input
+                    type="hidden"
+                    name="routeStopId"
+                    value={stop.id}
+                  />
+      
                   <label>
                     Reason
                     <select name="reason" defaultValue="lunch">
@@ -415,6 +528,7 @@ export default async function FieldStopPage({
                       ))}
                     </select>
                   </label>
+      
                   <label>
                     Notes
                     <textarea
@@ -422,12 +536,20 @@ export default async function FieldStopPage({
                       placeholder="Required for equipment issue, weather pause, customer delay, or other"
                     />
                   </label>
-                  <button className="button button-dark" type="submit">
+      
+                  <button
+                    className="button button-dark"
+                    type="submit"
+                  >
                     Start Break
                   </button>
                 </form>
               </details>
-              <Link className="button button-outline" href={`/field/stops/${visit.id}`}>
+      
+              <Link
+                className="button button-outline"
+                href={`/field/stops/${visit.id}`}
+              >
                 Stay Here
               </Link>
             </div>
