@@ -28,9 +28,19 @@ type WaitlistRow = {
   email: string;
 };
 
+type PublicPageCheck = {
+  path: string;
+  ok: boolean;
+  status: number | null;
+  finalUrl: string | null;
+  reason: string | null;
+};
+
 const TEMPLATE_KEY = "maintenance_back_online";
 const BATCH_SIZE = 20;
 const MAX_BATCHES = 25;
+const LIVE_CHECK_ATTEMPTS = 5;
+const LIVE_CHECK_DELAY_MS = 2_000;
 
 function verifySignature(
   rawBody: string,
@@ -51,38 +61,246 @@ function verifySignature(
   );
 }
 
-function getReleaseTemplate() {
-  const bookingUrl = new URL("/book", getSiteUrl()).toString();
+function delay(milliseconds: number) {
+  return new Promise((resolve) => setTimeout(resolve, milliseconds));
+}
+
+function getPublicSiteUrl() {
+  const url = new URL(getSiteUrl());
+
+  if (url.hostname === "cleancurbco.com") {
+    url.hostname = "www.cleancurbco.com";
+  }
+
+  return url;
+}
+
+async function checkPublicPage(path: string): Promise<PublicPageCheck> {
+  const url = new URL(path, getPublicSiteUrl());
+  url.searchParams.set("release-check", Date.now().toString());
+
+  try {
+    const response = await fetch(url, {
+      cache: "no-store",
+      redirect: "follow",
+      headers: {
+        "Cache-Control": "no-cache, no-store, max-age=0",
+        Pragma: "no-cache",
+        "User-Agent": "Clean-Curb-Co-Maintenance-Release-Check/1.0",
+      },
+    });
+
+    const finalUrl = response.url || url.toString();
+    const body = (await response.text()).toLowerCase();
+    const looksLikeMaintenance =
+      finalUrl.includes("/maintenance") ||
+      body.includes("maintenance mode") ||
+      body.includes("we’re cleaning things up") ||
+      body.includes("we're cleaning things up") ||
+      body.includes("website is getting a quick rinse");
+
+    if (!response.ok) {
+      return {
+        path,
+        ok: false,
+        status: response.status,
+        finalUrl,
+        reason: `Public page returned HTTP ${response.status}.`,
+      };
+    }
+
+    if (looksLikeMaintenance) {
+      return {
+        path,
+        ok: false,
+        status: response.status,
+        finalUrl,
+        reason: "Public page still appears to be in maintenance mode.",
+      };
+    }
+
+    return {
+      path,
+      ok: true,
+      status: response.status,
+      finalUrl,
+      reason: null,
+    };
+  } catch (error) {
+    return {
+      path,
+      ok: false,
+      status: null,
+      finalUrl: null,
+      reason:
+        error instanceof Error
+          ? error.message
+          : "Unknown public-page check failure.",
+    };
+  }
+}
+
+async function waitForPublicSite() {
+  let checks: PublicPageCheck[] = [];
+
+  for (let attempt = 1; attempt <= LIVE_CHECK_ATTEMPTS; attempt += 1) {
+    checks = await Promise.all([
+      checkPublicPage("/"),
+      checkPublicPage("/book"),
+    ]);
+
+    if (checks.every((check) => check.ok)) {
+      return { live: true, attempt, checks };
+    }
+
+    if (attempt < LIVE_CHECK_ATTEMPTS) {
+      await delay(LIVE_CHECK_DELAY_MS);
+    }
+  }
 
   return {
-    subject: "Clean Curb Co. is back online",
+    live: false,
+    attempt: LIVE_CHECK_ATTEMPTS,
+    checks,
+  };
+}
+
+function getReleaseTemplate() {
+  const siteUrl = getPublicSiteUrl();
+  const bookingUrl = new URL("/book", siteUrl);
+  const logoUrl = new URL("/clean-curb-logo.png", siteUrl);
+  const releaseId = Date.now().toString();
+
+  bookingUrl.searchParams.set("back-online", releaseId);
+
+  return {
+    subject: "We’re back, baby! Clean Curb Co. is online",
     text: [
-      "Hey there!",
+      "We’re back, baby!",
       "",
-      "Clean Curb Co. is back online and our booking system is ready to roll.",
+      "The website is officially back online, the digital trash fire has been extinguished, and you can now get back to booking the actual trash-related stuff.",
       "",
-      "You asked us to let you know once maintenance was finished, so here is your official all-clear:",
-      bookingUrl,
+      "Thanks for hanging in there while we cleaned things up behind the scenes. Everything should now be working normally, but if you find something acting weird, please tell us. We are very good at cleaning garbage cans. Websites occasionally require a second rinse.",
       "",
-      "Thanks for your patience while we tightened everything up behind the scenes.",
+      "Ready to get those bins handled?",
       "",
-      "— Clean Curb Co.",
-      "Veteran-owned. Hardworking. Weirdly enthusiastic about clean trash cans.",
+      `Book Your Cleaning: ${bookingUrl.toString()}`,
+      "",
+      "Thanks for supporting a local, veteran-owned small business. We genuinely appreciate every booking, referral, and person willing to trust us with the gross stuff.",
+      "",
+      "Stay fresh,",
+      "The Clean Curb Co. Team",
+      "Fresh Starts at the Curb.",
+      "",
+      "Need help? Reply to this email or contact contact@cleancurbco.com.",
     ].join("\n"),
     html: `
-      <div style="background:#f7f1e7;padding:32px 16px;font-family:Arial,sans-serif;color:#17211b;">
-        <div style="max-width:620px;margin:0 auto;background:#ffffff;border-radius:18px;padding:36px;box-shadow:0 10px 30px rgba(0,0,0,.08);">
-          <p style="margin:0 0 10px;font-size:13px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#47704f;">Clean Curb Co.</p>
-          <h1 style="margin:0 0 18px;font-size:30px;line-height:1.15;">We’re back online.</h1>
-          <p style="font-size:17px;line-height:1.6;margin:0 0 16px;">Hey there! Our website maintenance is finished and the booking system is ready to roll.</p>
-          <p style="font-size:17px;line-height:1.6;margin:0 0 24px;">You asked us to let you know once everything was live again, so here’s your official all-clear.</p>
-          <p style="margin:28px 0;">
-            <a href="${bookingUrl}" style="display:inline-block;background:#1f4d35;color:#ffffff;text-decoration:none;font-weight:700;padding:14px 22px;border-radius:10px;">Book Your Cleaning</a>
-          </p>
-          <p style="font-size:16px;line-height:1.6;margin:0 0 18px;">Thanks for your patience while we tightened everything up behind the scenes.</p>
-          <p style="font-size:15px;line-height:1.5;margin:0;color:#526057;">— Clean Curb Co.<br />Veteran-owned. Hardworking. Weirdly enthusiastic about clean trash cans.</p>
-        </div>
-      </div>
+      <!doctype html>
+      <html lang="en">
+        <head>
+          <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1" />
+          <title>We’re back, baby!</title>
+        </head>
+        <body style="margin:0;padding:0;background:#050505;color:#171d19;font-family:Arial,Helvetica,sans-serif;">
+          <div style="display:none;max-height:0;overflow:hidden;opacity:0;color:transparent;">
+            The digital trash fire has been extinguished. Clean Curb Co. is back online.
+          </div>
+
+          <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#050505;">
+            <tr>
+              <td align="center" style="padding:34px 14px;">
+                <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;">
+                  <tr>
+                    <td align="center" style="padding:0 0 18px;">
+                      <img src="${logoUrl.toString()}" width="92" height="92" alt="Clean Curb Co." style="display:block;width:92px;height:92px;border:0;border-radius:18px;" />
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td style="background:#f4ecdd;border:1px solid #2f3b33;border-radius:24px;overflow:hidden;box-shadow:0 18px 55px rgba(0,0,0,.36);">
+                      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0">
+                        <tr>
+                          <td style="height:8px;background:#63d471;font-size:0;line-height:0;">&nbsp;</td>
+                        </tr>
+                        <tr>
+                          <td style="padding:38px 38px 16px;">
+                            <div style="display:inline-block;background:#d9f7dd;border:1px solid #9edca7;border-radius:999px;padding:7px 12px;color:#174c25;font-size:12px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;">
+                              We’re live
+                            </div>
+
+                            <h1 style="margin:20px 0 18px;color:#0b0d0c;font-size:38px;line-height:1.08;letter-spacing:-.03em;">
+                              We’re back, baby!
+                            </h1>
+
+                            <p style="margin:0 0 18px;color:#27312b;font-size:17px;line-height:1.7;">
+                              The website is officially back online, the digital trash fire has been extinguished, and you can now get back to booking the actual trash-related stuff.
+                            </p>
+
+                            <p style="margin:0 0 18px;color:#27312b;font-size:17px;line-height:1.7;">
+                              Thanks for hanging in there while we cleaned things up behind the scenes. Everything should now be working normally, but if you find something acting weird, please tell us.
+                            </p>
+
+                            <div style="margin:24px 0;padding:18px 20px;background:#ffffff;border:1px solid #ddd2c1;border-radius:16px;color:#28322c;font-size:16px;line-height:1.65;">
+                              We are very good at cleaning garbage cans. Websites occasionally require a second rinse.
+                            </div>
+
+                            <p style="margin:0 0 22px;color:#111512;font-size:18px;font-weight:700;line-height:1.5;">
+                              Ready to get those bins handled?
+                            </p>
+
+                            <table role="presentation" cellspacing="0" cellpadding="0" border="0" style="margin:0 0 18px;">
+                              <tr>
+                                <td bgcolor="#58cf68" style="border-radius:12px;">
+                                  <a href="${bookingUrl.toString()}" style="display:inline-block;padding:15px 24px;color:#071209;text-decoration:none;font-size:16px;font-weight:800;line-height:1;border-radius:12px;">
+                                    Book Your Cleaning
+                                  </a>
+                                </td>
+                              </tr>
+                            </table>
+
+                            <p style="margin:0 0 28px;color:#657067;font-size:12px;line-height:1.55;word-break:break-all;">
+                              Button acting weird? Copy this link:<br />
+                              <a href="${bookingUrl.toString()}" style="color:#245d31;text-decoration:underline;">${bookingUrl.toString()}</a>
+                            </p>
+
+                            <p style="margin:0 0 18px;color:#27312b;font-size:16px;line-height:1.7;">
+                              Thanks for supporting a local, veteran-owned small business. We genuinely appreciate every booking, referral, and person willing to trust us with the gross stuff.
+                            </p>
+
+                            <p style="margin:0;color:#171d19;font-size:16px;line-height:1.65;">
+                              Stay fresh,<br />
+                              <strong>The Clean Curb Co. Team</strong><br />
+                              <em style="color:#477051;">Fresh Starts at the Curb.</em>
+                            </p>
+                          </td>
+                        </tr>
+
+                        <tr>
+                          <td style="padding:24px 38px 34px;">
+                            <div style="border-top:1px solid #d8cdbd;padding-top:20px;color:#697269;font-size:12px;line-height:1.7;">
+                              Need help? Reply to this email or
+                              <a href="mailto:contact@cleancurbco.com" style="color:#245d31;text-decoration:underline;">contact us</a>.<br />
+                              <a href="${siteUrl.toString()}" style="color:#245d31;text-decoration:underline;">cleancurbco.com</a><br />
+                              Clean Curb Co. is operated by Stonebranch Capital LLC.
+                            </div>
+                          </td>
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+
+                  <tr>
+                    <td align="center" style="padding:18px 12px 0;color:#aab0ab;font-size:11px;line-height:1.6;">
+                      Local. Veteran-owned. Weirdly enthusiastic about clean trash cans.
+                    </td>
+                  </tr>
+                </table>
+              </td>
+            </tr>
+          </table>
+        </body>
+      </html>
     `,
   };
 }
@@ -125,7 +343,7 @@ async function sendReleaseEmail(row: WaitlistRow) {
       : "error" in result && result.error
         ? String(result.error)
         : "Unknown email failure";
-  
+
   await admin
     .from("maintenance_waitlist")
     .update({
@@ -214,6 +432,23 @@ export async function POST(request: Request) {
     });
   }
 
+  const publicSite = await waitForPublicSite();
+
+  if (!publicSite.live) {
+    console.error("maintenance_release_public_site_not_ready", {
+      attempts: publicSite.attempt,
+      checks: publicSite.checks,
+    });
+
+    return NextResponse.json(
+      {
+        error: "The public site is not ready yet.",
+        checks: publicSite.checks,
+      },
+      { status: 503 },
+    );
+  }
+
   const admin = getSupabaseAdmin() as any;
   let sent = 0;
   let failed = 0;
@@ -260,6 +495,7 @@ export async function POST(request: Request) {
   console.info("maintenance_release_completed", {
     deploymentId:
       event.payload?.deployment?.id ?? null,
+    publicSiteChecks: publicSite.checks,
     sent,
     failed,
   });
