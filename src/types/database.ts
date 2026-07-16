@@ -808,6 +808,26 @@ export type Database = {
         Update: Partial<ContactMessageRow>;
         Relationships: [];
       };
+      maintenance_waitlist: {
+        Row: {
+          id: string;
+          email: string;
+          created_at: string;
+          source: string;
+        };
+        Insert: {
+          id?: string;
+          email: string;
+          created_at?: string;
+          source?: string;
+        };
+        Update: Partial<{
+          email: string;
+          source: string;
+        }>;
+        Relationships: [];
+      };
+    
       customer_requests: {
         Row: CustomerRequestRow;
         Insert: Partial<CustomerRequestRow> &
