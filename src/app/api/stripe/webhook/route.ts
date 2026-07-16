@@ -193,9 +193,16 @@ async function updatePaymentState(input: {
     );
   }
 
-  const bookingId = input.bookingId || payment?.booking_id || "";
+  const bookingId = input.bookingId || payment.booking_id;
+  
+  if (!bookingId) {
+    throw new Error(
+      `Stripe event ${input.stripeEventId} updated payment ${payment.id}, but the payment was not linked to a booking.`,
+    );
+  }
+  
   let booking: BookingRow | null = null;
-
+  
   if (bookingId) {
     const {
       data: previousBooking,
@@ -339,7 +346,7 @@ if (booking) {
                 message: "Stripe payment remains pending.",
               };
 
-  await recordBookingEvent({
+  const bookingEventResult = await recordBookingEvent({
     bookingId: booking.id,
     customerId: booking.customer_id,
     requestId: input.requestId,
@@ -368,6 +375,10 @@ if (booking) {
         input.failureCode ?? null,
     },
   });
+  if (!bookingEventResult.ok) {
+  throw new Error(
+    `Stripe booking event recording failed: ${bookingEventResult.error}`,
+  );
 }
   
   if (input.sendReceipt && booking && payment?.amount) {
