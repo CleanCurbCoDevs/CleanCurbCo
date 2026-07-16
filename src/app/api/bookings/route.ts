@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { recordBookingEvent } from "@/lib/server/booking-events";
 import {
   createAccountSetupLink,
   createClaimToken,
@@ -575,6 +576,59 @@ export async function POST(request: Request) {
     );
   }
 
+await recordBookingEvent({
+  bookingId: booking.id,
+  customerId: booking.customer_id,
+  actorProfileId: booking.customer_id,
+  requestId,
+  route,
+  source: "booking_api",
+  eventType: "BOOKING_CREATED",
+  outcome: "success",
+  message: "Booking request created.",
+  idempotencyKey: `booking:${booking.id}:created`,
+  metadata: {
+    status: booking.status,
+    approvalStatus: booking.approval_status,
+    attentionStatus: booking.attention_status,
+    paymentPreference,
+    frequency,
+    binCount,
+    collectionDay,
+    collectionTimeWindow,
+    suggestedServiceDate:
+      schedulingRecommendation.suggestedServiceDate,
+    serviceDistanceMiles:
+      serviceAreaResult.distanceMiles ?? null,
+    customerLinked: Boolean(booking.customer_id),
+  },
+});
+
+  await recordBookingEvent({
+  bookingId: booking.id,
+  customerId: booking.customer_id,
+  actorProfileId: booking.customer_id,
+  requestId,
+  route,
+  source: "booking_api",
+  eventType: booking.customer_id
+    ? "CUSTOMER_LINKED"
+    : "CUSTOMER_LINK_PENDING",
+  outcome: booking.customer_id
+    ? "success"
+    : "info",
+  message: booking.customer_id
+    ? "Booking attached to the logged-in customer account."
+    : "Booking created without a linked customer account.",
+  idempotencyKey: booking.customer_id
+    ? `booking:${booking.id}:customer_linked:${booking.customer_id}`
+    : `booking:${booking.id}:customer_link_pending`,
+  metadata: {
+    customerId: booking.customer_id,
+    accountSetupRequired: !booking.customer_id,
+  },
+});
+  
 let redirectTo: string | null = null;
 let setupLink: string | null = null;
 let claimToken: string | null = null;
@@ -598,9 +652,38 @@ if (claimError) {
     bookingId: booking.id,
     error: claimError,
   });
+  await recordBookingEvent({
+  bookingId: booking.id,
+  customerId: booking.customer_id,
+  requestId,
+  route,
+  source: "booking_api",
+  eventType: "BOOKING_CLAIM_FAILED",
+  outcome: "failure",
+  message: "Secure booking claim could not be created.",
+  idempotencyKey: `booking:${booking.id}:claim_failed`,
+  metadata: {
+    errorCode: claimError.code ?? null,
+  },
+});
 } else {
   claimToken = token;
 
+  await recordBookingEvent({
+  bookingId: booking.id,
+  customerId: booking.customer_id,
+  requestId,
+  route,
+  source: "booking_api",
+  eventType: "BOOKING_CLAIM_CREATED",
+  outcome: "success",
+  message: "Secure booking claim created.",
+  idempotencyKey: `booking:${booking.id}:claim_created`,
+  metadata: {
+    accountSetupRequired: !customerId,
+  },
+});
+  
   if (!customerId) {
     redirectTo =
       `/account-setup?booking=${booking.id}` +
@@ -630,6 +713,60 @@ const checkoutResult =
         checkoutUrl: null,
         error: null,
       };
+
+if (checkoutResult.checkoutUrl) {
+  await recordBookingEvent({
+    bookingId: booking.id,
+    customerId: booking.customer_id,
+    requestId,
+    route,
+    source: "booking_api",
+    eventType: "CHECKOUT_CREATED",
+    outcome: "success",
+    message: "Stripe checkout created.",
+    idempotencyKey: `booking:${booking.id}:initial_checkout_created`,
+    metadata: {
+      paymentPreference,
+      paymentStatus: "pending",
+      amount: booking.estimated_price,
+    },
+  });
+} else if (
+  paymentPreference === "stripe" &&
+  checkoutResult.error
+) {
+  await recordBookingEvent({
+    bookingId: booking.id,
+    customerId: booking.customer_id,
+    requestId,
+    route,
+    source: "booking_api",
+    eventType: "CHECKOUT_CREATION_FAILED",
+    outcome: "failure",
+    message: "Stripe checkout could not be created.",
+    idempotencyKey: `booking:${booking.id}:initial_checkout_failed`,
+    metadata: {
+      paymentPreference,
+      paymentStatus: booking.payment_status,
+    },
+  });
+} else {
+  await recordBookingEvent({
+    bookingId: booking.id,
+    customerId: booking.customer_id,
+    requestId,
+    route,
+    source: "booking_api",
+    eventType: "PAYMENT_METHOD_SELECTED",
+    outcome: "info",
+    message: "Customer selected a non-Stripe payment method.",
+    idempotencyKey: `booking:${booking.id}:payment_method_selected`,
+    metadata: {
+      paymentPreference,
+      paymentDueAtService,
+    },
+  });
+}
   
   logger.info("booking_submission_created", {
     requestId,
