@@ -7356,3 +7356,318 @@ form.data-row label textarea,
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+
+/* =========================================================
+   FAST FIELD CHECKLIST
+   ========================================================= */
+
+.field-fast-checklist {
+  background: white;
+  border: 1px solid var(--line);
+  border-top: 7px solid var(--purple);
+  border-radius: 20px;
+  box-shadow: 0 18px 42px rgba(5, 5, 5, 0.09);
+  display: grid;
+  gap: 18px;
+  overflow: hidden;
+  padding: clamp(18px, 5vw, 26px);
+}
+
+.field-checklist-heading {
+  align-items: start;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+}
+
+.field-checklist-heading h2 {
+  font-size: clamp(1.5rem, 6vw, 2.2rem);
+  line-height: 1;
+  margin: 4px 0 8px;
+}
+
+.field-checklist-heading p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.field-checklist-progress-count {
+  align-items: center;
+  background: var(--ink);
+  border-radius: 14px;
+  color: white;
+  display: grid;
+  flex: 0 0 auto;
+  justify-items: center;
+  min-height: 60px;
+  min-width: 64px;
+  padding: 8px 10px;
+}
+
+.field-checklist-progress-count strong {
+  color: var(--lime);
+  font-size: 1.45rem;
+  line-height: 1;
+}
+
+.field-checklist-progress-count span {
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.field-checklist-progress-bar {
+  background: rgba(17, 17, 17, 0.1);
+  border-radius: 999px;
+  height: 10px;
+  overflow: hidden;
+}
+
+.field-checklist-progress-bar span {
+  background: var(--lime);
+  border-radius: inherit;
+  display: block;
+  height: 100%;
+  transition: width 200ms ease;
+}
+
+.field-fast-checklist-form,
+.field-checklist-quick-items {
+  display: grid;
+  gap: 12px;
+}
+
+.field-checklist-group {
+  display: grid;
+  gap: 10px;
+}
+
+.field-checklist-group-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+  justify-content: space-between;
+}
+
+.field-checklist-group-heading h3 {
+  font-size: 1.05rem;
+  margin: 0;
+}
+
+.field-checklist-group-heading span {
+  background: #f1f1ec;
+  border-radius: 999px;
+  color: var(--muted);
+  font-size: 0.76rem;
+  font-weight: 900;
+  padding: 5px 9px;
+}
+
+.field-checklist-quick-item {
+  background: #f8f8f4;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  display: grid;
+  gap: 11px;
+  padding: 14px;
+}
+
+.field-checklist-quick-item > strong {
+  font-size: 0.95rem;
+  line-height: 1.4;
+}
+
+.field-checklist-tap-options {
+  border: 0;
+  display: grid;
+  gap: 8px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  margin: 0;
+  padding: 0;
+}
+
+.check-option {
+  cursor: pointer;
+  min-width: 0;
+  position: relative;
+}
+
+.check-option input {
+  height: 1px;
+  opacity: 0;
+  position: absolute;
+  width: 1px;
+}
+
+.check-option span {
+  align-items: center;
+  background: white;
+  border: 2px solid rgba(17, 17, 17, 0.13);
+  border-radius: 12px;
+  display: flex;
+  font-size: 0.8rem;
+  font-weight: 900;
+  gap: 6px;
+  justify-content: center;
+  min-height: 50px;
+  padding: 8px 5px;
+}
+
+.check-option b {
+  align-items: center;
+  border-radius: 999px;
+  display: flex;
+  font-size: 0.8rem;
+  height: 22px;
+  justify-content: center;
+  width: 22px;
+}
+
+.check-option-done b {
+  background: rgba(0, 255, 56, 0.14);
+  color: #075c1b;
+}
+
+.check-option-issue b {
+  background: rgba(225, 52, 47, 0.12);
+  color: var(--red);
+}
+
+.check-option-na b {
+  background: rgba(17, 17, 17, 0.08);
+  color: var(--muted);
+}
+
+.check-option-done input:checked + span {
+  background: rgba(0, 255, 56, 0.12);
+  border-color: var(--lime);
+  box-shadow: 0 0 0 2px rgba(0, 255, 56, 0.1);
+}
+
+.check-option-issue input:checked + span {
+  background: rgba(225, 52, 47, 0.09);
+  border-color: var(--red);
+  box-shadow: 0 0 0 2px rgba(225, 52, 47, 0.08);
+}
+
+.check-option-na input:checked + span {
+  background: rgba(17, 17, 17, 0.08);
+  border-color: var(--ink);
+}
+
+.field-checklist-issue-note {
+  display: none;
+  gap: 5px;
+  grid-column: 1 / -1;
+}
+
+.field-checklist-tap-options:has(
+    input[value="issue_found"]:checked
+  )
+  .field-checklist-issue-note {
+  display: grid;
+}
+
+.field-checklist-issue-note span {
+  font-size: 0.8rem;
+  font-weight: 900;
+}
+
+.field-checklist-issue-note textarea,
+.field-checklist-overall-notes textarea {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  min-height: 82px;
+  padding: 11px;
+  width: 100%;
+}
+
+.field-checklist-overall-notes {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.field-checklist-overall-notes summary {
+  cursor: pointer;
+  font-weight: 900;
+  padding: 14px;
+}
+
+.field-checklist-overall-notes label {
+  display: grid;
+  gap: 6px;
+  padding: 0 14px 14px;
+}
+
+.field-checklist-submit-actions {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: minmax(0, 0.7fr) minmax(0, 1.3fr);
+}
+
+.field-checklist-finish-button {
+  background: var(--lime);
+  border: 0;
+  border-radius: 15px;
+  color: var(--ink);
+  cursor: pointer;
+  font-size: 1rem;
+  font-weight: 950;
+  min-height: 58px;
+  padding: 12px 16px;
+}
+
+.field-checklist-complete-banner {
+  align-items: center;
+  background: rgba(0, 255, 56, 0.08);
+  border: 1px solid rgba(0, 255, 56, 0.3);
+  border-radius: 15px;
+  display: flex;
+  gap: 11px;
+  padding: 14px;
+}
+
+.field-checklist-complete-banner > span {
+  align-items: center;
+  background: var(--lime);
+  border-radius: 999px;
+  display: flex;
+  flex: 0 0 auto;
+  font-weight: 1000;
+  height: 42px;
+  justify-content: center;
+  width: 42px;
+}
+
+.field-checklist-complete-banner > div {
+  display: grid;
+  gap: 3px;
+}
+
+.field-checklist-complete-banner small {
+  color: var(--muted);
+}
+
+.sr-only {
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  padding: 0;
+  position: absolute;
+  width: 1px;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 520px) {
+  .field-checklist-submit-actions {
+    grid-template-columns: 1fr;
+  }
+
+  .field-checklist-finish-button {
+    min-height: 64px;
+  }
+}
