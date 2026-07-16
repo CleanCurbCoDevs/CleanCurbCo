@@ -220,14 +220,46 @@ export async function ensureServiceChecklistBundle(
     checklist = updatedChecklist ?? checklist;
   }
 
-  const templateItems = buildChecklistTemplate(booking);
-  const { data: existingItems } = await admin
-    .from("service_checklist_items")
-    .select("*")
-    .eq("checklist_id", checklist.id)
-    .order("sort_order", { ascending: true });
-  const existingKeys = new Set((existingItems ?? []).map((item) => item.item_key));
-  const missingItems = templateItems.filter((item) => !existingKeys.has(item.itemKey));
+const templateItems = buildChecklistTemplate(booking);
+
+const { data: existingItems } = await admin
+  .from("service_checklist_items")
+  .select("*")
+  .eq("checklist_id", checklist.id)
+  .order("sort_order", { ascending: true });
+
+const currentItems = existingItems ?? [];
+const templateKeys = new Set(
+  templateItems.map((item) => item.itemKey),
+);
+
+if (checklist.status !== "submitted") {
+  const obsoleteItemIds = currentItems
+    .filter((item) => !templateKeys.has(item.item_key))
+    .map((item) => item.id);
+
+  if (obsoleteItemIds.length) {
+    await admin
+      .from("service_checklist_items")
+      .delete()
+      .in("id", obsoleteItemIds);
+  }
+}
+
+const retainedItems =
+  checklist.status === "submitted"
+    ? currentItems
+    : currentItems.filter((item) =>
+        templateKeys.has(item.item_key),
+      );
+
+const existingKeys = new Set(
+  retainedItems.map((item) => item.item_key),
+);
+
+const missingItems = templateItems.filter(
+  (item) => !existingKeys.has(item.itemKey),
+);
 
   if (missingItems.length && checklist.status !== "submitted") {
     await admin.from("service_checklist_items").insert(
