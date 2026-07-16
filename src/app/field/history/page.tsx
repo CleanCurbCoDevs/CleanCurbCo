@@ -1,177 +1,747 @@
-import Link from "next/link";
 import type { Metadata } from "next";
+import {
+  AlertTriangle,
+  Camera,
+  CheckCircle2,
+  ChevronRight,
+  ClipboardCheck,
+  DollarSign,
+  Search,
+  UserRound,
+} from "lucide-react";
+import Link from "next/link";
+
 import { FieldShell } from "@/components/shells/field-shell";
-import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
-import { businessToday, getFieldContext } from "@/lib/field-data";
+import {
+  formatBookingAddress,
+  humanizeStatus,
+} from "@/lib/booking-utils";
+import { getFieldContext } from "@/lib/field-data";
+import { isAdminRole } from "@/lib/supabase/roles";
 
 export const metadata: Metadata = {
-  title: "Field History",
+  title: "Service History | CCC Field",
 };
 
-export default async function FieldHistoryPage() {
+type HistoryPageProps = {
+  searchParams?: Promise<{
+    q?: string;
+  }>;
+};
+
+type HistoryRecord = {
+  stop: Awaited<
+    ReturnType<typeof getFieldContext>
+  >["routeStops"][number];
+  visit:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["visits"][number]
+    | null;
+  booking:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["bookings"][number]
+    | null;
+  routeDay:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["routeDays"][number]
+    | null;
+  checklist:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["checklists"][number]
+    | null;
+  payment:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["payments"][number]
+    | null;
+  technician:
+    | Awaited<
+        ReturnType<typeof getFieldContext>
+      >["profiles"][number]
+    | null;
+  beforePhotoCount: number;
+  afterPhotoCount: number;
+  issuePhotoCount: number;
+  completedBy: string | null;
+  eventDate: string;
+};
+
+export default async function FieldHistoryPage({
+  searchParams,
+}: HistoryPageProps) {
   const context = await getFieldContext("/field/history");
-  const today = businessToday();
-  const completedStops = context.routeStops
-    .filter((stop) => ["completed", "skipped", "needs_follow_up"].includes(stop.status))
-    .sort((a, b) => (b.completed_at ?? b.updated_at).localeCompare(a.completed_at ?? a.updated_at));
-  const completedToday = completedStops.filter((stop) => {
-    const routeDay = context.routeDays.find((route) => route.id === stop.route_day_id);
-    return routeDay?.route_date === today;
-  });
-  const needsFollowUp = context.routeStops.filter((stop) => stop.status === "needs_follow_up");
-  const recentPaymentLinks = context.payments
-    .filter((payment) => payment.checkout_url)
-    .slice(0, 8);
+  const query = await searchParams;
+  const searchTerm = query?.q?.trim().toLowerCase() ?? "";
+
+  if (context.auth.status !== "ok") {
+    return (
+      <FieldShell title="History" auth={context.auth}>
+        <section className="field-empty-state">
+          <h2>History is unavailable.</h2>
+          <p>Please sign in again to review service records.</p>
+        </section>
+      </FieldShell>
+    );
+  }
+
+  const canViewAllHistory = isAdminRole(
+    context.auth.profile.role,
+  );
+
+  const userId = context.auth.userId;
+
+  const companyRecords: HistoryRecord[] =
+    context.routeStops
+      .filter((stop) =>
+        [
+          "completed",
+          "needs_follow_up",
+          "skipped",
+        ].includes(stop.status),
+      )
+      .map((stop) => {
+        const visit =
+          context.visits.find(
+            (item) =>
+              item.id === stop.service_visit_id,
+          ) ?? null;
+
+        const booking =
+          context.bookings.find(
+            (item) => item.id === stop.booking_id,
+          ) ?? null;
+
+        const routeDay =
+          context.routeDays.find(
+            (item) => item.id === stop.route_day_id,
+          ) ?? null;
+
+        const checklist =
+          context.checklists.find(
+            (item) =>
+              item.route_stop_id === stop.id ||
+              item.service_visit_id ===
+                stop.service_visit_id,
+          ) ?? null;
+
+        const payment =
+          context.payments.find(
+            (item) =>
+              item.booking_id === stop.booking_id,
+          ) ?? null;
+
+        const completedBy =
+          checklist?.completed_by ??
+          checklist?.submitted_by ??
+          null;
+
+        const responsibleTechnicianId =
+          completedBy ??
+          routeDay?.assigned_technician_id ??
+          null;
+
+        const technician =
+          context.profiles.find(
+            (profile) =>
+              profile.id === responsibleTechnicianId,
+          ) ?? null;
+
+        const stopPhotos = context.photos.filter(
+          (photo) =>
+            photo.route_stop_id === stop.id ||
+            photo.service_visit_id ===
+              stop.service_visit_id,
+        );
+
+        const eventDate =
+          stop.completed_at ??
+          checklist?.completed_at ??
+          checklist?.submitted_at ??
+          stop.updated_at;
+
+        return {
+          stop,
+          visit,
+          booking,
+          routeDay,
+          checklist,
+          payment,
+          technician,
+          beforePhotoCount: stopPhotos.filter(
+            (photo) => photo.photo_type === "before",
+          ).length,
+          afterPhotoCount: stopPhotos.filter(
+            (photo) => photo.photo_type === "after",
+          ).length,
+          issuePhotoCount: stopPhotos.filter(
+            (photo) => photo.photo_type === "issue",
+          ).length,
+          completedBy,
+          eventDate,
+        };
+      })
+      .sort((a, b) =>
+        b.eventDate.localeCompare(a.eventDate),
+      );
+
+  /*
+   * Permission boundary:
+   *
+   * Admins and owners receive all company records.
+   *
+   * Field technicians receive:
+   * 1. Records where the checklist says they completed/submitted it.
+   * 2. Older records with no recorded completer where they were the
+   *    technician assigned to the route.
+   *
+   * This filtering happens before totals, searching, and grouping.
+   */
+  const visibleRecords = canViewAllHistory
+    ? companyRecords
+    : companyRecords.filter((record) => {
+        if (record.completedBy) {
+          return record.completedBy === userId;
+        }
+
+        return (
+          record.routeDay?.assigned_technician_id ===
+          userId
+        );
+      });
+
+  const filteredRecords = searchTerm
+    ? visibleRecords.filter((record) => {
+        const booking = record.booking;
+
+        const searchableText = [
+          booking?.first_name,
+          booking?.last_name,
+          booking?.email,
+          booking?.phone,
+          booking?.street_address,
+          booking?.city,
+          booking?.zip_code,
+          record.routeDay?.route_name,
+          record.routeDay?.service_area,
+          record.technician?.first_name,
+          record.technician?.last_name,
+          record.stop.technician_notes,
+        ]
+          .filter(Boolean)
+          .join(" ")
+          .toLowerCase();
+
+        return searchableText.includes(searchTerm);
+      })
+    : visibleRecords;
+
+  const completedRecords = visibleRecords.filter(
+    (record) => record.stop.status === "completed",
+  );
+
+  const followUpRecords = visibleRecords.filter(
+    (record) =>
+      record.stop.status === "needs_follow_up",
+  );
+
+  const completedWithProof = completedRecords.filter(
+    (record) =>
+      record.beforePhotoCount > 0 &&
+      record.afterPhotoCount > 0 &&
+      record.checklist?.status === "submitted",
+  );
+
+  const servicedRevenue = completedRecords.reduce(
+    (total, record) => {
+      const amount =
+        record.payment?.status === "paid"
+          ? Number(record.payment.amount ?? 0)
+          : Number(
+              record.booking?.estimated_price ?? 0,
+            );
+
+      return total + (Number.isFinite(amount) ? amount : 0);
+    },
+    0,
+  );
+
+  const groupedRecords = groupRecordsByMonth(
+    filteredRecords,
+  );
 
   return (
-    <FieldShell title="History" auth={context.auth}>
-      <section className="field-dashboard-hero compact">
+    <FieldShell
+      title={
+        canViewAllHistory
+          ? "Service History"
+          : "My Service History"
+      }
+      subtitle={
+        canViewAllHistory
+          ? "Completed work and field exceptions across the company."
+          : "Your completed services and follow-up records."
+      }
+      auth={context.auth}
+    >
+      <section className="field-history-hero">
         <div>
-          <p className="section-kicker">Service Record</p>
-          <h2>Recent stops, issues, payments, and breaks.</h2>
-          <p>
-            Review completed work, follow-up items, payment links, and route
-            pauses from the field.
+          <p className="section-kicker">
+            {canViewAllHistory
+              ? "Company Archive"
+              : "Your Archive"}
           </p>
+
+          <h2>
+            {canViewAllHistory
+              ? "Every completed service, all in one place."
+              : "The work you handled, all in one place."}
+          </h2>
+
+          <p>
+            Find completed stops, review proof of work,
+            and revisit anything that needed follow-up.
+          </p>
+        </div>
+
+        <div className="field-history-scope">
+          <UserRound size={22} aria-hidden="true" />
+
+          <div>
+            <strong>
+              {canViewAllHistory
+                ? "All technicians"
+                : "Only your work"}
+            </strong>
+
+            <small>
+              {canViewAllHistory
+                ? "Owner/admin visibility"
+                : "Technician-specific history"}
+            </small>
+          </div>
         </div>
       </section>
 
-      <section className="field-stat-grid">
-        <Metric label="Recent Stops" value={completedStops.length} />
-        <Metric label="Completed Today" value={completedToday.length} tone="success" />
-        <Metric label="Needs Follow-Up" value={needsFollowUp.length} tone="danger" />
-        <Metric label="Payment Links" value={recentPaymentLinks.length} tone="warning" />
-        <Metric label="Recent Breaks" value={context.breaks.length} />
+      <section className="field-history-stats">
+        <HistoryMetric
+          icon={CheckCircle2}
+          label="Completed"
+          value={completedRecords.length}
+        />
+
+        <HistoryMetric
+          icon={AlertTriangle}
+          label="Follow-Ups"
+          tone="warning"
+          value={followUpRecords.length}
+        />
+
+        <HistoryMetric
+          icon={ClipboardCheck}
+          label="Proof Complete"
+          tone="success"
+          value={completedWithProof.length}
+        />
+
+        <HistoryMetric
+          icon={DollarSign}
+          label="Serviced"
+          value={formatMoney(servicedRevenue)}
+        />
       </section>
 
-      <HistorySection title="Recent Stops" empty="No completed field stops yet.">
-        {completedStops.slice(0, 10).map((stop) => {
-          const visit = context.visits.find((item) => item.id === stop.service_visit_id);
-          const booking = context.bookings.find((item) => item.id === stop.booking_id);
-          const photoCount = context.photos.filter((photo) => photo.route_stop_id === stop.id).length;
+      <form
+        action="/field/history"
+        className="field-history-search"
+        method="get"
+      >
+        <Search size={21} aria-hidden="true" />
 
-          return (
-            <article className="field-card compact-field-card" key={stop.id}>
-              <div className="field-card-top">
-                <span className={`status-badge status-${stop.status}`}>
-                  {humanizeStatus(stop.status)}
-                </span>
-                <span>{stop.completed_at ? new Date(stop.completed_at).toLocaleString() : "No end time"}</span>
+        <input
+          aria-label="Search service history"
+          defaultValue={query?.q ?? ""}
+          name="q"
+          placeholder={
+            canViewAllHistory
+              ? "Search customer, address, technician, or route"
+              : "Search customer, address, or route"
+          }
+          type="search"
+        />
+
+        <button type="submit">Search</button>
+
+        {searchTerm ? (
+          <Link href="/field/history">Clear</Link>
+        ) : null}
+      </form>
+
+      {searchTerm ? (
+        <div className="field-history-results-note">
+          <strong>
+            {filteredRecords.length}{" "}
+            {filteredRecords.length === 1
+              ? "record"
+              : "records"}
+          </strong>
+
+          <span>
+            matching “{query?.q?.trim()}”
+          </span>
+        </div>
+      ) : null}
+
+      {groupedRecords.length ? (
+        <div className="field-history-months">
+          {groupedRecords.map((group) => (
+            <section
+              className="field-history-month"
+              key={group.monthKey}
+            >
+              <div className="field-history-month-heading">
+                <h2>{group.monthLabel}</h2>
+                <span>{group.records.length}</span>
               </div>
-              <h2>
-                #{stop.stop_order} {booking ? `${booking.first_name} ${booking.last_name}` : "Stop"}
-              </h2>
-              {booking ? <p>{formatBookingAddress(booking)}</p> : null}
-              <p>{photoCount} photo(s) saved</p>
-              {visit ? (
-                <Link className="button button-outline" href={`/field/stops/${visit.id}`}>
-                  Open Stop
-                </Link>
-              ) : null}
-            </article>
-          );
-        })}
-      </HistorySection>
 
-      <HistorySection title="Needs Follow-Up" empty="No follow-up stops right now.">
-        {needsFollowUp.map((stop) => {
-          const visit = context.visits.find((item) => item.id === stop.service_visit_id);
-          const booking = context.bookings.find((item) => item.id === stop.booking_id);
-          return (
-            <article className="field-card compact-field-card" key={stop.id}>
-              <span className="status-badge status-needs_follow_up">Needs Follow-Up</span>
-              <h2>{booking ? `${booking.first_name} ${booking.last_name}` : "Stop"}</h2>
-              <p>{booking ? formatBookingAddress(booking) : "No address linked"}</p>
-              <p>{stop.technician_notes ?? "No technician notes added."}</p>
-              {visit ? (
-                <Link className="button button-dark" href={`/field/stops/${visit.id}`}>
-                  Review Issue
-                </Link>
-              ) : null}
-            </article>
-          );
-        })}
-      </HistorySection>
+              <div className="field-history-records">
+                {group.records.map((record) => (
+                  <HistoryCard
+                    canViewAllHistory={
+                      canViewAllHistory
+                    }
+                    key={record.stop.id}
+                    record={record}
+                  />
+                ))}
+              </div>
+            </section>
+          ))}
+        </div>
+      ) : (
+        <section className="field-history-empty">
+          <ClipboardCheck
+            size={42}
+            aria-hidden="true"
+          />
 
-      <HistorySection title="Recent Payment Links" empty="No payment links created yet.">
-        {recentPaymentLinks.map((payment) => {
-          const booking = context.bookings.find((item) => item.id === payment.booking_id);
-          return (
-            <article className="field-card compact-field-card" key={payment.id}>
-              <span className={`status-badge status-${payment.status}`}>
-                {humanizeStatus(payment.status)}
-              </span>
-              <h2>${payment.amount}</h2>
-              <p>{booking?.street_address ?? payment.description ?? "Payment link"}</p>
-              {payment.checkout_url ? (
-                <a className="button button-outline" href={payment.checkout_url}>
-                  Open Link
-                </a>
-              ) : null}
-            </article>
-          );
-        })}
-      </HistorySection>
+          <div>
+            <h2>
+              {searchTerm
+                ? "No matching service records"
+                : "No service history yet"}
+            </h2>
 
-      <HistorySection title="Recent Breaks" empty="No route breaks logged yet.">
-        {context.breaks.slice(0, 8).map((routeBreak) => (
-          <article className="field-card compact-field-card" key={routeBreak.id}>
-            <span className={`status-badge status-${routeBreak.ended_at ? "completed" : "in_progress"}`}>
-              {routeBreak.ended_at ? "Ended" : "Active"}
-            </span>
-            <h2>{humanizeStatus(routeBreak.reason)}</h2>
-            <p>{new Date(routeBreak.started_at).toLocaleString()}</p>
-          </article>
-        ))}
-      </HistorySection>
+            <p>
+              {searchTerm
+                ? "Try another customer name, address, technician, or route."
+                : "Completed stops and follow-up records will appear here."}
+            </p>
+          </div>
+
+          {searchTerm ? (
+            <Link
+              className="button button-outline"
+              href="/field/history"
+            >
+              Clear Search
+            </Link>
+          ) : (
+            <Link
+              className="button button-primary"
+              href="/field/today"
+            >
+              Open Today
+            </Link>
+          )}
+        </section>
+      )}
     </FieldShell>
   );
 }
 
-function Metric({
+function HistoryCard({
+  record,
+  canViewAllHistory,
+}: {
+  record: HistoryRecord;
+  canViewAllHistory: boolean;
+}) {
+  const {
+    stop,
+    visit,
+    booking,
+    checklist,
+    payment,
+    technician,
+    beforePhotoCount,
+    afterPhotoCount,
+    issuePhotoCount,
+    eventDate,
+  } = record;
+
+  const customerName = booking
+    ? [booking.first_name, booking.last_name]
+        .filter(Boolean)
+        .join(" ") || "Customer"
+    : "Unlinked customer";
+
+  const address = booking
+    ? formatBookingAddress(booking)
+    : "No service address linked";
+
+  const checklistComplete =
+    checklist?.status === "submitted";
+
+  const paymentStatus =
+    payment?.status ??
+    booking?.payment_status ??
+    "unknown";
+
+  const technicianName = technician
+    ? [technician.first_name, technician.last_name]
+        .filter(Boolean)
+        .join(" ") ||
+      technician.email ||
+      "Technician"
+    : "Technician not recorded";
+
+  const hasIssue =
+    stop.status === "needs_follow_up" ||
+    stop.issue_flags.length > 0 ||
+    issuePhotoCount > 0;
+
+  return (
+    <article
+      className={[
+        "field-history-card",
+        hasIssue ? "has-issue" : "",
+        stop.status === "completed"
+          ? "is-complete"
+          : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+    >
+      <div className="field-history-card-top">
+        <div>
+          <p className="section-kicker">
+            {formatServiceDate(eventDate)}
+          </p>
+
+          <h3>{customerName}</h3>
+
+          <p>{address}</p>
+        </div>
+
+        <span
+          className={`status-badge status-${stop.status}`}
+        >
+          {humanizeStatus(stop.status)}
+        </span>
+      </div>
+
+      <div className="field-history-service-meta">
+        <span>
+          {booking?.bin_count ?? 0}{" "}
+          {(booking?.bin_count ?? 0) === 1
+            ? "bin"
+            : "bins"}
+        </span>
+
+        <span>
+          {humanizeStatus(
+            booking?.frequency ?? "one_time",
+          )}
+        </span>
+
+        <span>
+          Payment: {humanizeStatus(paymentStatus)}
+        </span>
+
+        {canViewAllHistory ? (
+          <span>Tech: {technicianName}</span>
+        ) : null}
+      </div>
+
+      <div className="field-history-proof">
+        <ProofItem
+          complete={beforePhotoCount > 0}
+          icon={Camera}
+          label="Before"
+          value={beforePhotoCount}
+        />
+
+        <ProofItem
+          complete={checklistComplete}
+          icon={ClipboardCheck}
+          label="Checklist"
+          value={checklistComplete ? "Done" : "Missing"}
+        />
+
+        <ProofItem
+          complete={afterPhotoCount > 0}
+          icon={Camera}
+          label="After"
+          value={afterPhotoCount}
+        />
+      </div>
+
+      {hasIssue ? (
+        <div className="field-history-issue">
+          <AlertTriangle
+            size={20}
+            aria-hidden="true"
+          />
+
+          <div>
+            <strong>
+              {stop.status === "needs_follow_up"
+                ? "Follow-up required"
+                : "Issue documented"}
+            </strong>
+
+            <p>
+              {stop.technician_notes ??
+                stop.issue_flags
+                  .map(humanizeStatus)
+                  .join(", ") ??
+                "Review the service record for details."}
+            </p>
+          </div>
+        </div>
+      ) : null}
+
+      {visit ? (
+        <Link
+          className="field-history-open-button"
+          href={`/field/stops/${visit.id}`}
+        >
+          <span>View Service Record</span>
+          <ChevronRight
+            size={22}
+            aria-hidden="true"
+          />
+        </Link>
+      ) : (
+        <div className="field-history-no-link">
+          Service visit is not linked to this record.
+        </div>
+      )}
+    </article>
+  );
+}
+
+function ProofItem({
+  icon: Icon,
+  label,
+  value,
+  complete,
+}: {
+  icon: typeof Camera;
+  label: string;
+  value: number | string;
+  complete: boolean;
+}) {
+  return (
+    <div
+      className={
+        complete
+          ? "field-history-proof-item is-complete"
+          : "field-history-proof-item is-missing"
+      }
+    >
+      <Icon size={19} aria-hidden="true" />
+
+      <span>{label}</span>
+
+      <strong>{value}</strong>
+    </div>
+  );
+}
+
+function HistoryMetric({
+  icon: Icon,
   label,
   value,
   tone = "default",
 }: {
+  icon: typeof CheckCircle2;
   label: string;
-  value: number;
-  tone?: "default" | "success" | "warning" | "danger";
+  value: number | string;
+  tone?: "default" | "success" | "warning";
 }) {
   return (
-    <article className={`field-metric field-metric-${tone}`}>
+    <article
+      className={`field-history-metric field-history-metric-${tone}`}
+    >
+      <Icon size={21} aria-hidden="true" />
+
       <span>{label}</span>
+
       <strong>{value}</strong>
     </article>
   );
 }
 
-function HistorySection({
-  title,
-  empty,
-  children,
-}: {
-  title: string;
-  empty: string;
-  children: React.ReactNode;
-}) {
-  const hasChildren = Array.isArray(children) ? children.length > 0 : Boolean(children);
+function groupRecordsByMonth(
+  records: HistoryRecord[],
+) {
+  const groups = new Map<string, HistoryRecord[]>();
 
-  return (
-    <section className="field-section">
-      <div className="field-section-heading">
-        <div>
-          <p className="section-kicker">{title}</p>
-          <h2>{title}</h2>
-        </div>
-      </div>
-      {hasChildren ? (
-        <div className="field-route-grid">{children}</div>
-      ) : (
-        <section className="field-empty-state slim">
-          <h2>{empty}</h2>
-          <p>Route activity will appear here as service days are worked.</p>
-        </section>
-      )}
-    </section>
+  records.forEach((record) => {
+    const date = new Date(record.eventDate);
+
+    const monthKey = new Intl.DateTimeFormat(
+      "en-US",
+      {
+        year: "numeric",
+        month: "2-digit",
+        timeZone: "America/New_York",
+      },
+    ).format(date);
+
+    const existing = groups.get(monthKey) ?? [];
+    existing.push(record);
+    groups.set(monthKey, existing);
+  });
+
+  return Array.from(groups.entries()).map(
+    ([monthKey, monthRecords]) => ({
+      monthKey,
+      monthLabel: new Intl.DateTimeFormat(
+        "en-US",
+        {
+          month: "long",
+          year: "numeric",
+          timeZone: "America/New_York",
+        },
+      ).format(
+        new Date(monthRecords[0].eventDate),
+      ),
+      records: monthRecords,
+    }),
   );
+}
+
+function formatServiceDate(value: string) {
+  return new Intl.DateTimeFormat("en-US", {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZone: "America/New_York",
+  }).format(new Date(value));
+}
+
+function formatMoney(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(value);
 }
