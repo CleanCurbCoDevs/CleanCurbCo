@@ -44,6 +44,17 @@ function getInvoiceSubscriptionId(invoice: Stripe.Invoice) {
   return invoiceWithLegacySubscription.parent?.subscription_details?.subscription ?? null;
 }
 
+function throwIfDatabaseReadFailed(
+  operation: string,
+  error: { message: string; code?: string } | null,
+) {
+  if (!error) return;
+
+  throw new Error(
+    `${operation}${error.code ? ` (${error.code})` : ""}: ${error.message}`,
+  );
+}
+
 async function findPayment(input: {
   paymentId?: string | null;
   checkoutSessionId?: string | null;
@@ -60,11 +71,20 @@ async function findPayment(input: {
 
   for (const [column, value] of queries) {
     if (!value) continue;
-    const { data } = await admin
+    const {
+      data,
+      error,
+    } = await admin
       .from("payments")
       .select("*")
       .eq(column, value)
       .maybeSingle();
+    
+    throwIfDatabaseReadFailed(
+      `Stripe payment lookup by ${String(column)} failed`,
+      error,
+    );
+    
     if (data) return data;
   }
 
@@ -124,7 +144,12 @@ async function updatePaymentState(input: {
   const now = new Date().toISOString();
 
   const existingPayment = await findPayment(input);
-  const paymentId = input.paymentId ?? existingPayment?.id ?? null;
+  
+  if (!existingPayment) {
+    throw new Error(
+      `Stripe event ${input.stripeEventId} could not be linked to a payment row.`,
+    );
+  }
 
   const paymentUpdate: Partial<PaymentRow> = {
     status: input.paymentStatus,
@@ -147,74 +172,51 @@ async function updatePaymentState(input: {
     paymentUpdate.total_amount = input.receivedAmount;
   }
   
-  if (paymentId) {
-    const { error } = await admin
-      .from("payments")
-      .update(paymentUpdate)
-      .eq("id", paymentId);
+  const {
+    data: payment,
+    error: paymentUpdateError,
+  } = await admin
+    .from("payments")
+    .update(paymentUpdate)
+    .eq("id", existingPayment.id)
+    .select("*")
+    .maybeSingle();
   
-    throwIfDatabaseWriteFailed(
-      "Stripe payment update by payment ID failed",
-      error,
-    );
-  } else if (input.checkoutSessionId) {
-    const { error } = await admin
-      .from("payments")
-      .update(paymentUpdate)
-      .eq(
-        "stripe_checkout_session_id",
-        input.checkoutSessionId,
-      );
+  throwIfDatabaseWriteFailed(
+    "Stripe payment-state update failed",
+    paymentUpdateError,
+  );
   
-    throwIfDatabaseWriteFailed(
-      "Stripe payment update by checkout session failed",
-      error,
-    );
-  } else if (input.paymentIntentId) {
-    const { error } = await admin
-      .from("payments")
-      .update(paymentUpdate)
-      .eq(
-        "stripe_payment_intent_id",
-        input.paymentIntentId,
-      );
-  
-    throwIfDatabaseWriteFailed(
-      "Stripe payment update by payment intent failed",
-      error,
-    );
-  } else if (input.subscriptionId) {
-    const { error } = await admin
-      .from("payments")
-      .update(paymentUpdate)
-      .eq(
-        "stripe_subscription_id",
-        input.subscriptionId,
-      );
-  
-    throwIfDatabaseWriteFailed(
-      "Stripe payment update by subscription failed",
-      error,
+  if (!payment) {
+    throw new Error(
+      `Stripe payment update returned no row for payment ${existingPayment.id}.`,
     );
   }
-
-  const payment = await findPayment({
-    paymentId,
-    checkoutSessionId: input.checkoutSessionId,
-    paymentIntentId: input.paymentIntentId,
-    subscriptionId: input.subscriptionId,
-  });
 
   const bookingId = input.bookingId || payment?.booking_id || "";
   let booking: BookingRow | null = null;
 
   if (bookingId) {
-    const { data: previousBooking } = await admin
+    const {
+      data: previousBooking,
+      error: bookingLookupError,
+    } = await admin
       .from("bookings")
       .select("*")
       .eq("id", bookingId)
       .maybeSingle();
-
+    
+    throwIfDatabaseReadFailed(
+      "Stripe booking lookup failed",
+      bookingLookupError,
+    );
+    
+    if (!previousBooking) {
+      throw new Error(
+        `Stripe payment event could not find booking ${bookingId}.`,
+      );
+    }
+    
     if (previousBooking) {
       const preserveExistingPaidBooking =
         previousBooking.payment_status === "paid" &&
