@@ -239,6 +239,27 @@ export type BookingRow = {
   tip_request_sent_at: string | null;
 };
 
+export type BookingEventOutcome =
+  | "info"
+  | "success"
+  | "warning"
+  | "failure";
+
+export type BookingEventRow = {
+  id: string;
+  created_at: string;
+  booking_id: string;
+  customer_id: string | null;
+  actor_profile_id: string | null;
+  request_id: string | null;
+  source: string;
+  event_type: string;
+  outcome: BookingEventOutcome;
+  message: string;
+  idempotency_key: string | null;
+  metadata: Record<string, unknown>;
+};
+
 export type ProfileRow = {
   id: string;
   created_at: string;
@@ -735,6 +756,18 @@ export type Database = {
         Update: Partial<BookingRow>;
         Relationships: [];
       };
+
+      booking_events: {
+        Row: BookingEventRow;
+        Insert: Partial<BookingEventRow> &
+          Pick<
+            BookingEventRow,
+            "booking_id" | "event_type" | "message"
+          >;
+        Update: Partial<BookingEventRow>;
+        Relationships: [];
+      };
+    
       booking_claims: {
         Row: {
           id: string;
