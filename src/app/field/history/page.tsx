@@ -528,46 +528,267 @@ export default async function FieldHistoryPage({
         />
       </section>
 
-      <form
-        action="/field/history"
-        className="field-history-search"
-        method="get"
+      <details
+        className="field-history-filter-panel"
+        open={hasActiveFilters}
       >
-        <Search size={21} aria-hidden="true" />
+        <summary>
+          <div>
+            <Search size={21} aria-hidden="true" />
+      
+            <span>
+              <strong>Search & Filter</strong>
+      
+              <small>
+                Find a service by customer, date, technician,
+                status, proof, or time.
+              </small>
+            </span>
+          </div>
+      
+          {activeFilterCount > 0 ? (
+            <span className="field-history-filter-count">
+              {activeFilterCount} active
+            </span>
+          ) : (
+            <span className="field-history-filter-count is-empty">
+              All records
+            </span>
+          )}
+        </summary>
+      
+        <form
+          action="/field/history"
+          className="field-history-filter-form"
+          method="get"
+        >
+          <label className="field-history-filter-search">
+            <span>Customer, address, route, or notes</span>
+      
+            <input
+              defaultValue={query?.q ?? ""}
+              name="q"
+              placeholder={
+                canViewAllHistory
+                  ? "Search customer, address, technician, or route"
+                  : "Search customer, address, or route"
+              }
+              type="search"
+            />
+          </label>
+      
+          <div className="field-history-filter-grid">
+            <label>
+              <span>Year</span>
+      
+              <select
+                defaultValue={selectedYear}
+                name="year"
+              >
+                <option value="">All years</option>
+      
+                {availableYears.map((year) => (
+                  <option key={year} value={year}>
+                    {year}
+                  </option>
+                ))}
+              </select>
+            </label>
+      
+            <label>
+              <span>Month</span>
+      
+              <select
+                defaultValue={selectedMonth}
+                name="month"
+              >
+                <option value="">All months</option>
+                <option value="01">January</option>
+                <option value="02">February</option>
+                <option value="03">March</option>
+                <option value="04">April</option>
+                <option value="05">May</option>
+                <option value="06">June</option>
+                <option value="07">July</option>
+                <option value="08">August</option>
+                <option value="09">September</option>
+                <option value="10">October</option>
+                <option value="11">November</option>
+                <option value="12">December</option>
+              </select>
+            </label>
+      
+            <label>
+              <span>Specific day</span>
+      
+              <input
+                defaultValue={selectedDay}
+                name="day"
+                type="date"
+              />
+            </label>
+      
+            <label>
+              <span>Status</span>
+      
+              <select
+                defaultValue={selectedStatus}
+                name="status"
+              >
+                <option value="">All statuses</option>
+                <option value="completed">Completed</option>
+                <option value="needs_follow_up">
+                  Needs Follow-Up
+                </option>
+                <option value="skipped">Skipped</option>
+              </select>
+            </label>
+      
+            <label>
+              <span>Time of day</span>
+      
+              <select
+                defaultValue={selectedTime}
+                name="time"
+              >
+                <option value="">Any time</option>
+                <option value="morning">
+                  Morning — before 12 PM
+                </option>
+                <option value="afternoon">
+                  Afternoon — 12 to 5 PM
+                </option>
+                <option value="evening">
+                  Evening — after 5 PM
+                </option>
+              </select>
+            </label>
+      
+            <label>
+              <span>Proof status</span>
+      
+              <select
+                defaultValue={selectedProof}
+                name="proof"
+              >
+                <option value="">Any proof status</option>
+                <option value="complete">
+                  Complete proof
+                </option>
+                <option value="missing_before">
+                  Missing before photo
+                </option>
+                <option value="missing_checklist">
+                  Missing checklist
+                </option>
+                <option value="missing_after">
+                  Missing after photo
+                </option>
+              </select>
+            </label>
+      
+            {canViewAllHistory ? (
+              <label>
+                <span>Technician</span>
+      
+                <select
+                  defaultValue={selectedTechnician}
+                  name="technician"
+                >
+                  <option value="">All technicians</option>
+      
+                  {availableTechnicians.map(
+                    (technician) => (
+                      <option
+                        key={technician.id}
+                        value={technician.id}
+                      >
+                        {technician.name}
+                      </option>
+                    ),
+                  )}
+                </select>
+              </label>
+            ) : null}
+      
+            <label>
+              <span>Sort records</span>
+      
+              <select
+                defaultValue={selectedSort}
+                name="sort"
+              >
+                <option value="newest">
+                  Newest first
+                </option>
+      
+                <option value="oldest">
+                  Oldest first
+                </option>
+      
+                <option value="customer_asc">
+                  Customer A–Z
+                </option>
+      
+                <option value="customer_desc">
+                  Customer Z–A
+                </option>
+      
+                <option value="time_asc">
+                  Earliest time first
+                </option>
+      
+                <option value="time_desc">
+                  Latest time first
+                </option>
+              </select>
+            </label>
+          </div>
+      
+          <label className="field-history-filter-checkbox">
+            <input
+              defaultChecked={issuesOnly}
+              name="issues"
+              type="checkbox"
+              value="true"
+            />
+      
+            <span>
+              <strong>Issues only</strong>
+              <small>
+                Show follow-ups, issue flags, and issue photos.
+              </small>
+            </span>
+          </label>
+      
+          <div className="field-history-filter-actions">
+            <button type="submit">
+              Apply Filters
+            </button>
+      
+            {hasActiveFilters ? (
+              <Link href="/field/history">
+                Clear Everything
+              </Link>
+            ) : null}
+          </div>
+        </form>
+      </details>
 
-        <input
-          aria-label="Search service history"
-          defaultValue={query?.q ?? ""}
-          name="q"
-          placeholder={
-            canViewAllHistory
-              ? "Search customer, address, technician, or route"
-              : "Search customer, address, or route"
-          }
-          type="search"
-        />
-
-        <button type="submit">Search</button>
-
-        {searchTerm ? (
-          <Link href="/field/history">Clear</Link>
-        ) : null}
-      </form>
-
-      {searchTerm ? (
-        <div className="field-history-results-note">
-          <strong>
-            {filteredRecords.length}{" "}
-            {filteredRecords.length === 1
-              ? "record"
-              : "records"}
-          </strong>
-
-          <span>
-            matching “{query?.q?.trim()}”
-          </span>
-        </div>
-      ) : null}
+      <div className="field-history-results-note">
+        <strong>
+          {filteredRecords.length}{" "}
+          {filteredRecords.length === 1
+            ? "record"
+            : "records"}
+        </strong>
+      
+        <span>
+          {hasActiveFilters
+            ? `shown from ${visibleRecords.length} available`
+            : "available in this history"}
+        </span>
+      </div>
 
       {groupedRecords.length ? (
         <div className="field-history-months">
@@ -604,14 +825,14 @@ export default async function FieldHistoryPage({
 
           <div>
             <h2>
-              {searchTerm
+              {hasActiveFilters
                 ? "No matching service records"
                 : "No service history yet"}
             </h2>
 
             <p>
-              {searchTerm
-                ? "Try another customer name, address, technician, or route."
+              {hasActiveFilters
+                ? "Try removing a filter or choosing a broader date range."
                 : "Completed stops and follow-up records will appear here."}
             </p>
           </div>
@@ -621,7 +842,7 @@ export default async function FieldHistoryPage({
               className="button button-outline"
               href="/field/history"
             >
-              Clear Search
+              Clear Filters
             </Link>
           ) : (
             <Link
@@ -689,7 +910,7 @@ function HistoryCard({
     issuePhotoCount > 0;
 
   return (
-    <article
+    <details
       className={[
         "field-history-card",
         hasIssue ? "has-issue" : "",
@@ -700,112 +921,148 @@ function HistoryCard({
         .filter(Boolean)
         .join(" ")}
     >
-      <div className="field-history-card-top">
-        <div>
-          <p className="section-kicker">
+      <summary className="field-history-card-summary">
+        <div className="field-history-summary-status">
+          <span
+            className={
+              stop.status === "completed"
+                ? "history-status-icon is-complete"
+                : "history-status-icon has-issue"
+            }
+            aria-hidden="true"
+          >
+            {stop.status === "completed" ? "✓" : "!"}
+          </span>
+        </div>
+  
+        <div className="field-history-summary-main">
+          <strong>{customerName}</strong>
+          <span>{address}</span>
+  
+          <small>
             {formatServiceDate(eventDate)}
-          </p>
-
-          <h3>{customerName}</h3>
-
-          <p>{address}</p>
+            {" · "}
+            {booking?.bin_count ?? 0}{" "}
+            {(booking?.bin_count ?? 0) === 1
+              ? "bin"
+              : "bins"}
+          </small>
         </div>
-
-        <span
-          className={`status-badge status-${stop.status}`}
-        >
-          {humanizeStatus(stop.status)}
-        </span>
-      </div>
-
-      <div className="field-history-service-meta">
-        <span>
-          {booking?.bin_count ?? 0}{" "}
-          {(booking?.bin_count ?? 0) === 1
-            ? "bin"
-            : "bins"}
-        </span>
-
-        <span>
-          {humanizeStatus(
-            booking?.frequency ?? "one_time",
-          )}
-        </span>
-
-        <span>
-          Payment: {humanizeStatus(paymentStatus)}
-        </span>
-
-        {canViewAllHistory ? (
-          <span>Tech: {technicianName}</span>
-        ) : null}
-      </div>
-
-      <div className="field-history-proof">
-        <ProofItem
-          complete={beforePhotoCount > 0}
-          icon={Camera}
-          label="Before"
-          value={beforePhotoCount}
+  
+        <div className="field-history-summary-badges">
+          <span
+            className={`status-badge status-${stop.status}`}
+          >
+            {humanizeStatus(stop.status)}
+          </span>
+  
+          <small>
+            {checklistComplete &&
+            beforePhotoCount > 0 &&
+            afterPhotoCount > 0
+              ? "Proof complete"
+              : "Proof incomplete"}
+          </small>
+        </div>
+  
+        <ChevronRight
+          className="field-history-summary-chevron"
+          size={22}
+          aria-hidden="true"
         />
-
-        <ProofItem
-          complete={checklistComplete}
-          icon={ClipboardCheck}
-          label="Checklist"
-          value={checklistComplete ? "Done" : "Missing"}
-        />
-
-        <ProofItem
-          complete={afterPhotoCount > 0}
-          icon={Camera}
-          label="After"
-          value={afterPhotoCount}
-        />
-      </div>
-
-      {hasIssue ? (
-        <div className="field-history-issue">
-          <AlertTriangle
-            size={20}
-            aria-hidden="true"
+      </summary>
+  
+      <div className="field-history-card-details">
+        <div className="field-history-service-meta">
+          <span>
+            {booking?.bin_count ?? 0}{" "}
+            {(booking?.bin_count ?? 0) === 1
+              ? "bin"
+              : "bins"}
+          </span>
+  
+          <span>
+            {humanizeStatus(
+              booking?.frequency ?? "one_time",
+            )}
+          </span>
+  
+          <span>
+            Payment: {humanizeStatus(paymentStatus)}
+          </span>
+  
+          {canViewAllHistory ? (
+            <span>Tech: {technicianName}</span>
+          ) : null}
+        </div>
+  
+        <div className="field-history-proof">
+          <ProofItem
+            complete={beforePhotoCount > 0}
+            icon={Camera}
+            label="Before"
+            value={beforePhotoCount}
           />
-
-          <div>
-            <strong>
-              {stop.status === "needs_follow_up"
-                ? "Follow-up required"
-                : "Issue documented"}
-            </strong>
-
-            <p>
-              {stop.technician_notes ??
-                stop.issue_flags
-                  .map(humanizeStatus)
-                  .join(", ") ??
-                "Review the service record for details."}
-            </p>
+  
+          <ProofItem
+            complete={checklistComplete}
+            icon={ClipboardCheck}
+            label="Checklist"
+            value={checklistComplete ? "Done" : "Missing"}
+          />
+  
+          <ProofItem
+            complete={afterPhotoCount > 0}
+            icon={Camera}
+            label="After"
+            value={afterPhotoCount}
+          />
+        </div>
+  
+        {hasIssue ? (
+          <div className="field-history-issue">
+            <AlertTriangle
+              size={20}
+              aria-hidden="true"
+            />
+  
+            <div>
+              <strong>
+                {stop.status === "needs_follow_up"
+                  ? "Follow-up required"
+                  : "Issue documented"}
+              </strong>
+  
+              <p>
+                {stop.technician_notes ||
+                  stop.issue_flags
+                    .map(humanizeStatus)
+                    .join(", ") ||
+                  "Review the service record for details."}
+              </p>
+            </div>
           </div>
-        </div>
-      ) : null}
-
-      {visit ? (
-        <Link
-          className="field-history-open-button"
-          href={`/field/stops/${visit.id}`}
-        >
-          <span>View Service Record</span>
-          <ChevronRight
-            size={22}
-            aria-hidden="true"
-          />
-        </Link>
-      ) : (
-        <div className="field-history-no-link">
-          Service visit is not linked to this record.
-        </div>
-      )}
-    </article>
+        ) : null}
+  
+        {visit ? (
+          <Link
+            className="field-history-open-button"
+            href={`/field/stops/${visit.id}`}
+          >
+            <span>View Full Service Record</span>
+  
+            <ChevronRight
+              size={22}
+              aria-hidden="true"
+            />
+          </Link>
+        ) : (
+          <div className="field-history-no-link">
+            Service visit is not linked to this record.
+          </div>
+        )}
+      </div>
+    </details>
   );
 }
 
@@ -899,6 +1156,101 @@ function groupRecordsByMonth(
       records: monthRecords,
     }),
   );
+}
+
+function getEasternDateParts(value: string) {
+  const parts = new Intl.DateTimeFormat(
+    "en-US",
+    {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      hourCycle: "h23",
+    },
+  ).formatToParts(new Date(value));
+
+  const year =
+    parts.find((part) => part.type === "year")
+      ?.value ?? "";
+
+  const month =
+    parts.find((part) => part.type === "month")
+      ?.value ?? "";
+
+  const day =
+    parts.find((part) => part.type === "day")
+      ?.value ?? "";
+
+  const hour = Number(
+    parts.find((part) => part.type === "hour")
+      ?.value ?? 0,
+  );
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    date: `${year}-${month}-${day}`,
+  };
+}
+
+function getTimeOfDay(value: string) {
+  const { hour } = getEasternDateParts(value);
+
+  if (hour < 12) return "morning";
+  if (hour < 17) return "afternoon";
+  return "evening";
+}
+
+function getCustomerSortName(record: HistoryRecord) {
+  return [
+    record.booking?.last_name,
+    record.booking?.first_name,
+  ]
+    .filter(Boolean)
+    .join(" ")
+    .toLowerCase();
+}
+
+function sortHistoryRecords(
+  a: HistoryRecord,
+  b: HistoryRecord,
+  sort: string,
+) {
+  if (sort === "oldest") {
+    return a.eventDate.localeCompare(b.eventDate);
+  }
+
+  if (sort === "customer_asc") {
+    return getCustomerSortName(a).localeCompare(
+      getCustomerSortName(b),
+    );
+  }
+
+  if (sort === "customer_desc") {
+    return getCustomerSortName(b).localeCompare(
+      getCustomerSortName(a),
+    );
+  }
+
+  if (sort === "time_asc") {
+    return (
+      getEasternDateParts(a.eventDate).hour -
+      getEasternDateParts(b.eventDate).hour
+    );
+  }
+
+  if (sort === "time_desc") {
+    return (
+      getEasternDateParts(b.eventDate).hour -
+      getEasternDateParts(a.eventDate).hour
+    );
+  }
+
+  return b.eventDate.localeCompare(a.eventDate);
 }
 
 function formatServiceDate(value: string) {
