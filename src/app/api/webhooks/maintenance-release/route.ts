@@ -168,7 +168,10 @@ export async function POST(request: Request) {
     );
   }
 
-  if (event.type !== "deployment.succeeded") {
+  if (
+    event.type !== "deployment.ready" &&
+    event.type !== "deployment.succeeded"
+  ) {
     return NextResponse.json({
       ignored: true,
       reason: "Not a successful deployment.",
