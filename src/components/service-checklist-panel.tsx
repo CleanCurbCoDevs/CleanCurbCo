@@ -37,6 +37,176 @@ export function ServiceChecklistPanel({
   const progress = checklistProgress(bundle.items);
   const isSubmitted = bundle.checklist.status === "submitted";
 
+  if (!adminMode) {
+    return (
+      <FieldChecklist
+        bundle={bundle}
+        groupedItems={groupedItems}
+        isSubmitted={isSubmitted}
+        notice={notice}
+        progress={progress}
+        returnTo={returnTo}
+      />
+    );
+  }
+  
+  return (
+    <section className="service-checklist-shell">
+      <div className="service-checklist-hero">
+        <div>
+          <p className="section-kicker">Service Checklist</p>
+          <h1>Proof-of-work report</h1>
+          <p className="muted">
+            Each appointment gets its own checklist. Drafts can be updated
+            during service; submitted checklists lock and generate a branded PDF.
+          </p>
+        </div>
+        <div className="status-stack">
+          <span className={`status-badge status-${bundle.checklist.status}`}>
+            {humanizeStatus(bundle.checklist.status)}
+          </span>
+          <span className="status-badge">
+            {progress.resolved} of {progress.total} resolved
+          </span>
+        </div>
+      </div>
+
+      {notice ? <ChecklistNotice notice={notice} /> : null}
+
+      <div className="service-checklist-summary">
+        <div>
+          <span>Customer</span>
+          <strong>
+            {bundle.booking.first_name} {bundle.booking.last_name}
+          </strong>
+        </div>
+        <div>
+          <span>Address</span>
+          <strong>{formatBookingAddress(bundle.booking)}</strong>
+        </div>
+        <div>
+          <span>Service date</span>
+          <strong>
+            {bundle.visit.route_day ??
+              bundle.booking.confirmed_route_day ??
+              "Not scheduled"}
+          </strong>
+        </div>
+        <div>
+          <span>Services</span>
+          <strong>{bundle.checklist.services_performed.join(", ")}</strong>
+        </div>
+      </div>
+
+      {documents.length || bundle.checklist.pdf_storage_path ? (
+        <div className="service-checklist-documents">
+          <h2>Generated documents</h2>
+          {(documents.length
+            ? documents
+            : [
+                {
+                  id: "current",
+                  storage_path: bundle.checklist.pdf_storage_path ?? "",
+                  generated_at: bundle.checklist.pdf_generated_at ?? "",
+                  signedUrl: null,
+                },
+              ]
+          ).map((document) => (
+            <article className="mini-record" key={document.id}>
+              <strong>Service checklist PDF</strong>
+              <span>
+                {document.generated_at
+                  ? new Date(document.generated_at).toLocaleString()
+                  : "Generated"}
+              </span>
+              {document.signedUrl ? (
+                <a href={document.signedUrl} target="_blank" rel="noreferrer">
+                  Open PDF
+                </a>
+              ) : (
+                <span>Storage path: {document.storage_path}</span>
+              )}
+            </article>
+          ))}
+        </div>
+      ) : null}
+
+      <form action={saveServiceChecklistDraftAction} className="service-checklist-form">
+        <input type="hidden" name="visitId" value={bundle.visit.id} />
+        <input type="hidden" name="returnTo" value={returnTo} />
+
+        <ChecklistSections groupedItems={groupedItems} isSubmitted={isSubmitted} />
+
+        <label className="field">
+          <span>Overall service notes</span>
+          <textarea
+            name="overallNotes"
+            defaultValue={bundle.checklist.overall_notes ?? ""}
+            disabled={isSubmitted}
+            placeholder="Final service notes, customer-visible limitations, access issues, or follow-up needs."
+          />
+        </label>
+
+        {isSubmitted ? (
+          <p className="muted">
+            This checklist is locked. Use an admin correction note for amendments.
+          </p>
+        ) : (
+          <div className="action-row">
+            <button className="button button-outline" type="submit">
+              Save Draft
+            </button>
+            <button
+              className="button button-dark"
+              formAction={submitServiceChecklistAction}
+              type="submit"
+            >
+              Submit Final Checklist
+            </button>
+          </div>
+        )}
+
+        {!isSubmitted ? (
+          <label className="choice-card service-checklist-finalize">
+            <input name="finalizeAck" type="checkbox" />
+            <span>
+              I understand final submission locks this checklist and generates
+              the customer/internal PDF service record.
+            </span>
+          </label>
+        ) : null}
+      </form>
+
+      {isSubmitted && bundle.checklist.correction_notes ? (
+        <section className="service-checklist-documents">
+          <h2>Correction notes</h2>
+          <pre>{bundle.checklist.correction_notes}</pre>
+        </section>
+      ) : null}
+
+      {adminMode && isSubmitted ? (
+        <form action={addChecklistCorrectionAction} className="form-section">
+          <input type="hidden" name="checklistId" value={bundle.checklist.id} />
+          <input type="hidden" name="visitId" value={bundle.visit.id} />
+          <input type="hidden" name="returnTo" value={returnTo} />
+          <h2>Admin amendment</h2>
+          <p className="muted">
+            Add a correction note without silently changing the original submitted
+            checklist.
+          </p>
+          <label className="field">
+            <span>Correction note</span>
+            <textarea name="correctionNote" />
+          </label>
+          <button className="button button-outline" type="submit">
+            Add Correction Note
+          </button>
+        </form>
+      ) : null}
+    </section>
+  );
+}
+
   function FieldChecklist({
     bundle,
     groupedItems,
@@ -235,163 +405,6 @@ export function ServiceChecklistPanel({
       </section>
     );
   }
-  
-  return (
-    <section className="service-checklist-shell">
-      <div className="service-checklist-hero">
-        <div>
-          <p className="section-kicker">Service Checklist</p>
-          <h1>Proof-of-work report</h1>
-          <p className="muted">
-            Each appointment gets its own checklist. Drafts can be updated
-            during service; submitted checklists lock and generate a branded PDF.
-          </p>
-        </div>
-        <div className="status-stack">
-          <span className={`status-badge status-${bundle.checklist.status}`}>
-            {humanizeStatus(bundle.checklist.status)}
-          </span>
-          <span className="status-badge">
-            {progress.resolved} of {progress.total} resolved
-          </span>
-        </div>
-      </div>
-
-      {notice ? <ChecklistNotice notice={notice} /> : null}
-
-      <div className="service-checklist-summary">
-        <div>
-          <span>Customer</span>
-          <strong>
-            {bundle.booking.first_name} {bundle.booking.last_name}
-          </strong>
-        </div>
-        <div>
-          <span>Address</span>
-          <strong>{formatBookingAddress(bundle.booking)}</strong>
-        </div>
-        <div>
-          <span>Service date</span>
-          <strong>
-            {bundle.visit.route_day ??
-              bundle.booking.confirmed_route_day ??
-              "Not scheduled"}
-          </strong>
-        </div>
-        <div>
-          <span>Services</span>
-          <strong>{bundle.checklist.services_performed.join(", ")}</strong>
-        </div>
-      </div>
-
-      {documents.length || bundle.checklist.pdf_storage_path ? (
-        <div className="service-checklist-documents">
-          <h2>Generated documents</h2>
-          {(documents.length
-            ? documents
-            : [
-                {
-                  id: "current",
-                  storage_path: bundle.checklist.pdf_storage_path ?? "",
-                  generated_at: bundle.checklist.pdf_generated_at ?? "",
-                  signedUrl: null,
-                },
-              ]
-          ).map((document) => (
-            <article className="mini-record" key={document.id}>
-              <strong>Service checklist PDF</strong>
-              <span>
-                {document.generated_at
-                  ? new Date(document.generated_at).toLocaleString()
-                  : "Generated"}
-              </span>
-              {document.signedUrl ? (
-                <a href={document.signedUrl} target="_blank" rel="noreferrer">
-                  Open PDF
-                </a>
-              ) : (
-                <span>Storage path: {document.storage_path}</span>
-              )}
-            </article>
-          ))}
-        </div>
-      ) : null}
-
-      <form action={saveServiceChecklistDraftAction} className="service-checklist-form">
-        <input type="hidden" name="visitId" value={bundle.visit.id} />
-        <input type="hidden" name="returnTo" value={returnTo} />
-
-        <ChecklistSections groupedItems={groupedItems} isSubmitted={isSubmitted} />
-
-        <label className="field">
-          <span>Overall service notes</span>
-          <textarea
-            name="overallNotes"
-            defaultValue={bundle.checklist.overall_notes ?? ""}
-            disabled={isSubmitted}
-            placeholder="Final service notes, customer-visible limitations, access issues, or follow-up needs."
-          />
-        </label>
-
-        {isSubmitted ? (
-          <p className="muted">
-            This checklist is locked. Use an admin correction note for amendments.
-          </p>
-        ) : (
-          <div className="action-row">
-            <button className="button button-outline" type="submit">
-              Save Draft
-            </button>
-            <button
-              className="button button-dark"
-              formAction={submitServiceChecklistAction}
-              type="submit"
-            >
-              Submit Final Checklist
-            </button>
-          </div>
-        )}
-
-        {!isSubmitted ? (
-          <label className="choice-card service-checklist-finalize">
-            <input name="finalizeAck" type="checkbox" />
-            <span>
-              I understand final submission locks this checklist and generates
-              the customer/internal PDF service record.
-            </span>
-          </label>
-        ) : null}
-      </form>
-
-      {isSubmitted && bundle.checklist.correction_notes ? (
-        <section className="service-checklist-documents">
-          <h2>Correction notes</h2>
-          <pre>{bundle.checklist.correction_notes}</pre>
-        </section>
-      ) : null}
-
-      {adminMode && isSubmitted ? (
-        <form action={addChecklistCorrectionAction} className="form-section">
-          <input type="hidden" name="checklistId" value={bundle.checklist.id} />
-          <input type="hidden" name="visitId" value={bundle.visit.id} />
-          <input type="hidden" name="returnTo" value={returnTo} />
-          <h2>Admin amendment</h2>
-          <p className="muted">
-            Add a correction note without silently changing the original submitted
-            checklist.
-          </p>
-          <label className="field">
-            <span>Correction note</span>
-            <textarea name="correctionNote" />
-          </label>
-          <button className="button button-outline" type="submit">
-            Add Correction Note
-          </button>
-        </form>
-      ) : null}
-    </section>
-  );
-}
 
 function ChecklistSections({
   groupedItems,
