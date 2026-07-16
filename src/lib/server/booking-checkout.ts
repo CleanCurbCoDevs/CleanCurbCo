@@ -14,6 +14,7 @@ import type { BookingRow } from "@/types/database";
 type CreateBookingCheckoutInput = {
   booking: BookingRow;
   requestId: string;
+  claimToken: string;
 };
 
 export type BookingCheckoutResult = {
@@ -37,6 +38,7 @@ function stringifyMetadata(
 export async function createBookingCheckout({
   booking,
   requestId,
+  claimToken,
 }: CreateBookingCheckoutInput): Promise<BookingCheckoutResult> {
   const customerMessage =
     "Your booking was saved, but secure checkout could not start. We will send you a fresh card-payment link.";
@@ -173,11 +175,17 @@ export async function createBookingCheckout({
         }).status,
     });
 
+    const accountQuery = new URLSearchParams({
+      booking: booking.id,
+      token: claimToken,
+    }).toString();
+    
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
       customer: stripeCustomerId,
       client_reference_id: booking.id,
       payment_method_types: ["card"],
+      allow_promotion_codes: true,
       line_items: [
         {
           quantity: 1,
@@ -193,13 +201,15 @@ export async function createBookingCheckout({
           },
         },
       ],
-      success_url:
-        `${siteUrl}/billing/success` +
-        `?payment=success` +
-        `&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url:
-        `${siteUrl}/billing/success` +
-        `?payment=cancelled`,
+    success_url:
+      `${siteUrl}/billing/success` +
+      `?payment=success` +
+      `&session_id={CHECKOUT_SESSION_ID}` +
+      `&${accountQuery}`,
+    cancel_url:
+      `${siteUrl}/billing/success` +
+      `?payment=cancelled` +
+      `&${accountQuery}`,
       metadata: stripeMetadata,
       payment_intent_data: {
         metadata: stripeMetadata,
