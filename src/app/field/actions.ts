@@ -651,39 +651,43 @@ export async function completeStopAction(
   const beforeCount = photos?.filter((photo) => photo.photo_type === "before").length ?? 0;
   const afterCount = photos?.filter((photo) => photo.photo_type === "after").length ?? 0;
 
-  const { data: checklist } = await admin
-    .from("service_checklists")
-    .select("*")
-    .eq("route_stop_id", stop.id)
-    .limit(1)
-    .maybeSingle();
+const { data: checklist } = await admin
+  .from("service_checklists")
+  .select("*")
+  .eq("route_stop_id", stop.id)
+  .limit(1)
+  .maybeSingle();
 
-  const checklistUpdate = {
-    before_photos_taken: beforeCount > 0,
-    after_photos_taken: afterCount > 0,
+if (beforeCount < 1) {
+  return actionFailure(
+    "Take at least one before photo before completing this stop.",
+  );
+}
+
+if (!checklist || checklist.status !== "submitted") {
+  return actionFailure(
+    "Finish and submit the cleaning checklist before completing this stop.",
+  );
+}
+
+if (afterCount < 1) {
+  return actionFailure(
+    "Take at least one after photo before completing this stop.",
+  );
+}
+
+await admin
+  .from("service_checklists")
+  .update({
+    before_photos_taken: true,
+    after_photos_taken: true,
     service_completed: true,
     completed_by: auth.userId,
     completed_at: completedAt,
-  };
-
-  if (checklist) {
-      await admin
-        .from("service_checklists")
-        .update({
-          ...checklistUpdate,
-          booking_id: booking.id,
-          customer_id: booking.customer_id,
-        })
-        .eq("id", checklist.id);
-    } else {
-      await admin.from("service_checklists").insert({
-        service_visit_id: visit.id,
-        route_stop_id: stop.id,
-        booking_id: booking.id,
-        customer_id: booking.customer_id,
-        ...checklistUpdate,
-      });
-  }
+    booking_id: booking.id,
+    customer_id: booking.customer_id,
+  })
+  .eq("id", checklist.id);
 
   await Promise.all([
     admin
