@@ -575,12 +575,57 @@ export async function POST(request: Request) {
     );
   }
 
+let redirectTo: string | null = null;
+let setupLink: string | null = null;
+let claimToken: string | null = null;
+
+const token = createClaimToken();
+const tokenHash = hashClaimToken(token);
+
+const { error: claimError } = await admin
+  .from("booking_claims")
+  .insert({
+    booking_id: booking.id,
+    email,
+    token_hash: tokenHash,
+  });
+
+if (claimError) {
+  logger.error("booking_claim_creation_failed", {
+    requestId,
+    route,
+    customerId,
+    bookingId: booking.id,
+    error: claimError,
+  });
+} else {
+  claimToken = token;
+
+  if (!customerId) {
+    redirectTo =
+      `/account-setup?booking=${booking.id}` +
+      `&token=${encodeURIComponent(token)}`;
+
+    setupLink = createAccountSetupLink(
+      booking.id,
+      token,
+    );
+  }
+}
+  
 const checkoutResult =
   paymentPreference === "stripe"
-    ? await createBookingCheckout({
-        booking,
-        requestId,
-      })
+    ? claimToken
+      ? await createBookingCheckout({
+          booking,
+          requestId,
+          claimToken,
+        })
+      : {
+          checkoutUrl: null,
+          error:
+            "Your booking was saved, but secure checkout could not start. We will send you a fresh payment link.",
+        }
     : {
         checkoutUrl: null,
         error: null,
@@ -625,23 +670,6 @@ const checkoutResult =
       status: "pending",
     });
   }
-
-  let redirectTo: string | null = null;
-  let setupLink: string | null = null;
-
-if (!customerId) {
-  const token = createClaimToken();
-  const tokenHash = hashClaimToken(token);
-
-  await admin.from("booking_claims").insert({
-    booking_id: booking.id,
-    email,
-    token_hash: tokenHash,
-  });
-
-  redirectTo = `/account-setup?booking=${booking.id}&token=${encodeURIComponent(token)}`;
-  setupLink = createAccountSetupLink(booking.id, token);
-}
 
   const emailJobs = [
     sendBookingConfirmation(booking, {
