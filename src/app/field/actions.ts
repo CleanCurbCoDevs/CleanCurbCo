@@ -528,6 +528,261 @@ export async function saveTechnicianNotesAction(formData: FormData) {
   revalidateField(visit.id);
 }
 
+
+type ServicePhotoUploadTicket = {
+  bucket: string;
+  path: string;
+  token: string;
+  contentType: string;
+};
+
+type PrepareServicePhotoUploadInput = {
+  visitId: string;
+  photoType: PhotoType;
+  fileName: string;
+  contentType: string;
+  size: number;
+};
+
+type FinalizeServicePhotoUploadInput = {
+  visitId: string;
+  photoType: PhotoType;
+  storageBucket: string;
+  storagePath: string;
+};
+
+const SERVICE_PHOTO_BUCKET = "service-photos";
+const MAX_SERVICE_PHOTO_BYTES = 20 * 1024 * 1024;
+const validServicePhotoTypes: readonly PhotoType[] = [
+  "before",
+  "after",
+  "issue",
+  "other",
+];
+const validServicePhotoContentTypes = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/webp",
+  "image/heic",
+  "image/heif",
+]);
+
+export async function prepareServicePhotoUploadAction(
+  input: PrepareServicePhotoUploadInput,
+): Promise<ActionResult<ServicePhotoUploadTicket>> {
+  await requireFieldUser();
+
+  const visitId = String(input?.visitId ?? "").trim();
+  const photoType = String(input?.photoType ?? "").trim() as PhotoType;
+  const contentType = String(input?.contentType ?? "").trim().toLowerCase();
+  const size = Number(input?.size ?? 0);
+
+  if (!visitId || !validServicePhotoTypes.includes(photoType)) {
+    return actionFailure("Choose a valid service stop and photo type.");
+  }
+
+  if (!validServicePhotoContentTypes.has(contentType)) {
+    return actionFailure(
+      "Use a JPG, PNG, WEBP, HEIC, or HEIF image.",
+    );
+  }
+
+  if (!Number.isFinite(size) || size <= 0) {
+    return actionFailure("The selected photo is empty.");
+  }
+
+  if (size > MAX_SERVICE_PHOTO_BYTES) {
+    return actionFailure("Each photo must be 20 MB or smaller.");
+  }
+
+  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+
+  if (!visit || !stop || !booking) {
+    return actionFailure("This stop could not be loaded.");
+  }
+
+  const extension = extensionForServicePhoto(contentType);
+  const storagePath =
+    `${visit.id}/${photoType}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
+
+  const { data, error } = await admin.storage
+    .from(SERVICE_PHOTO_BUCKET)
+    .createSignedUploadUrl(storagePath);
+
+  if (error || !data?.token) {
+    return actionFailure(
+      error?.message
+        ? `Could not prepare the photo upload: ${error.message}`
+        : "Could not prepare the photo upload.",
+    );
+  }
+
+  return actionSuccess("Photo upload prepared.", {
+    bucket: SERVICE_PHOTO_BUCKET,
+    path: storagePath,
+    token: data.token,
+    contentType,
+  });
+}
+
+export async function finalizeServicePhotoUploadAction(
+  input: FinalizeServicePhotoUploadInput,
+): Promise<ActionResult<{ photoId: string }>> {
+  const auth = await requireFieldUser();
+
+  const visitId = String(input?.visitId ?? "").trim();
+  const photoType = String(input?.photoType ?? "").trim() as PhotoType;
+  const storageBucket = String(input?.storageBucket ?? "").trim();
+  const storagePath = String(input?.storagePath ?? "").trim();
+
+  if (!visitId || !validServicePhotoTypes.includes(photoType)) {
+    return actionFailure("Choose a valid service stop and photo type.");
+  }
+
+  if (storageBucket !== SERVICE_PHOTO_BUCKET) {
+    return actionFailure("The photo was uploaded to an invalid storage bucket.");
+  }
+
+  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+
+  if (!visit || !stop || !booking) {
+    return actionFailure("This stop could not be loaded.");
+  }
+
+  const requiredPrefix = `${visit.id}/${photoType}/`;
+
+  if (
+    !storagePath.startsWith(requiredPrefix) ||
+    storagePath.includes("..")
+  ) {
+    return actionFailure("The uploaded photo path is invalid.");
+  }
+
+  const slashIndex = storagePath.lastIndexOf("/");
+  const folder = storagePath.slice(0, slashIndex);
+  const fileName = storagePath.slice(slashIndex + 1);
+
+  const { data: storedObjects, error: listError } = await admin.storage
+    .from(SERVICE_PHOTO_BUCKET)
+    .list(folder, {
+      limit: 100,
+      search: fileName,
+    });
+
+  if (
+    listError ||
+    !storedObjects?.some((object) => object.name === fileName)
+  ) {
+    return actionFailure(
+      "Supabase has not confirmed this photo yet. Try the upload again.",
+    );
+  }
+
+  const { data: existingPhoto } = await admin
+    .from("service_photos")
+    .select("id")
+    .eq("storage_bucket", SERVICE_PHOTO_BUCKET)
+    .eq("storage_path", storagePath)
+    .maybeSingle();
+
+  if (existingPhoto?.id) {
+    return actionSuccess("Photo already attached to this stop.", {
+      photoId: existingPhoto.id,
+    });
+  }
+
+  const { data: photo, error: insertError } = await admin
+    .from("service_photos")
+    .insert({
+      service_visit_id: visit.id,
+      route_stop_id: stop.id,
+      booking_id: booking.id,
+      customer_id: booking.customer_id,
+      photo_type: photoType,
+      storage_bucket: SERVICE_PHOTO_BUCKET,
+      storage_path: storagePath,
+      uploaded_by: auth.userId,
+      is_customer_visible:
+        photoType === "before" || photoType === "after",
+    })
+    .select("id")
+    .single();
+
+  if (insertError || !photo?.id) {
+    await admin.storage
+      .from(SERVICE_PHOTO_BUCKET)
+      .remove([storagePath]);
+
+    return actionFailure(
+      insertError?.message
+        ? `Photo reached storage, but the service record failed: ${insertError.message}`
+        : "Photo reached storage, but it could not be attached to the stop.",
+    );
+  }
+
+  const sideEffects: Array<Promise<unknown>> = [
+    recordServiceEvent({
+      actorId: auth.userId,
+      booking,
+      visit,
+      stop,
+      eventType: `${photoType}_photo_uploaded`,
+      message: `1 ${photoType} photo uploaded and confirmed.`,
+      metadata: { path: storagePath, directUpload: true },
+    }),
+  ];
+
+  if (photoType === "before") {
+    sideEffects.push(
+      admin
+        .from("service_visits")
+        .update({
+          before_photo_urls: Array.from(
+            new Set([...(visit.before_photo_urls ?? []), storagePath]),
+          ),
+        })
+        .eq("id", visit.id),
+    );
+  }
+
+  if (photoType === "after") {
+    sideEffects.push(
+      admin
+        .from("service_visits")
+        .update({
+          after_photo_urls: Array.from(
+            new Set([...(visit.after_photo_urls ?? []), storagePath]),
+          ),
+        })
+        .eq("id", visit.id),
+    );
+  }
+
+  await Promise.allSettled(sideEffects);
+
+  revalidateField(visit.id);
+
+  return actionSuccess("Photo confirmed and attached to this stop.", {
+    photoId: photo.id,
+  });
+}
+
+function extensionForServicePhoto(contentType: string) {
+  switch (contentType) {
+    case "image/png":
+      return "png";
+    case "image/webp":
+      return "webp";
+    case "image/heic":
+      return "heic";
+    case "image/heif":
+      return "heif";
+    default:
+      return "jpg";
+  }
+}
+
+
 export async function uploadServicePhotosAction(formData: FormData) {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
