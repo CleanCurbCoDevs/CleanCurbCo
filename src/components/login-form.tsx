@@ -8,9 +8,11 @@ import { LogIn } from "lucide-react";
 export function LoginForm({
   nextPath,
   buttonLabel = "Log In",
+  showForgotPassword = true,
 }: {
   nextPath?: string;
   buttonLabel?: string;
+  showForgotPassword?: boolean;
 }) {
   const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
@@ -94,9 +96,11 @@ export function LoginForm({
         <LogIn size={20} aria-hidden="true" />
         {isSubmitting ? "Signing In..." : buttonLabel}
       </button>
-      <Link className="muted underline-link" href="/reset-password">
-        Forgot your password?
-      </Link>
+        {showForgotPassword ? (
+          <Link className="muted underline-link" href="/reset-password">
+            Forgot your password?
+          </Link>
+        ) : null}
     </form>
   );
 }
