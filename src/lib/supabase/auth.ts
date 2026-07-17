@@ -146,7 +146,7 @@ export async function requireField(nextPath = "/field/today"): Promise<AuthResul
   const auth = await getCurrentProfile();
 
   if (auth.status === "forbidden") {
-    redirect(`/login?next=${encodeURIComponent(nextPath)}`);
+    redirect(`/field/login?next=${encodeURIComponent(nextPath)}`);
   }
 
   if (auth.status === "ok" && !isFieldRole(auth.profile.role)) {
