@@ -154,10 +154,13 @@ const afterPhotoRequirementMet =
     },
   ];
 
-  {!hasBeforePhotos ||
-beforePhotoException ||
-!hasAfterPhotos ||
-afterPhotoException ? (
+  const photoExceptionPanel =
+    (
+      !hasBeforePhotos ||
+      beforePhotoException ||
+      !hasAfterPhotos ||
+      afterPhotoException
+    ) ? (
   <section className="photo-exception-card">
     <div>
       <p className="section-kicker">Photo Exception</p>
@@ -236,7 +239,7 @@ afterPhotoException ? (
       </ActionSubmitButton>
     </FeedbackForm>
   </section>
-) : null}
+) : null;
   
   const canCompleteStop = completionRequirements.every(
     (requirement) => requirement.complete,
@@ -539,7 +542,9 @@ afterPhotoException ? (
         title="After Photos"
         visitId={visit.id}
       />
-      
+
+      {photoExceptionPanel}
+
       <FieldStopMoreTools
         hasIssues={
           issuePhotos.length > 0 ||
