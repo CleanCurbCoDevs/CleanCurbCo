@@ -7,9 +7,9 @@ import {
   readyForNextStopAction,
   saveTechnicianNotesAction,
   startBreakAction,
-  uploadServicePhotosAction,
 } from "@/app/field/actions";
 import { FieldServiceProgress } from "@/components/field-service-progress";
+import { FieldPhotoUploader } from "@/components/field-photo-uploader";
 import { FieldStopMoreTools } from "@/components/field-stop-more-tools";
 import {
   ActionSubmitButton,
@@ -667,36 +667,12 @@ function PhotoSection({
           <span>{photos.length === 1 ? "photo" : "photos"}</span>
         </div>
       </div>
-
-      <FeedbackForm
-        action={uploadServicePhotosAction}
-        className="photo-stage-form"
-        pendingMessage="Uploading photos..."
-        successMessage={`${heading} uploaded.`}
-      >
-        <input type="hidden" name="visitId" value={visitId} />
-        <input type="hidden" name="photoType" value={photoType} />
-
-        <label className="photo-upload-control">
-          <span className="photo-upload-icon" aria-hidden="true">
-            📷
-          </span>
-
-          <span className="photo-upload-copy">
-            <strong>{actionLabel}</strong>
-            <small>
-              Open the camera or choose multiple photos from the device.
-            </small>
-          </span>
-
-          <input
-            accept="image/*"
-            capture="environment"
-            multiple
-            name="photos"
-            type="file"
-          />
-        </label>
+      <FieldPhotoUploader
+        actionLabel={actionLabel}
+        photoType={photoType}
+        visitId={visitId}
+      />
+    </label>
 
         <ActionSubmitButton
           className="photo-upload-submit"
