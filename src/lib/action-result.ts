@@ -12,6 +12,8 @@ export function actionSuccess<Data = unknown>(
   return { ok: true, message, data };
 }
 
-export function actionFailure(message: string): ActionResult {
+export function actionFailure<Data = never>(
+  message: string,
+): ActionResult<Data> {
   return { ok: false, error: message };
 }
