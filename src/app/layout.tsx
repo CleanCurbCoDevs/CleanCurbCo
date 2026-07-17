@@ -11,6 +11,7 @@ import { getSiteUrl } from "@/lib/env";
 import { localBusinessStructuredData } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./globals.css";
+import "./tablet.css";
 import { PublicPageEffects } from "@/components/public-page-effects";
 
 const geistSans = Geist({
