@@ -1075,15 +1075,20 @@ export async function deleteServicePhotoAction(formData: FormData) {
 }
 
 export async function completeStopAction(
-    formData: FormData,
-  ): Promise<ActionResult> {
+  formData: FormData,
+): Promise<ActionResult> {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+
+  const { admin, stop, visit, booking } =
+    await getStopBundle(visitId);
+
   if (!visit || !stop || !booking) {
-    return actionFailure("This stop could not be loaded.");
+    return actionFailure(
+      "This stop could not be loaded.",
+    );
   }
-  
+
   if (
     booking.payment_due_at_service &&
     booking.payment_status !== "paid"
@@ -1094,86 +1099,154 @@ export async function completeStopAction(
   }
 
   const completedAt = new Date().toISOString();
-  const { data: photos } = await admin
+
+  const {
+    data: photos,
+    error: photosError,
+  } = await admin
     .from("service_photos")
     .select("*")
     .eq("route_stop_id", stop.id);
-  const beforeCount = photos?.filter((photo) => photo.photo_type === "before").length ?? 0;
-  const afterCount = photos?.filter((photo) => photo.photo_type === "after").length ?? 0;
+
+  if (photosError) {
+    return actionFailure(
+      `Could not verify the service photos: ${photosError.message}`,
+    );
+  }
 
   const beforeCount =
     photos?.filter(
       (photo) => photo.photo_type === "before",
     ).length ?? 0;
-  
+
   const afterCount =
     photos?.filter(
       (photo) => photo.photo_type === "after",
     ).length ?? 0;
-  
+
   const photoExceptionRecorded =
     hasPhotoUploadExceptionNote(
       stop.technician_notes ??
         visit.technician_notes,
     );
-  
+
   const beforePhotoException =
     photoExceptionRecorded &&
     stop.issue_flags.includes(
       BEFORE_PHOTO_EXCEPTION_FLAG,
     );
-  
+
   const afterPhotoException =
     photoExceptionRecorded &&
     stop.issue_flags.includes(
       AFTER_PHOTO_EXCEPTION_FLAG,
     );
-  
-  const { data: checklist } = await admin
+
+  const {
+    data: checklist,
+    error: checklistError,
+  } = await admin
     .from("service_checklists")
     .select("*")
     .eq("route_stop_id", stop.id)
     .limit(1)
     .maybeSingle();
-  
+
+  if (checklistError) {
+    return actionFailure(
+      `Could not verify the cleaning checklist: ${checklistError.message}`,
+    );
+  }
+
   if (beforeCount < 1 && !beforePhotoException) {
     return actionFailure(
       "Upload at least one before photo or document a before-photo exception.",
     );
   }
-  
-  if (!checklist || checklist.status !== "submitted") {
+
+  if (
+    !checklist ||
+    checklist.status !== "submitted"
+  ) {
     return actionFailure(
       "Finish and submit the cleaning checklist before completing this stop.",
     );
   }
-  
+
   if (afterCount < 1 && !afterPhotoException) {
     return actionFailure(
       "Upload at least one after photo or document an after-photo exception.",
     );
   }
 
-  await Promise.all([
+  const { error: checklistUpdateError } =
+    await admin
+      .from("service_checklists")
+      .update({
+        before_photos_taken: beforeCount > 0,
+        after_photos_taken: afterCount > 0,
+        service_completed: true,
+        completed_by: auth.userId,
+        completed_at: completedAt,
+        booking_id: booking.id,
+        customer_id: booking.customer_id,
+      })
+      .eq("id", checklist.id);
+
+  if (checklistUpdateError) {
+    return actionFailure(
+      `Could not finalize the cleaning checklist: ${checklistUpdateError.message}`,
+    );
+  }
+
+  const [
+    stopUpdate,
+    visitUpdate,
+    bookingUpdate,
+  ] = await Promise.all([
     admin
       .from("route_stops")
-      .update({ status: "completed", completed_at: completedAt })
+      .update({
+        status: "completed",
+        completed_at: completedAt,
+      })
       .eq("id", stop.id),
+
     admin
       .from("service_visits")
-      .update({ status: "completed", completed_at: completedAt })
+      .update({
+        status: "completed",
+        completed_at: completedAt,
+      })
       .eq("id", visit.id),
+
     admin
       .from("bookings")
-      .update({ status: "completed" })
+      .update({
+        status: "completed",
+      })
       .eq("id", booking.id),
   ]);
+
+  const completionError =
+    stopUpdate.error ??
+    visitUpdate.error ??
+    bookingUpdate.error;
+
+  if (completionError) {
+    return actionFailure(
+      `Could not complete the service record: ${completionError.message}`,
+    );
+  }
 
   await sendServiceCompletedEmail(booking, {
     bookingId: booking.id,
     visitId: visit.id,
     routeStopId: stop.id,
-    paymentLink: booking.payment_status === "paid" ? null : booking.payment_link,
+    paymentLink:
+      booking.payment_status === "paid"
+        ? null
+        : booking.payment_link,
   });
 
   await recordServiceEvent({
@@ -1182,7 +1255,9 @@ export async function completeStopAction(
     visit,
     stop,
     eventType: "stop_completed",
-    message: `Stop completed at ${formatBookingAddress(booking)}.`,
+    message: `Stop completed at ${formatBookingAddress(
+      booking,
+    )}.`,
     metadata: {
       beforeCount,
       afterCount,
@@ -1192,6 +1267,7 @@ export async function completeStopAction(
   });
 
   revalidateField(visit.id);
+
   return actionSuccess("Stop completed.");
 }
 
