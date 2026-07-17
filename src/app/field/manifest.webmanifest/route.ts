@@ -5,14 +5,23 @@ export const dynamic = "force-static";
 export function GET() {
   return NextResponse.json(
     {
-      name: "CCC Field | Clean Curb Co.",
+      id: "/field/",
+      name: "Clean Curb Co. Field",
       short_name: "CCC Field",
-      description: "Clean Curb Co. field route and service workflow app.",
-      start_url: "/field/today",
+      description:
+        "Clean Curb Co. employee field service and route operations.",
+
+      start_url: "/field/login",
       scope: "/field/",
+
       display: "standalone",
+      orientation: "portrait",
+
       background_color: "#050505",
       theme_color: "#00ff38",
+
+      categories: ["business", "productivity", "utilities"],
+
       icons: [
         {
           src: "/ccc-field-icon-192.png",
@@ -36,6 +45,7 @@ export function GET() {
     {
       headers: {
         "Content-Type": "application/manifest+json",
+        "Cache-Control": "public, max-age=0, must-revalidate",
       },
     },
   );
