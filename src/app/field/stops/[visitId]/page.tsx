@@ -667,20 +667,12 @@ function PhotoSection({
           <span>{photos.length === 1 ? "photo" : "photos"}</span>
         </div>
       </div>
+      
       <FieldPhotoUploader
         actionLabel={actionLabel}
         photoType={photoType}
         visitId={visitId}
       />
-    </label>
-
-        <ActionSubmitButton
-          className="photo-upload-submit"
-          pendingLabel="Uploading..."
-        >
-          Upload Selected Photos
-        </ActionSubmitButton>
-      </FeedbackForm>
 
       {photos.length ? (
         <>
