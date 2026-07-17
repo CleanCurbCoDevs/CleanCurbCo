@@ -9950,3 +9950,97 @@ form.data-row label textarea,
     grid-template-columns: 1fr;
   }
 }
+
+.photo-exception-card {
+  background: rgba(215, 169, 40, 0.08);
+  border: 1px solid rgba(215, 169, 40, 0.38);
+  border-top: 7px solid var(--gold);
+  border-radius: 20px;
+  box-shadow: 0 18px 42px rgba(5, 5, 5, 0.07);
+  display: grid;
+  gap: 18px;
+  padding: clamp(18px, 5vw, 26px);
+}
+
+.photo-exception-card h2 {
+  font-size: clamp(1.45rem, 6vw, 2rem);
+  margin: 4px 0 8px;
+}
+
+.photo-exception-card p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.photo-exception-form {
+  display: grid;
+  gap: 12px;
+}
+
+.photo-exception-toggle {
+  align-items: center;
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  cursor: pointer;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+  min-height: 72px;
+  padding: 13px 15px;
+}
+
+.photo-exception-toggle > span {
+  display: grid;
+  gap: 3px;
+}
+
+.photo-exception-toggle small,
+.photo-exception-note small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.photo-exception-toggle input {
+  appearance: none;
+  background: #d9d9d4;
+  border-radius: 999px;
+  cursor: pointer;
+  flex: 0 0 auto;
+  height: 30px;
+  position: relative;
+  transition: background 160ms ease;
+  width: 52px;
+}
+
+.photo-exception-toggle input::after {
+  background: white;
+  border-radius: 999px;
+  box-shadow: 0 2px 7px rgba(5, 5, 5, 0.22);
+  content: "";
+  height: 24px;
+  left: 3px;
+  position: absolute;
+  top: 3px;
+  transition: transform 160ms ease;
+  width: 24px;
+}
+
+.photo-exception-toggle input:checked {
+  background: var(--gold);
+}
+
+.photo-exception-toggle input:checked::after {
+  transform: translateX(22px);
+}
+
+.photo-exception-note {
+  display: grid;
+  font-weight: 900;
+  gap: 7px;
+}
+
+.photo-exception-note textarea {
+  min-height: 100px;
+}
