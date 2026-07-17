@@ -8,6 +8,8 @@ import { formatFrequency } from "@/lib/pricing";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { ServiceChecklistDocumentRow } from "@/types/database";
 
+export const dynamic = "force-dynamic";
+
 export const metadata: Metadata = {
   title: "Portal Bookings",
 };
