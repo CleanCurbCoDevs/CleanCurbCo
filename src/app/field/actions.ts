@@ -522,44 +522,85 @@ export async function saveChecklistAction(formData: FormData) {
 export async function saveTechnicianNotesAction(formData: FormData) {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
-  const technicianNotes = cleanText(formData, "technicianNotes", 1800);
+  const submittedTechnicianNotes = cleanText(
+    formData,
+    "technicianNotes",
+    1800,
+  );
+
   const issueFlags = formData
     .getAll("issueFlags")
     .map((value) => String(value))
     .filter(Boolean);
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } =
+    await getStopBundle(visitId);
+
   if (!visit || !stop) return;
 
-  await Promise.all([
-    admin
-      .from("route_stops")
-      .update({ technician_notes: technicianNotes, issue_flags: nextIssueFlags })
-      .eq("id", stop.id),
-    admin
-      .from("service_visits")
-      .update({ technician_notes: technicianNotes })
-      .eq("id", visit.id),
-  ]);
-  
   const preservedPhotoFlags = stop.issue_flags.filter(
     (flag) =>
       flag === BEFORE_PHOTO_EXCEPTION_FLAG ||
       flag === AFTER_PHOTO_EXCEPTION_FLAG,
   );
-  
+
   const nextIssueFlags = Array.from(
     new Set([...issueFlags, ...preservedPhotoFlags]),
   );
-  
+
+  const currentNotes =
+    stop.technician_notes ??
+    visit.technician_notes ??
+    "";
+
+  const existingExceptionLine =
+    currentNotes
+      .split("\n")
+      .find((line) =>
+        line
+          .trim()
+          .startsWith(PHOTO_UPLOAD_EXCEPTION_PREFIX),
+      )
+      ?.trim() ?? "";
+
+  const technicianNotes = [
+    removePhotoUploadExceptionNote(
+      submittedTechnicianNotes,
+    ),
+    existingExceptionLine,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  await Promise.all([
+    admin
+      .from("route_stops")
+      .update({
+        technician_notes: technicianNotes,
+        issue_flags: nextIssueFlags,
+      })
+      .eq("id", stop.id),
+
+    admin
+      .from("service_visits")
+      .update({
+        technician_notes: technicianNotes,
+      })
+      .eq("id", visit.id),
+  ]);
+
   await recordServiceEvent({
     actorId: auth.userId,
     booking,
     visit,
     stop,
     eventType: "technician_notes_saved",
-    message: "Technician notes and issue flags were saved.",
-    metadata: { issueFlags: nextIssueFlags },
+    message:
+      "Technician notes and issue flags were saved.",
+    metadata: {
+      issueFlags: nextIssueFlags,
+    },
   });
 
   revalidateField(visit.id);
@@ -1060,56 +1101,58 @@ export async function completeStopAction(
   const beforeCount = photos?.filter((photo) => photo.photo_type === "before").length ?? 0;
   const afterCount = photos?.filter((photo) => photo.photo_type === "after").length ?? 0;
 
-const { data: checklist } = await admin
-  .from("service_checklists")
-  .select("*")
-  .eq("route_stop_id", stop.id)
-  .limit(1)
-  .maybeSingle();
-
-if (beforeCount < 1 && !beforePhotoException) {
-  return actionFailure(
-    "Take at least one before photo before completing this stop.",
-  );
-}
-
-if (!checklist || checklist.status !== "submitted") {
-  return actionFailure(
-    "Finish and submit the cleaning checklist before completing this stop.",
-  );
-}
-
-if (afterCount < 1 && !afterPhotoException) {
-  return actionFailure(
-    "Take at least one after photo before completing this stop.",
-  );
-}
-
+  const beforeCount =
+    photos?.filter(
+      (photo) => photo.photo_type === "before",
+    ).length ?? 0;
+  
+  const afterCount =
+    photos?.filter(
+      (photo) => photo.photo_type === "after",
+    ).length ?? 0;
+  
   const photoExceptionRecorded =
-  hasPhotoUploadExceptionNote(
-    stop.technician_notes ?? visit.technician_notes,
-  );
-
-const beforePhotoException =
-  photoExceptionRecorded &&
-  stop.issue_flags.includes(BEFORE_PHOTO_EXCEPTION_FLAG);
-
-const afterPhotoException =
-  photoExceptionRecorded &&
-  stop.issue_flags.includes(AFTER_PHOTO_EXCEPTION_FLAG);
-
-await admin
-  .from("service_checklists")
-  .update({
-    before_photos_taken: beforeCount > 0,
-    after_photos_taken: afterCount > 0,
-    service_completed: true,
-    completed_by: auth.userId,
-    completed_at: completedAt,
-    booking_id: booking.id,
-    customer_id: booking.customer_id,
-  })
-  .eq("id", checklist.id);
+    hasPhotoUploadExceptionNote(
+      stop.technician_notes ??
+        visit.technician_notes,
+    );
+  
+  const beforePhotoException =
+    photoExceptionRecorded &&
+    stop.issue_flags.includes(
+      BEFORE_PHOTO_EXCEPTION_FLAG,
+    );
+  
+  const afterPhotoException =
+    photoExceptionRecorded &&
+    stop.issue_flags.includes(
+      AFTER_PHOTO_EXCEPTION_FLAG,
+    );
+  
+  const { data: checklist } = await admin
+    .from("service_checklists")
+    .select("*")
+    .eq("route_stop_id", stop.id)
+    .limit(1)
+    .maybeSingle();
+  
+  if (beforeCount < 1 && !beforePhotoException) {
+    return actionFailure(
+      "Upload at least one before photo or document a before-photo exception.",
+    );
+  }
+  
+  if (!checklist || checklist.status !== "submitted") {
+    return actionFailure(
+      "Finish and submit the cleaning checklist before completing this stop.",
+    );
+  }
+  
+  if (afterCount < 1 && !afterPhotoException) {
+    return actionFailure(
+      "Upload at least one after photo or document an after-photo exception.",
+    );
+  }
 
   await Promise.all([
     admin
