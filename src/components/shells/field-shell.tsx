@@ -1,13 +1,11 @@
 import type { ReactNode } from "react";
 import Link from "next/link";
-import { LayoutDashboard } from "lucide-react";
 import { FieldBottomNav } from "@/components/field-bottom-nav";
 import { humanizeStatus } from "@/lib/booking-utils";
 import {
   requireField,
   type AuthResult,
 } from "@/lib/supabase/auth";
-import { isAdminRole } from "@/lib/supabase/roles";
 
 type FieldShellProps = {
   title: string;
@@ -37,20 +35,14 @@ export async function FieldShell({
           </p>
 
           <div className="field-actions">
-            <Link className="button button-primary" href="/login">
+            <Link className="button button-primary" href="/field/login">
               Employee Login
-            </Link>
-
-            <Link className="button button-outline" href="/portal">
-              Customer Portal
             </Link>
           </div>
         </section>
       </main>
     );
   }
-
-  const canSeeAdminLinks = isAdminRole(currentAuth.profile.role);
 
   const technicianName =
     [
@@ -83,18 +75,7 @@ export async function FieldShell({
             </div>
           </div>
 
-          <div className="field-topbar-actions">
-            {canSeeAdminLinks ? (
-            <Link
-              className="field-admin-link"
-              href="/admin"
-              aria-label="Open admin dashboard"
-            >
-              <LayoutDashboard size={19} aria-hidden="true" />
-              <span>Admin</span>
-            </Link>
-            ) : null}
-          </div>
+          <div className="field-topbar-actions" />
         </header>
 
         <section className="field-welcome-strip">
