@@ -7,6 +7,7 @@ import {
   readyForNextStopAction,
   saveTechnicianNotesAction,
   startBreakAction,
+  savePhotoUploadExceptionAction,
 } from "@/app/field/actions";
 import { FieldServiceProgress } from "@/components/field-service-progress";
 import { FieldPhotoUploader } from "@/components/field-photo-uploader";
@@ -110,21 +111,132 @@ export default async function FieldStopPage({
   serviceChecklistBundle?.checklist.status === "submitted";
   const hasBeforePhotos = beforePhotos.length > 0;
   const hasAfterPhotos = afterPhotos.length > 0;
-  
+  const photoExceptionNote = getPhotoUploadExceptionNote(
+  stop.technician_notes ?? visit.technician_notes,
+);
+
+const hasPhotoExceptionNote =
+  Boolean(photoExceptionNote);
+
+const beforePhotoException =
+  hasPhotoExceptionNote &&
+  stop.issue_flags.includes("before_photo_exception");
+
+const afterPhotoException =
+  hasPhotoExceptionNote &&
+  stop.issue_flags.includes("after_photo_exception");
+
+const beforePhotoRequirementMet =
+  hasBeforePhotos || beforePhotoException;
+
+const afterPhotoRequirementMet =
+  hasAfterPhotos || afterPhotoException;
   const completionRequirements = [
     {
-      label: "Before photo uploaded",
-      complete: hasBeforePhotos,
+      label: hasBeforePhotos
+        ? "Before photo uploaded"
+        : beforePhotoException
+          ? "Before photo exception documented"
+          : "Before photo uploaded",
+      complete: beforePhotoRequirementMet,
     },
     {
       label: "Cleaning checklist submitted",
       complete: checklistComplete,
     },
     {
-      label: "After photo uploaded",
-      complete: hasAfterPhotos,
+      label: hasAfterPhotos
+        ? "After photo uploaded"
+        : afterPhotoException
+          ? "After photo exception documented"
+          : "After photo uploaded",
+      complete: afterPhotoRequirementMet,
     },
   ];
+
+  {!hasBeforePhotos ||
+beforePhotoException ||
+!hasAfterPhotos ||
+afterPhotoException ? (
+  <section className="photo-exception-card">
+    <div>
+      <p className="section-kicker">Photo Exception</p>
+      <h2>Couldn’t save a required photo?</h2>
+      <p>
+        Only use this when the photo was taken or attempted,
+        but a technical problem prevented it from being saved.
+      </p>
+    </div>
+
+    <FeedbackForm
+      action={savePhotoUploadExceptionAction}
+      className="photo-exception-form"
+      pendingMessage="Saving photo exception..."
+      successMessage="Photo exception saved."
+    >
+      <input
+        type="hidden"
+        name="visitId"
+        value={visit.id}
+      />
+
+      {!hasBeforePhotos || beforePhotoException ? (
+        <label className="photo-exception-toggle">
+          <span>
+            <strong>Before-photo exception</strong>
+            <small>
+              Satisfy the before-photo requirement using a
+              documented explanation.
+            </small>
+          </span>
+
+          <input
+            type="checkbox"
+            name="beforePhotoException"
+            defaultChecked={beforePhotoException}
+          />
+        </label>
+      ) : null}
+
+      {!hasAfterPhotos || afterPhotoException ? (
+        <label className="photo-exception-toggle">
+          <span>
+            <strong>After-photo exception</strong>
+            <small>
+              Satisfy the after-photo requirement using a
+              documented explanation.
+            </small>
+          </span>
+
+          <input
+            type="checkbox"
+            name="afterPhotoException"
+            defaultChecked={afterPhotoException}
+          />
+        </label>
+      ) : null}
+
+      <label className="photo-exception-note">
+        What happened?
+        <textarea
+          name="photoExceptionNote"
+          defaultValue={photoExceptionNote}
+          placeholder="Example: Photos were taken onsite, but the field app failed to upload them."
+        />
+        <small>
+          Required when either exception switch is enabled.
+        </small>
+      </label>
+
+      <ActionSubmitButton
+        className="button button-dark"
+        pendingLabel="Saving..."
+      >
+        Save Photo Exception
+      </ActionSubmitButton>
+    </FeedbackForm>
+  </section>
+) : null}
   
   const canCompleteStop = completionRequirements.every(
     (requirement) => requirement.complete,
@@ -806,6 +918,20 @@ async function createSignedChecklistDocuments(
 function formatArrivalWindow(start: string | null, end: string | null) {
   if (!start && !end) return "Not set";
   return [start, end].filter(Boolean).join(" - ");
+}
+
+function getPhotoUploadExceptionNote(
+  notes: string | null | undefined,
+) {
+  const prefix = "[Photo upload exception]";
+
+  const exceptionLine = (notes ?? "")
+    .split("\n")
+    .find((line) => line.trim().startsWith(prefix));
+
+  return exceptionLine
+    ? exceptionLine.trim().slice(prefix.length).trim()
+    : "";
 }
 
 function formatFieldTime(value: string) {
