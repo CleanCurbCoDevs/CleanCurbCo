@@ -2,15 +2,20 @@ import type { MetadataRoute } from "next";
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: "Clean Curb Co.",
-    short_name: "Clean Curb",
+    name: "Clean Curb Co. Field",
+    short_name: "CCC Field",
     description:
-      "Garbage bin cleaning, sanitizing, and deodorizing for Cane Bay and nearby Summerville communities.",
-    start_url: "/",
+      "Clean Curb Co. employee field service tools for routes, photos, checklists, and service operations.",
+
+    start_url: "/employee-login",
     scope: "/",
+
     display: "standalone",
+    orientation: "portrait",
+
     background_color: "#050505",
     theme_color: "#00ff38",
+
     icons: [
       {
         src: "/ccc-field-icon-192.png",
