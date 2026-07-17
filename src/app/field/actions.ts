@@ -720,7 +720,7 @@ export async function finalizeServicePhotoUploadAction(
     );
   }
 
-  const sideEffects: Array<Promise<unknown>> = [
+  const sideEffects: Array<PromiseLike<unknown>> = [
     recordServiceEvent({
       actorId: auth.userId,
       booking,
