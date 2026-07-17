@@ -1,0 +1,232 @@
+/*
+ * Tablet and iPad layout refinements.
+ *
+ * Tablets use the compact menu because the full navigation does not fit
+ * comfortably at these widths. A separate Book Now button remains visible.
+ */
+
+.tablet-header-actions,
+.tablet-book-button {
+  display: none;
+}
+
+@media (min-width: 720px) and (max-width: 1179px) {
+  html {
+    font-size: 16px;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .container {
+    max-width: 960px;
+    padding-left: clamp(24px, 4vw, 44px);
+    padding-right: clamp(24px, 4vw, 44px);
+  }
+
+  .section {
+    padding: 72px 0;
+  }
+
+  .section-tight {
+    padding: 48px 0;
+  }
+
+  /*
+   * Header
+   */
+
+  .site-header-inner {
+    gap: 14px;
+    min-height: 72px;
+  }
+
+  .brand-logo {
+    flex: 1 1 auto;
+    max-width: min(360px, 48vw);
+  }
+
+  .brand-image-frame {
+    height: 52px;
+    width: 52px;
+  }
+
+  .brand-name {
+    font-size: 1.05rem;
+  }
+
+  .brand-tagline {
+    font-size: 0.74rem;
+  }
+
+  /*
+   * globals.css currently enables the desktop nav at 720px.
+   * This overrides that behavior for tablet widths.
+   */
+
+  .desktop-nav {
+    display: none;
+  }
+
+  .mobile-menu {
+    display: block;
+  }
+
+  .tablet-header-actions {
+    align-items: center;
+    display: flex;
+    flex: 0 0 auto;
+    gap: 10px;
+  }
+
+  .tablet-book-button {
+    display: inline-flex;
+    min-height: 46px;
+    padding: 9px 16px;
+    white-space: nowrap;
+  }
+
+  .mobile-menu summary {
+    min-height: 46px;
+    padding: 0 14px;
+  }
+
+  .mobile-menu-panel {
+    max-height: min(70vh, 560px);
+    min-width: 260px;
+    overflow-y: auto;
+    padding: 12px;
+  }
+
+  .mobile-menu-panel a {
+    align-items: center;
+    display: flex;
+    min-height: 46px;
+  }
+
+  /*
+   * Announcement bar
+   */
+
+  .announcement-bar {
+    font-size: 0.88rem;
+    min-height: 42px;
+    padding: 9px clamp(24px, 4vw, 44px);
+  }
+
+  /*
+   * Page heroes
+   */
+
+  .page-hero {
+    padding: 68px 0;
+  }
+
+  .page-hero .section-header {
+    gap: 14px;
+    max-width: 780px;
+  }
+
+  .page-hero h1,
+  .placeholder-page h1,
+  .section-header h2 {
+    font-size: clamp(2.65rem, 5vw, 3.6rem);
+  }
+
+  .page-hero p,
+  .section-header p,
+  .placeholder-page p {
+    font-size: 1.08rem;
+    line-height: 1.62;
+  }
+
+  /*
+   * Login and account pages
+   */
+
+  .auth-layout {
+    gap: 22px;
+    max-width: 800px;
+  }
+
+  .auth-form,
+  .placeholder-panel {
+    padding: clamp(24px, 3.5vw, 34px);
+  }
+
+  .auth-form input,
+  .auth-form select,
+  .auth-form textarea {
+    min-height: 54px;
+  }
+
+  .auth-form .button,
+  .auth-layout > .placeholder-panel .button {
+    min-height: 54px;
+  }
+
+  /*
+   * Footer
+   */
+
+  .footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/*
+ * Narrower portrait tablets and smaller iPads
+ */
+
+@media (min-width: 720px) and (max-width: 860px) {
+  .container {
+    padding-left: 26px;
+    padding-right: 26px;
+  }
+
+  .brand-logo {
+    max-width: 44vw;
+  }
+
+  .brand-tagline {
+    display: none;
+  }
+
+  .tablet-book-button {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .page-hero {
+    padding: 58px 0;
+  }
+
+  .section {
+    padding: 64px 0;
+  }
+}
+
+/*
+ * Phones retain the existing compact menu behavior.
+ */
+
+@media (max-width: 719px) {
+  .tablet-header-actions {
+    display: block;
+  }
+
+  .tablet-book-button {
+    display: none;
+  }
+}
+
+/*
+ * Full desktop navigation resumes on larger screens.
+ */
+
+@media (min-width: 1180px) {
+  .tablet-header-actions {
+    display: none;
+  }
+}
