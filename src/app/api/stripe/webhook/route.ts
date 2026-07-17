@@ -308,83 +308,80 @@ async function updatePaymentState(input: {
     },
   });
 
-if (booking) {
-  const bookingEvent =
-    input.paymentStatus === "paid"
-      ? {
-          eventType: "PAYMENT_RECEIVED",
-          outcome: "success" as const,
-          message: "Stripe confirmed payment.",
-        }
-      : input.paymentStatus === "failed"
+  if (booking) {
+    const bookingEvent =
+      input.paymentStatus === "paid"
         ? {
-            eventType: "PAYMENT_FAILED",
-            outcome: "failure" as const,
-            message: "Stripe reported a failed payment.",
+            eventType: "PAYMENT_RECEIVED",
+            outcome: "success" as const,
+            message: "Stripe confirmed payment.",
           }
-        : input.paymentStatus === "refunded"
+        : input.paymentStatus === "failed"
           ? {
-              eventType: "PAYMENT_REFUNDED",
-              outcome: "warning" as const,
-              message: "Stripe confirmed a payment refund.",
+              eventType: "PAYMENT_FAILED",
+              outcome: "failure" as const,
+              message: "Stripe reported a failed payment.",
             }
-          : input.paymentStatus === "cancelled"
+          : input.paymentStatus === "refunded"
             ? {
-                eventType:
-                  input.eventType === "checkout.session.expired"
-                    ? "CHECKOUT_EXPIRED"
-                    : "PAYMENT_CANCELLED",
+                eventType: "PAYMENT_REFUNDED",
                 outcome: "warning" as const,
-                message:
-                  input.eventType === "checkout.session.expired"
-                    ? "Stripe checkout expired before payment."
-                    : "Stripe payment was cancelled.",
+                message: "Stripe confirmed a payment refund.",
               }
-            : {
-                eventType: "PAYMENT_PENDING",
-                outcome: "info" as const,
-                message: "Stripe payment remains pending.",
-              };
+            : input.paymentStatus === "cancelled"
+              ? {
+                  eventType:
+                    input.eventType === "checkout.session.expired"
+                      ? "CHECKOUT_EXPIRED"
+                      : "PAYMENT_CANCELLED",
+                  outcome: "warning" as const,
+                  message:
+                    input.eventType === "checkout.session.expired"
+                      ? "Stripe checkout expired before payment."
+                      : "Stripe payment was cancelled.",
+                }
+              : {
+                  eventType: "PAYMENT_PENDING",
+                  outcome: "info" as const,
+                  message: "Stripe payment remains pending.",
+                };
 
-  const bookingEventResult = await recordBookingEvent({
-    bookingId: booking.id,
-    customerId: booking.customer_id,
-    requestId: input.requestId,
-    route: "/api/stripe/webhook",
-    source: "stripe",
-    eventType: bookingEvent.eventType,
-    outcome: bookingEvent.outcome,
-    message: bookingEvent.message,
-    idempotencyKey: `stripe:${input.stripeEventId}`,
-    metadata: {
-      stripeEventId: input.stripeEventId,
-      stripeEventType: input.eventType,
-      paymentId: payment?.id ?? null,
-      paymentStatus: input.paymentStatus,
-      bookingPaymentStatus:
-        input.bookingPaymentStatus ?? null,
-      checkoutSessionId:
-        input.checkoutSessionId ?? null,
-      paymentIntentId:
-        input.paymentIntentId ?? null,
-      subscriptionId:
-        input.subscriptionId ?? null,
-      receivedAmount:
-        input.receivedAmount ?? null,
-      failureCode:
-        input.failureCode ?? null,
-    },
-  });
-  if (!bookingEventResult.ok) {
-  throw new Error(
-    `Stripe booking event recording failed: ${bookingEventResult.error}`,
-  );
-}
-  
-  if (input.sendReceipt && booking && payment?.amount) {
-    await sendPaymentReceived(booking, payment.amount);
+    const bookingEventResult = await recordBookingEvent({
+      bookingId: booking.id,
+      customerId: booking.customer_id,
+      requestId: input.requestId,
+      route: "/api/stripe/webhook",
+      source: "stripe",
+      eventType: bookingEvent.eventType,
+      outcome: bookingEvent.outcome,
+      message: bookingEvent.message,
+      idempotencyKey: `stripe:${input.stripeEventId}`,
+      metadata: {
+        stripeEventId: input.stripeEventId,
+        stripeEventType: input.eventType,
+        paymentId: payment.id,
+        paymentStatus: input.paymentStatus,
+        bookingPaymentStatus: input.bookingPaymentStatus ?? null,
+        checkoutSessionId: input.checkoutSessionId ?? null,
+        paymentIntentId: input.paymentIntentId ?? null,
+        subscriptionId: input.subscriptionId ?? null,
+        receivedAmount: input.receivedAmount ?? null,
+        failureCode: input.failureCode ?? null,
+      },
+    });
+
+    if (!bookingEventResult.ok) {
+      throw new Error(
+        `Stripe booking event recording failed: ${bookingEventResult.error}`,
+      );
+    }
+
+    if (input.sendReceipt && payment.amount) {
+      await sendPaymentReceived(booking, payment.amount);
+    }
   }
 }
+
 async function updatePaymentSetupState(input: {
   session: Stripe.Checkout.Session;
   requestId: string;
