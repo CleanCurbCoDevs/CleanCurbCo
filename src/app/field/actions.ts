@@ -75,6 +75,10 @@ const validFieldPaymentMethods = [
   "other",
 ] as const;
 
+const PHOTO_UPLOAD_EXCEPTION_PREFIX = "[Photo upload exception]";
+const BEFORE_PHOTO_EXCEPTION_FLAG = "before_photo_exception";
+const AFTER_PHOTO_EXCEPTION_FLAG = "after_photo_exception";
+
 type FieldPaymentMethod = (typeof validFieldPaymentMethods)[number];
 
 const breakReasonsRequiringNotes: readonly BreakReason[] = [
@@ -115,6 +119,29 @@ function cleanId(formData: FormData, key: string) {
 
 function cleanText(formData: FormData, key: string, max = 1200) {
   return String(formData.get(key) ?? "").trim().slice(0, max);
+}
+
+function removePhotoUploadExceptionNote(
+  notes: string | null | undefined,
+) {
+  return (notes ?? "")
+    .split("\n")
+    .filter(
+      (line) =>
+        !line.trim().startsWith(PHOTO_UPLOAD_EXCEPTION_PREFIX),
+    )
+    .join("\n")
+    .trim();
+}
+
+function hasPhotoUploadExceptionNote(
+  notes: string | null | undefined,
+) {
+  return (notes ?? "")
+    .split("\n")
+    .some((line) =>
+      line.trim().startsWith(PHOTO_UPLOAD_EXCEPTION_PREFIX),
+    );
 }
 
 function cleanMoney(formData: FormData, key: string) {
@@ -507,14 +534,24 @@ export async function saveTechnicianNotesAction(formData: FormData) {
   await Promise.all([
     admin
       .from("route_stops")
-      .update({ technician_notes: technicianNotes, issue_flags: issueFlags })
+      .update({ technician_notes: technicianNotes, issue_flags: nextIssueFlags })
       .eq("id", stop.id),
     admin
       .from("service_visits")
       .update({ technician_notes: technicianNotes })
       .eq("id", visit.id),
   ]);
-
+  
+  const preservedPhotoFlags = stop.issue_flags.filter(
+    (flag) =>
+      flag === BEFORE_PHOTO_EXCEPTION_FLAG ||
+      flag === AFTER_PHOTO_EXCEPTION_FLAG,
+  );
+  
+  const nextIssueFlags = Array.from(
+    new Set([...issueFlags, ...preservedPhotoFlags]),
+  );
+  
   await recordServiceEvent({
     actorId: auth.userId,
     booking,
@@ -522,12 +559,129 @@ export async function saveTechnicianNotesAction(formData: FormData) {
     stop,
     eventType: "technician_notes_saved",
     message: "Technician notes and issue flags were saved.",
-    metadata: { issueFlags },
+    metadata: { issueFlags: nextIssueFlags },
   });
 
   revalidateField(visit.id);
 }
 
+export async function savePhotoUploadExceptionAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireFieldUser();
+  const visitId = cleanId(formData, "visitId");
+
+  const beforeException =
+    formData.get("beforePhotoException") === "on";
+
+  const afterException =
+    formData.get("afterPhotoException") === "on";
+
+  const reason = cleanText(
+    formData,
+    "photoExceptionNote",
+    600,
+  )
+    .replace(/\s+/g, " ")
+    .trim();
+
+  const { admin, stop, visit, booking } =
+    await getStopBundle(visitId);
+
+  if (!visit || !stop) {
+    return actionFailure("This stop could not be loaded.");
+  }
+
+  if ((beforeException || afterException) && reason.length < 8) {
+    return actionFailure(
+      "Add a short explanation before using a photo exception.",
+    );
+  }
+
+  const nextFlags = stop.issue_flags.filter(
+    (flag) =>
+      flag !== BEFORE_PHOTO_EXCEPTION_FLAG &&
+      flag !== AFTER_PHOTO_EXCEPTION_FLAG,
+  );
+
+  if (beforeException) {
+    nextFlags.push(BEFORE_PHOTO_EXCEPTION_FLAG);
+  }
+
+  if (afterException) {
+    nextFlags.push(AFTER_PHOTO_EXCEPTION_FLAG);
+  }
+
+  const existingNotes = removePhotoUploadExceptionNote(
+    stop.technician_notes ?? visit.technician_notes,
+  );
+
+  const exceptionNote =
+    beforeException || afterException
+      ? `${PHOTO_UPLOAD_EXCEPTION_PREFIX} ${reason}`
+      : "";
+
+  const technicianNotes = [
+    existingNotes,
+    exceptionNote,
+  ]
+    .filter(Boolean)
+    .join("\n\n")
+    .trim();
+
+  const [stopResult, visitResult] = await Promise.all([
+    admin
+      .from("route_stops")
+      .update({
+        issue_flags: Array.from(new Set(nextFlags)),
+        technician_notes: technicianNotes,
+      })
+      .eq("id", stop.id),
+
+    admin
+      .from("service_visits")
+      .update({
+        technician_notes: technicianNotes,
+      })
+      .eq("id", visit.id),
+  ]);
+
+  if (stopResult.error || visitResult.error) {
+    return actionFailure(
+      stopResult.error?.message ??
+        visitResult.error?.message ??
+        "The photo exception could not be saved.",
+    );
+  }
+
+  await recordServiceEvent({
+    actorId: auth.userId,
+    booking,
+    visit,
+    stop,
+    eventType:
+      beforeException || afterException
+        ? "photo_upload_exception_saved"
+        : "photo_upload_exception_cleared",
+    message:
+      beforeException || afterException
+        ? "A documented photo-upload exception was saved."
+        : "The photo-upload exception was cleared.",
+    metadata: {
+      beforeException,
+      afterException,
+      reason: reason || null,
+    },
+  });
+
+  revalidateField(visit.id);
+
+  return actionSuccess(
+    beforeException || afterException
+      ? "Photo exception documented."
+      : "Photo exception cleared.",
+  );
+}
 
 type ServicePhotoUploadTicket = {
   bucket: string;
@@ -913,7 +1067,7 @@ const { data: checklist } = await admin
   .limit(1)
   .maybeSingle();
 
-if (beforeCount < 1) {
+if (beforeCount < 1 && !beforePhotoException) {
   return actionFailure(
     "Take at least one before photo before completing this stop.",
   );
@@ -925,17 +1079,30 @@ if (!checklist || checklist.status !== "submitted") {
   );
 }
 
-if (afterCount < 1) {
+if (afterCount < 1 && !afterPhotoException) {
   return actionFailure(
     "Take at least one after photo before completing this stop.",
   );
 }
 
+  const photoExceptionRecorded =
+  hasPhotoUploadExceptionNote(
+    stop.technician_notes ?? visit.technician_notes,
+  );
+
+const beforePhotoException =
+  photoExceptionRecorded &&
+  stop.issue_flags.includes(BEFORE_PHOTO_EXCEPTION_FLAG);
+
+const afterPhotoException =
+  photoExceptionRecorded &&
+  stop.issue_flags.includes(AFTER_PHOTO_EXCEPTION_FLAG);
+
 await admin
   .from("service_checklists")
   .update({
-    before_photos_taken: true,
-    after_photos_taken: true,
+    before_photos_taken: beforeCount > 0,
+    after_photos_taken: afterCount > 0,
     service_completed: true,
     completed_by: auth.userId,
     completed_at: completedAt,
@@ -973,7 +1140,12 @@ await admin
     stop,
     eventType: "stop_completed",
     message: `Stop completed at ${formatBookingAddress(booking)}.`,
-    metadata: { beforeCount, afterCount },
+    metadata: {
+      beforeCount,
+      afterCount,
+      beforePhotoException,
+      afterPhotoException,
+    },
   });
 
   revalidateField(visit.id);
