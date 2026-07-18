@@ -25,26 +25,25 @@ export const launchRouteHeadline =
   "We build efficient neighborhood routes around local trash-collection schedules.";
 
 export const launchReservationCopy =
-  "Submit your booking request and we will confirm your service date before payment is due.";
+  "Submit your booking and choose your preferred payment method. Your requested service date remains subject to route availability.";
 
 export const launchBillingNote =
-  "Payment is due no later than 24 hours before your confirmed service date.";
+  "Card payments are collected through secure Stripe Checkout when you submit your booking. Venmo, Zelle, and pay-in-person requests require manual confirmation.";
 
 export const futureBillingNote =
-  "Recurring services are billed according to the selected service frequency. We may adjust payment dates with advance notice when needed for routing or billing operations.";
+  "Selecting recurring service tells us how often you want your bins cleaned. Your first card payment is collected through checkout. Future service dates and billing are handled according to the recurring-service terms you approve.";
 
 export const bookingLaunchTimingNotice =
-  "Your booking request reserves a place on an upcoming route. We will confirm your service date based on your regular collection day and current route availability.";
+  "Your requested service date is reviewed against your normal collection schedule and current route availability.";
 
 export const bookingBillingAfterLaunchNotice =
-  "Payment is due no later than 24 hours before your confirmed service date. Recurring plans are billed according to the selected service frequency.";
+  "Card payments are collected through secure Stripe Checkout. Venmo, Zelle, and pay-in-person requests remain unpaid until payment is received and verified.";
 
 export const bookingLaunchAgreement =
-  "I understand that my requested date is not final until Clean Curb Co. confirms my route. Payment must be completed no later than 24 hours before the confirmed service date.";
+  "I understand that card payment is collected during secure checkout, my requested service date remains subject to route confirmation, and any approved refund, credit, or rescheduling will follow the Cancellation & Refund Policy.";
 
 export const bookingSuccessLaunchMessage =
-  "Your request has been received. We will review your collection day, confirm your service date, and send payment instructions before service.";
-
+  "Your booking has been received. We will review your collection schedule and confirm your route details by email or text when available.";
 export const navItems = [
   { label: "Services", href: "/services" },
   { label: "Pricing", href: "/pricing" },
@@ -206,20 +205,20 @@ export const faqItems = [
     answer:
       "We normally schedule cleaning after your regular trash collection so the bins are empty. Your requested date is reviewed against current route availability before it is confirmed.",
   },
-  {
+   {
     question: "When is payment due?",
     answer:
-      "Payment is due no later than 24 hours before your confirmed service date. Your booking is not fully scheduled until the route date has been confirmed.",
+      "Card payment is collected through secure Stripe Checkout when you submit your booking. Venmo, Zelle, and pay-in-person selections remain unpaid until payment is received and verified.",
   },
   {
     question: "How does recurring billing work?",
     answer:
-      "Recurring plans are billed according to the selected service frequency. We will provide payment and scheduling details before your first confirmed service.",
+      "Selecting Monthly, Every Other Month, or Quarterly tells us how often you want service. Your first card payment is collected through checkout. Future visits and billing follow the recurring-service terms you approve, and you may cancel future service before the applicable cutoff.",
   },
   {
     question: "Can Clean Curb Co change my billing date?",
     answer:
-      "We may adjust billing dates with advance notice when needed for route scheduling, service changes, or billing operations.",
+      "Route or billing timing may change when needed because of collection schedules, weather, holidays, service changes, or operational needs. We will provide advance notice when a change affects a planned charge or service visit.",
   },
   {
     question: "Do I need to be home?",
