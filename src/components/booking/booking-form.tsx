@@ -818,36 +818,37 @@ export function BookingForm({
           <h2>Payment Method</h2>
         
           <p className="muted">
-            Choose how you would like to handle payment. Card checkout is the
-            fastest option, but Venmo Business, Zelle, and in-person payment are
-            also available.
+            Card payment is handled through secure Stripe Checkout after your booking
+            details are saved. Venmo Business, Zelle, and pay-in-person selections
+            require manual confirmation and are not considered paid until payment is
+            received and verified.
           </p>
         
           <div className="choice-grid">
             {[
               {
                 value: "stripe",
-                title: "Card / Apple Pay / Google Pay",
+                title: "Card",
                 note:
-                  "Recommended. Secure checkout is handled through Stripe. Clean Curb Co. never receives your full card number or security code.",
+                  "Recommended. Secure checkout is handled through Stripe. Apple Pay or Google Pay may appear when supported by your device, browser, and Stripe. Clean Curb Co. does not receive your full card number or security code.",
               },
               {
                 value: "venmo_business",
                 title: "Venmo Business",
                 note:
-                  "Pay through our business Venmo. The payment must be received and verified before it is treated as paid.",
+                  "We will provide or confirm the appropriate business-payment instructions. Your booking remains unpaid until the payment is received and verified.",
               },
               {
                 value: "zelle",
                 title: "Zelle",
                 note:
-                  "Pay through Zelle using the instructions provided with your booking. The payment is manually verified.",
+                  "We will provide or confirm the appropriate Zelle instructions. Your booking remains unpaid until the payment is received and verified.",
               },
               {
                 value: "cash_in_person",
                 title: "Pay in person",
                 note:
-                  "A quieter backup option. Payment must be collected and recorded during the service visit before the stop is completed.",
+                  "Payment must be collected and recorded during the service visit before the stop is completed.",
               },
             ].map((option) => (
               <label className="choice-card" key={option.value}>
@@ -877,18 +878,19 @@ export function BookingForm({
         
           {form.payment.preference === "stripe" ? (
             <p className="muted">
-              Secure card checkout will be the next step after your booking
-              details are saved.
+              Your estimated booking total will be collected through secure Stripe
+              Checkout. Starting-at add-ons or additional work will not be added
+              without your approval.
             </p>
           ) : form.payment.preference === "cash_in_person" ? (
             <p className="muted">
-              Your field technician will receive a prominent payment-due alert
-              and must record the service amount and any tip separately.
+              Your field technician will receive a payment-due alert and must record
+              the service amount and any optional tip separately.
             </p>
           ) : (
             <p className="muted">
-              Your booking will remain unpaid until the external payment is
-              received and verified.
+              Your booking will remain unpaid until the external payment is received
+              and manually verified by Clean Curb Co.
             </p>
           )}
         </section>
@@ -931,19 +933,24 @@ export function BookingForm({
             }
             label={
               form.payment.preference === "cash_in_person"
-                ? "I understand payment must be collected and recorded during the service visit before the stop is completed."
+                ? "I understand that payment must be collected and recorded during the service visit before the stop is completed."
                 : form.payment.preference === "venmo_business" ||
                     form.payment.preference === "zelle"
-                  ? "I understand my payment is not considered complete until Clean Curb Co. receives and verifies it."
-                  : "I understand secure payment is due during the booking checkout process and recurring services may be billed according to the selected service frequency."
+                  ? "I understand that my booking is not considered paid until Clean Curb Co. receives and verifies the selected external payment."
+                  : "I authorize the estimated booking total shown on this form to be collected through secure Stripe Checkout. I understand that starting-at add-ons or additional work will not be charged without my approval."
             }
-          />
           <Agreement
             checked={Boolean(form.agreements.launchBilling)}
             onChange={(checked) =>
               setAgreement("launchBilling", checked, setForm)
             }
-            label={bookingLaunchAgreement}
+            label={
+              form.service.frequency === "one_time"
+                ? bookingLaunchAgreement
+                : `${bookingLaunchAgreement} I am also requesting ${formatFrequency(
+                    form.service.frequency,
+                  ).toLowerCase()} service. I understand that selecting a recurring frequency does not guarantee a specific future route date and that future visits may require a saved payment method, payment link, invoice, or other separately confirmed billing arrangement.`
+            }
           />
         </section>
 
@@ -987,8 +994,9 @@ export function BookingForm({
           </button>
 
           <p className="muted">
-            Your route day remains subject to availability. The payment method
-            selected above will be saved with your booking.
+            Your requested service date remains subject to route availability. Your
+            selected payment preference and required acknowledgments will be saved with
+            your booking.
           </p>
         </div>
       </form>
@@ -1056,15 +1064,28 @@ export function BookingForm({
 
         <div className="estimate-panel-section">
           <h3>What happens after you submit?</h3>
+        
           <ol className="number-list">
-            <li>We confirm your route day by email or text when available.</li>
-            <li>You approve the final price/payment link before service.</li>
-            <li>We clean the bins and send completion photos.</li>
+            <li>
+              Your booking details and preferred payment method are saved.
+            </li>
+            <li>
+              Card customers continue to secure Stripe Checkout. Manual payment
+              selections remain unpaid until verified.
+            </li>
+            <li>
+              We review your collection schedule and confirm your route details.
+            </li>
+            <li>
+              We clean the bins and send completion updates or photos when available.
+            </li>
           </ol>
         </div>
 
         <p className="estimate-note">
-          Estimate shown until route day, add-ons, and final price are confirmed.
+          The displayed total is based on the information submitted. Starting-at
+          add-ons or additional work require confirmation before an additional amount
+          is charged.
         </p>
       </aside>
     </div>
