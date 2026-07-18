@@ -75,6 +75,11 @@ export function isStripeConfigured() {
   return Boolean(secretKey && publishableKey);
 }
 
+export function isStripeWebhookConfigured() {
+  const { secretKey, webhookSecret } = getStripeEnv();
+  return Boolean(secretKey && webhookSecret);
+}
+
 export function getTurnstileEnv() {
   return {
     siteKey: process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "",
