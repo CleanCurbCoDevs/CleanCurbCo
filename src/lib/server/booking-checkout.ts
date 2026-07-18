@@ -41,7 +41,7 @@ export async function createBookingCheckout({
   claimToken,
 }: CreateBookingCheckoutInput): Promise<BookingCheckoutResult> {
   const customerMessage =
-    "Your booking was saved, but secure checkout could not start. We will send you a fresh card-payment link.";
+    "Your booking was saved, but secure Stripe Checkout could not start. No successful card payment was recorded. Please try again from your booking or contact us for a fresh payment link.";
 
   if (!isStripeConfigured()) {
     logger.warn("booking_checkout_unconfigured", {
