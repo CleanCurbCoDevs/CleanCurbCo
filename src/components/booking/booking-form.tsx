@@ -322,9 +322,9 @@ export function BookingForm({
           ) : null}
           
           <p>
-            We will email or text you when available to confirm your route day,
-            final price, and service details before anything is charged.
-            Fresh Starts at the Curb.
+            We will email or text you when available to confirm your route day and
+            service details. If you selected card payment, your Stripe Checkout result
+            is reflected in your booking and payment records. Fresh Starts at the Curb.
           </p>
           <p>{bookingSuccessLaunchMessage}</p>
 
