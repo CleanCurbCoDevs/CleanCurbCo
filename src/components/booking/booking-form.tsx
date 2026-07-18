@@ -10,7 +10,6 @@ import {
   addOns,
   binTypes,
   bookingLaunchAgreement,
-  bookingSuccessLaunchMessage,
   launchBillingNote,
   launchPromo,
   neighborhoods,
@@ -322,11 +321,11 @@ export function BookingForm({
           ) : null}
           
           <p>
-            We will email or text you when available to confirm your route day and
-            service details. If you selected card payment, your Stripe Checkout result
-            is reflected in your booking and payment records. Fresh Starts at the Curb.
+            Your booking has been received. We will review your collection schedule
+            and confirm your route details by email or text when available. If you
+            selected card payment, your Stripe Checkout result is reflected in your
+            booking and payment records.
           </p>
-          <p>{bookingSuccessLaunchMessage}</p>
 
           {isAmerica250PromoActive() &&
           submittedBooking.service.frequency !== "one_time" ? (
