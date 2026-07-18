@@ -939,6 +939,8 @@ export function BookingForm({
                   ? "I understand that my booking is not considered paid until Clean Curb Co. receives and verifies the selected external payment."
                   : "I authorize the estimated booking total shown on this form to be collected through secure Stripe Checkout. I understand that starting-at add-ons or additional work will not be charged without my approval."
             }
+          />
+          
           <Agreement
             checked={Boolean(form.agreements.launchBilling)}
             onChange={(checked) =>
@@ -1193,7 +1195,7 @@ function formatPaymentPreference(
     return "Manually arranged";
   }
 
-  return "Card / Apple Pay / Google Pay";
+  return "Card through Stripe";
 }
 
 function BookingSummary({ booking }: { booking: BookingRequest }) {
@@ -1221,8 +1223,9 @@ function BookingSummary({ booking }: { booking: BookingRequest }) {
         {formatPaymentPreference(booking.payment.preference)}
       </p>
       <p>
-        We will confirm the route day, final price, and payment timing before
-        service.
+        We will review your collection schedule and confirm your route details.
+        Card payments are processed through Stripe Checkout, while manual payment
+        selections remain unpaid until received and verified.
       </p>
     </aside>
   );
