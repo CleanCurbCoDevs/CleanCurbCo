@@ -40,9 +40,10 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           <p className="section-kicker">Book in under 2 minutes</p>
           <h1>Join a local route.</h1>
           <p>
-            Tell us what needs cleaning. We will confirm your route day, final
-            price, and payment timing by email or text when available before
-            service. Launch bookings reserve your spot without an immediate charge.
+            Tell us what needs cleaning, choose your preferred payment method, and
+            share your normal collection schedule. Card payments are collected through
+            secure Stripe Checkout. Your requested service date remains subject to
+            route availability.
           </p>
         </div>
       </section>
@@ -51,8 +52,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
           <div className="booking-launch-grid">
             <LaunchStatusCard variant="card" className="launch-info-card" />
             <article className="launch-info-card">
-              <p className="section-kicker">Billing after launch</p>
-              <h2>August billing rhythm.</h2>
+              <p className="section-kicker">Payment options</p>
+              <h2>Choose what works for you.</h2>
               <p>{bookingBillingAfterLaunchNotice}</p>
             </article>
           </div>
