@@ -64,32 +64,31 @@ export default function Home() {
           </div>
 
           <p className="hero-note">
-            Reserve your spot now. You won&apos;t be charged until your route
-            and service are confirmed.
+            Card payments are handled through secure Stripe Checkout. Your requested
+            service date remains subject to route availability.
           </p>
         </div>
       </section>
 
-   <section className="launch-special-band">
-  <div className="container">
-    <article className="launch-special-card">
-      <p className="section-kicker">Launch Special</p>
-
-      <h2>First 2-bin cleaning only $25.</h2>
-
-      <p>
-        Join a recurring route and reserve your spot before our first
-        planned route on July 13, 2026. You won&apos;t be charged until your
-        route day and service are confirmed.
-      </p>
-
-      <Link className="button button-primary" href="/book">
-        Book Your Spot
-      </Link>
-    </article>
-  </div>
-</section>
-
+      <section className="launch-special-band">
+        <div className="container">
+          <article className="launch-special-card">
+            <p className="section-kicker">Founding Neighbor Special</p>
+      
+            <h2>First recurring 2-bin cleaning only $25.</h2>
+      
+            <p>
+              Join a recurring neighborhood route and save on your first qualifying
+              2-bin cleaning. Your booking total and requested service frequency are
+              shown before checkout.
+            </p>
+      
+            <Link className="button button-primary" href="/book">
+              Book Your Cleaning
+            </Link>
+          </article>
+        </div>
+      </section>
       <ProblemSection />
       <ProofSection />
       <WhatGetsCleanedSection />
