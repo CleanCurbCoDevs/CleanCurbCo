@@ -141,7 +141,7 @@ export function ProofSection() {
             ))}
           </div>
         </div>
-        <p className="proof-note">Real service photos from launch prep.</p>
+        <p className="proof-note">Real photos from Clean Curb Co. service work.</p>
       </div>
     </section>
   );
@@ -256,27 +256,29 @@ export function PricingSection() {
         </SectionHeader>
         <div className="billing-note-grid">
           <article className="billing-note-card">
-            <p className="section-kicker">Before launch</p>
-            <h3>No pre-launch charge.</h3>
+            <p className="section-kicker">Card payments</p>
+            <h3>Secure Stripe Checkout.</h3>
             <p>{launchBillingNote}</p>
           </article>
+        
           <article className="billing-note-card">
-            <p className="section-kicker">After launch</p>
-            <h3>Clear recurring timing.</h3>
+            <p className="section-kicker">Recurring service</p>
+            <h3>Your requested cleaning frequency.</h3>
             <p>{futureBillingNote}</p>
           </article>
         </div>
         <div className="route-status-card">
           <div>
             <p className="section-kicker">Route status</p>
-            <h3>Now building our first Cane Bay routes.</h3>
+            <h3>Now booking Summerville-area route days.</h3>
             <p>
-              Early customers help us build efficient neighborhood cleaning
-              days and lock in smoother recurring service.
+              We schedule neighborhood routes around local collection days so bins can
+              be cleaned after they are emptied.
             </p>
           </div>
+        
           <Link className="button button-primary" href="/book">
-            Join the Route
+            Book Your Cleaning
           </Link>
         </div>
         <div className="grid grid-4">
