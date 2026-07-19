@@ -22,6 +22,7 @@ import {
 } from "@/lib/pricing";
 import { findReferrerByCode } from "@/lib/referrals";
 import { createRequestId, getClientIp, logger } from "@/lib/server/logger";
+import { sendGa4ServerEvent } from "@/lib/server/ga4";
 import { evaluateServiceArea } from "@/lib/server/service-area";
 import {
   rejectCrossOriginRequest,
@@ -57,6 +58,10 @@ import { buildBookingSchedulingRecommendation } from "@/lib/server/booking-sched
 
 type IncomingBooking = {
   turnstileToken?: unknown;
+  analytics?: {
+    clientId?: unknown;
+    sessionId?: unknown;
+  } | null;
   referralCode?: unknown;
   website?: unknown;
   company?: unknown;
@@ -113,6 +118,7 @@ const customerPaymentPreferences = [
 ] as const satisfies readonly PaymentPreference[];
 const expectedTopLevelFields = new Set([
   "turnstileToken",
+  "analytics",
   "referralCode",
   "website",
   "company",
@@ -265,6 +271,25 @@ export async function POST(request: Request) {
     cleanString(body.scheduling?.requestedDate, 30) || null;
   const binTypes = cleanArray(body.service?.binTypes);
   const addOns = cleanArray(body.service?.addOns);
+  const rawGa4ClientId = cleanString(
+    body.analytics?.clientId,
+    100,
+  );
+  
+  const rawGa4SessionId = cleanString(
+    body.analytics?.sessionId,
+    30,
+  );
+  
+  const ga4ClientId =
+    /^[A-Za-z0-9._-]{1,100}$/.test(rawGa4ClientId)
+      ? rawGa4ClientId
+      : null;
+  
+  const ga4SessionId =
+    /^\d{1,30}$/.test(rawGa4SessionId)
+      ? rawGa4SessionId
+      : null;
   const referralCode = cleanString(body.referralCode, 40).toUpperCase() || null;
   const waterSpigotAvailable = pickEnum(
     body.instructions?.waterSpigotAvailable,
@@ -604,6 +629,27 @@ await recordBookingEvent({
   },
 });
 
+  if (ga4ClientId) {
+    await sendGa4ServerEvent({
+      eventName: "booking_submitted",
+      clientId: ga4ClientId,
+      sessionId: ga4SessionId,
+      requestId,
+      route,
+      bookingId: booking.id,
+      parameters: {
+        service_type: "bin_cleaning",
+        service_frequency: frequency,
+        bin_count: binCount,
+        add_on_count: addOns.length,
+        payment_preference: paymentPreference,
+        has_referral_code: Boolean(referralCode),
+        value: estimatedPrice,
+        currency: "USD",
+      },
+    });
+  }
+  
   await recordBookingEvent({
   bookingId: booking.id,
   customerId: booking.customer_id,
