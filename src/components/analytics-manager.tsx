@@ -95,6 +95,7 @@ export function AnalyticsManager({
       `${pathname}${window.location.search}`;
 
     window.gtag("event", "page_view", {
+      send_to: googleAnalyticsId,
       page_title: document.title,
       page_location: window.location.href,
       page_path: pagePath,
@@ -119,35 +120,25 @@ export function AnalyticsManager({
       {allowTrafficAnalytics && googleAnalyticsId ? (
         <>
           <Script
-            id="ccc-google-analytics-loader"
-            src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(
-              googleAnalyticsId,
-            )}`}
-            strategy="afterInteractive"
-            onLoad={() => setGoogleAnalyticsReady(true)}
-            onReady={() => setGoogleAnalyticsReady(true)}
-          />
-
-          <Script
             id="ccc-google-analytics-config"
             strategy="afterInteractive"
           >
             {`
               window.dataLayer = window.dataLayer || [];
-
-              window.gtag = function gtag() {
-                window.dataLayer.push(Array.from(arguments));
+      
+              window.gtag = window.gtag || function gtag() {
+                window.dataLayer.push(arguments);
               };
-
-              window.gtag("js", new Date());
-
+      
               window.gtag("consent", "default", {
                 analytics_storage: "granted",
                 ad_storage: "denied",
                 ad_user_data: "denied",
                 ad_personalization: "denied"
               });
-
+      
+              window.gtag("js", new Date());
+      
               window.gtag("config", ${googleAnalyticsIdForScript}, {
                 send_page_view: false,
                 anonymize_ip: true,
@@ -156,6 +147,16 @@ export function AnalyticsManager({
               });
             `}
           </Script>
+      
+          <Script
+            id="ccc-google-analytics-loader"
+            src={`https://www.googletagmanager.com/gtag/js?id=${encodeURIComponent(
+              googleAnalyticsId,
+            )}`}
+            strategy="afterInteractive"
+            onLoad={() => setGoogleAnalyticsReady(true)}
+            onReady={() => setGoogleAnalyticsReady(true)}
+          />
         </>
       ) : null}
 
