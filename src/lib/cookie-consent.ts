@@ -47,6 +47,27 @@ export function isPrivateAnalyticsRoute(pathname: string): boolean {
   );
 }
 
+const CLARITY_ANALYTICS_ROUTES = new Set([
+  "/",
+  "/services",
+  "/pricing",
+  "/service-area",
+  "/faq",
+  "/contact",
+  "/book",
+]);
+
+export function isClarityAnalyticsRoute(
+  pathname: string,
+): boolean {
+  const normalizedPath =
+    pathname.length > 1
+      ? pathname.replace(/\/+$/, "")
+      : "/";
+
+  return CLARITY_ANALYTICS_ROUTES.has(normalizedPath);
+}
+
 export function createStoredCookieConsent(
   choices: CookieConsentChoices,
 ): StoredCookieConsent {
