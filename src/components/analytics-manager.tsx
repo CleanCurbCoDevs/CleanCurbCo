@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import Script from "next/script";
 import { useEffect, useState } from "react";
 import {
+  isClarityAnalyticsRoute,
   isPrivateAnalyticsRoute,
   StoredCookieConsent,
 } from "@/lib/cookie-consent";
@@ -33,7 +34,8 @@ export function AnalyticsManager({
     Boolean(consent?.analytics) && !isPrivateRoute;
 
   const allowExperienceAnalytics =
-    Boolean(consent?.experience) && !isPrivateRoute;
+    Boolean(consent?.experience) &&
+    isClarityAnalyticsRoute(pathname);
 
   const allowPerformanceAnalytics =
     Boolean(consent?.performance) && !isPrivateRoute;
@@ -71,15 +73,18 @@ export function AnalyticsManager({
     ) {
       return;
     }
-
+  
     window.clarity("consentv2", {
       ad_Storage: "denied",
-      analytics_Storage: isPrivateRoute
-        ? "denied"
-        : "granted",
+      analytics_Storage: allowExperienceAnalytics
+        ? "granted"
+        : "denied",
     });
-  }, [consent?.experience, isPrivateRoute]);
-
+  }, [
+    allowExperienceAnalytics,
+    consent?.experience,
+  ]);
+  
   useEffect(() => {
     if (
       !allowTrafficAnalytics ||
