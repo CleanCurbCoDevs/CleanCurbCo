@@ -1,6 +1,9 @@
 import type { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/env";
 
 export default function robots(): MetadataRoute.Robots {
+  const baseUrl = getSiteUrl();
+
   return {
     rules: {
       userAgent: "*",
@@ -24,6 +27,6 @@ export default function robots(): MetadataRoute.Robots {
         "/billing/",
       ],
     },
-    sitemap: "https://cleancurbco.com/sitemap.xml",
+    sitemap: `${baseUrl}/sitemap.xml`,
   };
 }
