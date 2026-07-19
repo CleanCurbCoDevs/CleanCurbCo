@@ -31,7 +31,10 @@ const footerGroups = [
       { label: "Service Policy", href: "/service-policy" },
       { label: "Payment Policy", href: "/payment-policy" },
       { label: "Cancellation & Refunds", href: "/cancellation-refund-policy" },
-      { label: "Cookie & Analytics", href: "/cookie-analytics-policy" },
+      {
+        label: "Cookie Settings & Analytics",
+        href: "/cookie-analytics-policy#cookie-settings",
+      },
       { label: "Security", href: "/vulnerability-disclosure" },
     ],
   },
