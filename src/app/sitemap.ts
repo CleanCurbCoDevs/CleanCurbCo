@@ -1,4 +1,5 @@
 import type { MetadataRoute } from "next";
+import { getSiteUrl } from "@/lib/env";
 
 const routes = [
   "",
@@ -25,7 +26,7 @@ const routes = [
 ];
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const baseUrl = "https://cleancurbco.com";
+  const baseUrl = getSiteUrl();
 
   return routes.map((route) => ({
     url: `${baseUrl}${route}`,
