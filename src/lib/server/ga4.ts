@@ -28,28 +28,30 @@ const GA_API_SECRET =
 function cleanEventParameters(
   parameters: Record<string, Ga4EventParameter>,
 ): Record<string, string | number | boolean> {
-  const cleanedEntries = Object.entries(parameters).flatMap(
-    ([key, value]) => {
-      if (value === null || value === undefined) {
-        return [];
-      }
+  const cleaned: Record<
+    string,
+    string | number | boolean
+  > = {};
 
-      if (
-        typeof value === "number" &&
-        !Number.isFinite(value)
-      ) {
-        return [];
-      }
+  for (const [key, value] of Object.entries(parameters)) {
+    if (value === null || value === undefined) {
+      continue;
+    }
 
-      if (typeof value === "string") {
-        return [[key, value.slice(0, 100)] as const];
-      }
+    if (
+      typeof value === "number" &&
+      !Number.isFinite(value)
+    ) {
+      continue;
+    }
 
-      return [[key, value] as const];
-    },
-  );
+    cleaned[key] =
+      typeof value === "string"
+        ? value.slice(0, 100)
+        : value;
+  }
 
-  return Object.fromEntries(cleanedEntries);
+  return cleaned;
 }
 
 export async function sendGa4ServerEvent({
