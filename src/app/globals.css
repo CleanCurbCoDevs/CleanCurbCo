@@ -10378,79 +10378,60 @@ form.data-row label textarea,
   }
 }
 
+/* =========================================================
+   COOKIE BANNER TOP-LAYER POSITIONING
+   ========================================================= */
 
-/* Emergency isolation for cookie consent banner */
-body > .cookie-banner,
-.cookie-banner {
-  position: fixed !important;
-  top: auto !important;
-  right: 16px !important;
+.cookie-banner[popover] {
+  background: transparent !important;
+  border: 0 !important;
+
   bottom: 16px !important;
-  left: 16px !important;
-
-  display: flex !important;
-  align-items: flex-end !important;
-  justify-content: flex-end !important;
-
-  width: auto !important;
+  display: flex;
   height: auto !important;
-  max-width: none !important;
+  inset: auto 16px 16px 16px !important;
+  justify-content: flex-end;
+
+  left: 16px !important;
   margin: 0 !important;
-
-  opacity: 1 !important;
-  visibility: visible !important;
-
-  transform: none !important;
-  translate: none !important;
-  scale: none !important;
-  rotate: none !important;
-
-  animation: none !important;
-  transition: none !important;
-  filter: none !important;
+  max-height: none !important;
+  max-width: none !important;
 
   overflow: visible !important;
-  clip: auto !important;
-  clip-path: none !important;
+  padding: 0 !important;
+  pointer-events: none;
 
-  pointer-events: none !important;
-  isolation: isolate;
-  z-index: 2147483647 !important;
+  position: fixed !important;
+  right: 16px !important;
+  top: auto !important;
+
+  width: auto !important;
 }
 
-.cookie-banner > .cookie-banner-card,
-.cookie-banner-card {
-  position: relative !important;
-  display: grid !important;
+.cookie-banner[popover]::backdrop {
+  background: transparent;
+  pointer-events: none;
+}
 
-  width: min(570px, 100%) !important;
-  max-width: 570px !important;
-  height: auto !important;
-
-  margin: 0 0 0 auto !important;
-
-  opacity: 1 !important;
-  visibility: visible !important;
-  transform: none !important;
-  animation: none !important;
-
-  pointer-events: auto !important;
-  z-index: 1 !important;
+.cookie-banner[popover] .cookie-banner-card {
+  margin: 0 0 0 auto;
+  max-height: calc(100dvh - 32px);
+  max-width: 570px;
+  overflow-y: auto;
+  pointer-events: auto;
+  width: 100%;
 }
 
 @media (max-width: 640px) {
-  body > .cookie-banner,
-  .cookie-banner {
-    right: 10px !important;
+  .cookie-banner[popover] {
     bottom: 10px !important;
+    inset: auto 10px 10px 10px !important;
     left: 10px !important;
+    right: 10px !important;
   }
 
-  .cookie-banner > .cookie-banner-card,
-  .cookie-banner-card {
-    width: 100% !important;
-    max-width: none !important;
-    max-height: calc(100dvh - 20px) !important;
-    overflow-y: auto !important;
+  .cookie-banner[popover] .cookie-banner-card {
+    max-height: calc(100dvh - 20px);
+    max-width: none;
   }
 }
