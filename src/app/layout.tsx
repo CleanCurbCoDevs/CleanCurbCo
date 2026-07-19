@@ -1,10 +1,9 @@
-import type { Metadata } from "next";
-import type { Viewport } from "next";
-import { Analytics } from "@vercel/analytics/next";
-import { SpeedInsights } from "@vercel/speed-insights/next";
+import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { ActionFeedbackProvider } from "@/components/action-feedback";
 import { ChromeFrame } from "@/components/chrome-frame";
+import { CookieConsentProvider } from "@/components/cookie-consent-provider";
+import { PublicPageEffects } from "@/components/public-page-effects";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
 import { getSiteUrl } from "@/lib/env";
@@ -12,7 +11,6 @@ import { localBusinessStructuredData } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./globals.css";
 import "./tablet.css";
-import { PublicPageEffects } from "@/components/public-page-effects";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -29,7 +27,8 @@ export const metadata: Metadata = {
   applicationName: "Clean Curb Co.",
   manifest: "/manifest.webmanifest",
   title: {
-    default: "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
+    default:
+      "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
     template: "%s | Clean Curb Co.",
   },
   description:
@@ -43,7 +42,8 @@ export const metadata: Metadata = {
     "Curbside bin cleaning",
   ],
   openGraph: {
-    title: "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
+    title:
+      "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
     description:
       "Fresh Starts at the Curb. Garbage bin cleaning for Cane Bay and nearby Summerville communities.",
     url: "/",
@@ -61,7 +61,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "Clean Curb Co. | Fresh Starts at the Curb.",
+    title:
+      "Clean Curb Co. | Fresh Starts at the Curb.",
     description:
       "Professional garbage bin cleaning for Cane Bay and nearby Summerville communities.",
     images: ["/twitter-image.png"],
@@ -76,8 +77,16 @@ export const metadata: Metadata = {
   },
   icons: {
     icon: [
-      { url: "/ccc-field-icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/ccc-field-icon-512.png", sizes: "512x512", type: "image/png" },
+      {
+        url: "/ccc-field-icon-192.png",
+        sizes: "192x192",
+        type: "image/png",
+      },
+      {
+        url: "/ccc-field-icon-512.png",
+        sizes: "512x512",
+        type: "image/png",
+      },
     ],
     apple: [
       {
@@ -109,19 +118,25 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <ActionFeedbackProvider>
-        <ChromeFrame header={<SiteHeader />} footer={<SiteFooter />}>
-          <PublicPageEffects />
-          {children}
-        </ChromeFrame>
+          <CookieConsentProvider>
+            <ChromeFrame
+              header={<SiteHeader />}
+              footer={<SiteFooter />}
+            >
+              <PublicPageEffects />
+              {children}
+            </ChromeFrame>
+          </CookieConsentProvider>
         </ActionFeedbackProvider>
+
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
-            __html: JSON.stringify(localBusinessStructuredData(siteUrl)),
+            __html: JSON.stringify(
+              localBusinessStructuredData(siteUrl),
+            ),
           }}
         />
-        <Analytics />
-        <SpeedInsights />
       </body>
     </html>
   );
