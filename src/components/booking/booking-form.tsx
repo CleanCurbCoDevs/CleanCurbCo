@@ -14,6 +14,7 @@ import {
   launchPromo,
   neighborhoods,
 } from "@/lib/site";
+import { getGa4ServerContext } from "@/lib/client-analytics";
 import {
   america250Promotion,
   isAmerica250PromoActive,
@@ -250,12 +251,15 @@ export function BookingForm({
     setIsSubmitting(true);
 
     try {
+      const ga4Context = await getGa4ServerContext();
+    
       const response = await fetch("/api/bookings", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           ...form,
           turnstileToken: turnstileTokenForSubmit,
+          analytics: ga4Context,
         }),
       });
 
