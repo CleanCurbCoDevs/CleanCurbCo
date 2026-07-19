@@ -163,8 +163,60 @@ function CookieBanner({
   onAccept,
   onDecline,
 }: CookieBannerProps) {
+  const bannerRef = useRef<HTMLElement | null>(null);
+
+  useEffect(() => {
+    const banner = bannerRef.current;
+
+    if (!banner) {
+      return;
+    }
+
+    try {
+      if (
+        typeof banner.showPopover === "function" &&
+        !banner.matches(":popover-open")
+      ) {
+        banner.showPopover();
+      }
+    } catch (error) {
+      console.warn(
+        "The cookie banner could not enter the top layer.",
+        error,
+      );
+    }
+  }, []);
+
+  function closeBanner() {
+    const banner = bannerRef.current;
+
+    try {
+      if (
+        banner &&
+        typeof banner.hidePopover === "function" &&
+        banner.matches(":popover-open")
+      ) {
+        banner.hidePopover();
+      }
+    } catch {
+      // The consent state will still remove the banner.
+    }
+  }
+
+  function handleAccept() {
+    closeBanner();
+    onAccept();
+  }
+
+  function handleDecline() {
+    closeBanner();
+    onDecline();
+  }
+
   return (
     <aside
+      ref={bannerRef}
+      popover="manual"
       className="cookie-banner"
       role="dialog"
       aria-modal="false"
@@ -193,7 +245,7 @@ function CookieBanner({
           <button
             type="button"
             className="button button-primary"
-            onClick={onAccept}
+            onClick={handleAccept}
             aria-label="Accept all optional cookies"
           >
             Accept
@@ -202,6 +254,7 @@ function CookieBanner({
           <Link
             className="button button-secondary"
             href="/cookie-analytics-policy#cookie-settings"
+            onClick={closeBanner}
           >
             Accept some
           </Link>
@@ -209,7 +262,7 @@ function CookieBanner({
           <button
             type="button"
             className="cookie-banner-decline"
-            onClick={onDecline}
+            onClick={handleDecline}
           >
             Decline optional cookies
           </button>
