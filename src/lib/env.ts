@@ -11,10 +11,21 @@ export function isSupabaseConfigured() {
 }
 
 export function getSiteUrl() {
-  return (
+  const configuredUrl =
     process.env.NEXT_PUBLIC_SITE_URL?.replace(/\/$/, "") ??
-    "https://cleancurbco.com"
-  );
+    "https://www.cleancurbco.com";
+
+  try {
+    const url = new URL(configuredUrl);
+
+    if (url.hostname === "cleancurbco.com") {
+      url.hostname = "www.cleancurbco.com";
+    }
+
+    return url.toString().replace(/\/$/, "");
+  } catch {
+    return "https://www.cleancurbco.com";
+  }
 }
 
 function splitEmails(value?: string) {
