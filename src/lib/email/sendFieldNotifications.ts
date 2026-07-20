@@ -55,7 +55,7 @@ function facebookReviewRequestTemplate(
 
   const html = `
     <!doctype html>
-    <html>
+    <html lang="en">
       <head>
         <meta charset="utf-8" />
         <meta
@@ -68,16 +68,17 @@ function facebookReviewRequestTemplate(
         <div
           style="display:none;max-height:0;overflow:hidden;opacity:0"
         >
-          A quick Facebook recommendation makes a huge difference
-          for our small business.
+          Your bins are cleaner. Now tell the neighbors how we did.
         </div>
 
         <div style="padding:28px 14px;background:#f5f4ef">
           <div
             style="max-width:640px;margin:0 auto;background:#ffffff;border:1px solid #dedbd0;border-radius:16px;overflow:hidden;box-shadow:0 14px 40px rgba(5,5,5,.08)"
           >
+            <div style="height:6px;background:#e53935"></div>
+
             <div
-              style="background:#050505;color:#ffffff;padding:24px;border-bottom:5px solid #00ff38"
+              style="background:#050505;color:#ffffff;padding:26px;border-bottom:5px solid #00ff38"
             >
               <p
                 style="margin:0 0 8px;color:#ffe38a;font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase"
@@ -86,67 +87,78 @@ function facebookReviewRequestTemplate(
               </p>
 
               <h1
-                style="margin:0;font-size:28px;line-height:1.1"
+                style="margin:0;font-size:28px;line-height:1.15"
               >
-                Did we leave things fresh?
+                How'd we do with the gross stuff?
               </h1>
 
               <p
-                style="margin:8px 0 0;color:#ffe38a;font-weight:800"
+                style="margin:10px 0 0;color:#ffe38a;font-weight:800"
               >
                 Fresh Starts at the Curb.
               </p>
             </div>
 
             <div
-              style="padding:26px;font-size:16px;line-height:1.65;color:#222"
+              style="padding:28px 26px;font-size:16px;line-height:1.65;color:#222"
             >
               <p style="margin-top:0">
                 Hey ${escapeHtml(firstName)},
               </p>
 
               <p>
-                Thanks again for trusting Clean Curb Co. with the
-                gross stuff. We hope your bins are looking cleaner,
-                smelling better, and feeling significantly less
-                suspicious.
+                Your bins have had a little time to enjoy their fresh
+                start. We hope they are looking cleaner, smelling
+                better, and feeling considerably less suspicious.
               </p>
 
               <p>
-                As a new local, veteran-owned small business, a
-                quick Facebook recommendation helps more than you
-                might think. It lets nearby neighbors know we are
+                Clean Curb Co. is still the new kid on the route, so
+                an honest Facebook recommendation helps more than
+                you might think. It lets nearby neighbors know we are
                 real people doing real work—and not just three
                 raccoons operating a pressure washer.
               </p>
 
-              <p style="margin:26px 0">
+              <div style="margin:28px 0;text-align:center">
                 <a
                   href="${escapeHtml(FACEBOOK_REVIEWS_URL)}"
-                  style="display:inline-block;background:#00ff38;color:#050505;padding:14px 20px;border-radius:10px;font-weight:800;text-decoration:none"
+                  style="display:inline-block;background:#00ff38;color:#050505;padding:15px 22px;border-radius:10px;font-size:16px;font-weight:800;text-decoration:none"
                 >
-                  Recommend Clean Curb Co. on Facebook
+                  Recommend Us on Facebook
                 </a>
-              </p>
+              </div>
 
-              <p
-                style="font-size:14px;color:#625d53;background:#f8f4e8;border:1px solid #dedbd0;border-radius:12px;padding:14px"
+              <div
+                style="margin:24px 0;background:#f4efff;border:1px solid #c9b8f4;border-left:6px solid #6d28d9;border-radius:12px;padding:16px"
               >
-                <strong>Not on Facebook?</strong>
-                No worries at all. Clean Curb Co. is also on Yelp
-                if that is where you prefer to share your
-                experience.
-              </p>
+                <p
+                  style="margin:0 0 6px;color:#3f1d78;font-weight:800"
+                >
+                  More of a Google or Yelp person?
+                </p>
+
+                <p style="margin:0;color:#514760;font-size:14px">
+                  We're getting those profiles squared away too.
+                  They are still finishing their official verification
+                  rinse, so Facebook is the best place to review us
+                  right now. Once everything is live, you'll be able
+                  to find Clean Curb Co. on Google and Yelp too.
+                </p>
+              </div>
 
               <p>
-                Every recommendation, referral, and person willing
-                to trust us with the gross stuff genuinely matters.
-                Thank you for supporting Clean Curb Co.
+                Every review, referral, and person willing to trust us
+                with the gross stuff genuinely matters. Thanks for
+                supporting a local, veteran-owned small business.
               </p>
 
               <p style="margin-bottom:0">
                 Stay fresh,<br />
-                <strong>The Clean Curb Co. Team</strong>
+                <strong>The Clean Curb Co. Team</strong><br />
+                <span style="color:#6d28d9;font-style:italic">
+                  Fresh Starts at the Curb.
+                </span>
               </p>
             </div>
 
@@ -165,7 +177,25 @@ function facebookReviewRequestTemplate(
                 communities.
               </p>
 
-              <p style="margin:0;color:#ffe38a">
+              <p style="margin:0 0 8px">
+                <a
+                  href="tel:+18438884124"
+                  style="color:#00ff38;text-decoration:none"
+                >
+                  +1 (843) 888-4124
+                </a>
+
+                <span style="color:#807b70"> | </span>
+
+                <a
+                  href="mailto:contact@cleancurbco.com"
+                  style="color:#00ff38;text-decoration:none"
+                >
+                  contact@cleancurbco.com
+                </a>
+              </p>
+
+              <p style="margin:0;color:#ffe38a;font-weight:700">
                 Need help? Reply directly to this email.
               </p>
             </div>
@@ -178,21 +208,24 @@ function facebookReviewRequestTemplate(
   const text = [
     `Hey ${firstName},`,
     "",
-    "Thanks again for trusting Clean Curb Co. with the gross stuff. We hope your bins are looking cleaner and smelling better.",
+    "Your bins have had a little time to enjoy their fresh start. We hope they are looking cleaner, smelling better, and feeling considerably less suspicious.",
     "",
-    "As a new local, veteran-owned small business, a quick Facebook recommendation helps nearby neighbors find and trust us:",
+    "Clean Curb Co. is still the new kid on the route, so an honest Facebook recommendation helps more than you might think. It lets nearby neighbors know we are real people doing real work—and not just three raccoons operating a pressure washer.",
+    "",
+    "Recommend us on Facebook:",
     FACEBOOK_REVIEWS_URL,
     "",
-    "Not on Facebook? No worries at all. Clean Curb Co. is also on Yelp if that is where you prefer to share your experience.",
+    "More of a Google or Yelp person? We're getting those profiles squared away too. They are still finishing their official verification rinse, so Facebook is the best place to review us right now. Once everything is live, you'll be able to find Clean Curb Co. on Google and Yelp too.",
     "",
-    "Every recommendation and referral genuinely matters. Thank you for supporting Clean Curb Co.",
+    "Every review, referral, and person willing to trust us with the gross stuff genuinely matters. Thanks for supporting a local, veteran-owned small business.",
     "",
     "Stay fresh,",
     "The Clean Curb Co. Team",
+    "Fresh Starts at the Curb.",
   ].join("\n");
 
   return {
-    subject: "Did we leave things fresh?",
+    subject: "How'd we do with the gross stuff?",
     html,
     text,
   };
