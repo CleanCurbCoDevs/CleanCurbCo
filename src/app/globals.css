@@ -10546,3 +10546,388 @@ form.data-row label textarea,
     max-width: none;
   }
 }
+/* =========================================================
+   Booking page layout overhaul
+   Scoped to /book only
+   ========================================================= */
+
+.booking-page {
+  background: #f4f3ee;
+}
+
+.booking-page .page-hero {
+  padding: 54px 0 42px;
+}
+
+.booking-page > .section {
+  padding: 38px 0 72px;
+}
+
+.booking-page > .section > .container {
+  max-width: 1240px;
+}
+
+.booking-page .booking-launch-grid {
+  margin-bottom: 22px;
+}
+
+.booking-page .booking-shell {
+  align-items: start;
+  gap: 28px;
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.booking-page .booking-form {
+  gap: 22px;
+}
+
+.booking-page .form-section {
+  background: white;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 10px 28px rgba(5, 5, 5, 0.045);
+  gap: 22px;
+  padding: 28px;
+}
+
+.booking-page .form-section > .section-kicker {
+  margin: 0 0 -12px;
+}
+
+.booking-page .form-section > h2 {
+  font-size: 1.45rem;
+  line-height: 1.1;
+}
+
+.booking-page .form-section > .muted {
+  line-height: 1.55;
+  margin: -10px 0 0;
+  max-width: 760px;
+}
+
+/* Predictable field layout instead of auto-fit */
+
+.booking-page .form-grid,
+.booking-page .scheduling-fields {
+  display: grid;
+  gap: 18px 16px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.booking-page .scheduling-preference-field {
+  grid-column: 1 / -1;
+}
+
+/* Let the street address breathe */
+
+@media (min-width: 720px) {
+  .booking-page
+    .booking-form
+    > .form-section:first-of-type
+    .form-grid
+    > .field:nth-child(5) {
+    grid-column: 1 / -1;
+  }
+}
+
+/* Fields */
+
+.booking-page .field {
+  gap: 8px;
+}
+
+.booking-page .field > span,
+.booking-page .option-label {
+  font-size: 0.94rem;
+  font-weight: 900;
+  line-height: 1.3;
+  margin: 0;
+}
+
+.booking-page .field input,
+.booking-page .field select,
+.booking-page .field textarea {
+  background: white;
+  border-color: rgba(17, 17, 17, 0.2);
+  border-radius: 10px;
+  min-height: 52px;
+  padding: 12px 14px;
+}
+
+.booking-page .field input:focus,
+.booking-page .field select:focus,
+.booking-page .field textarea:focus {
+  border-color: var(--purple);
+  outline: 3px solid rgba(138, 0, 196, 0.13);
+  outline-offset: 1px;
+}
+
+.booking-page .field small {
+  color: var(--muted);
+  line-height: 1.45;
+  margin-top: 0;
+}
+
+/* Choice cards */
+
+.booking-page .choice-grid {
+  gap: 12px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.booking-page .choice-card {
+  background: #fcfcfa;
+  border-radius: 10px;
+  gap: 11px;
+  min-height: 56px;
+  padding: 14px;
+}
+
+.booking-page .choice-card input[type="checkbox"],
+.booking-page .choice-card input[type="radio"] {
+  accent-color: var(--purple);
+  height: 18px;
+  width: 18px;
+}
+
+.booking-page .choice-card span {
+  font-weight: 850;
+  line-height: 1.35;
+}
+
+.booking-page .choice-card small {
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.45;
+  margin-top: 5px;
+}
+
+.booking-page .choice-card:has(input:checked) {
+  background: rgba(138, 0, 196, 0.045);
+  border-color: rgba(138, 0, 196, 0.42);
+  box-shadow: inset 4px 0 0 var(--purple);
+}
+
+/* Scheduling */
+
+.booking-page .scheduling-choice-grid {
+  gap: 12px;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.booking-page .scheduling-choice-grid .choice-card {
+  min-height: 132px;
+}
+
+/* Optional expanders */
+
+.booking-page .booking-optional-details {
+  background: white;
+  border-radius: 10px;
+}
+
+.booking-page .booking-optional-details summary {
+  min-height: 54px;
+  padding: 13px 15px;
+}
+
+.booking-page .booking-optional-details[open] summary {
+  background: rgba(138, 0, 196, 0.035);
+}
+
+.booking-page .booking-optional-content {
+  padding: 16px;
+}
+
+/* Required agreements:
+   readable legal acknowledgements, not giant bold buttons */
+
+.booking-page
+  .booking-form
+  > .form-section:last-of-type {
+  gap: 12px;
+}
+
+.booking-page
+  .booking-form
+  > .form-section:last-of-type
+  .choice-card {
+  min-height: 0;
+  padding: 14px 16px;
+}
+
+.booking-page
+  .booking-form
+  > .form-section:last-of-type
+  .choice-card
+  span {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+/* Submission area */
+
+.booking-page .submit-area {
+  background: white;
+  border: 1px solid rgba(17, 17, 17, 0.12);
+  border-radius: 14px;
+  gap: 14px;
+  padding: 18px;
+}
+
+.booking-page .submit-area .button {
+  min-height: 54px;
+}
+
+.booking-page .turnstile-panel {
+  background: #fcfcfa;
+  border-radius: 10px;
+}
+
+/* Mobile/tablet estimate */
+
+.booking-page .booking-mobile-summary {
+  border-radius: 14px;
+  box-shadow: 0 12px 30px rgba(5, 5, 5, 0.12);
+  display: flex;
+}
+
+/* Full desktop estimate */
+
+.booking-page .estimate-panel {
+  border-radius: 14px;
+  box-shadow: 0 20px 48px rgba(5, 5, 5, 0.2);
+  display: none;
+  gap: 18px;
+  padding: 24px;
+  top: 108px;
+}
+
+.booking-page .estimate-panel > svg {
+  color: var(--gold);
+}
+
+.booking-page .estimate-panel h2 {
+  font-size: 1.2rem;
+}
+
+.booking-page .estimate-total strong {
+  font-size: 2.7rem;
+}
+
+.booking-page .estimate-panel p,
+.booking-page .estimate-panel li {
+  font-size: 0.94rem;
+  margin-bottom: 0;
+  margin-top: 0;
+}
+
+.booking-page .launch-reminder {
+  gap: 8px;
+  padding: 14px;
+}
+
+/* Do not squeeze the form and sidebar together
+   until there is genuinely enough room */
+
+@media (min-width: 1100px) {
+  .booking-page .booking-shell {
+    gap: 32px;
+    grid-template-columns:
+      minmax(0, 1fr)
+      minmax(340px, 380px);
+  }
+
+  .booking-page .booking-mobile-summary {
+    display: none;
+  }
+
+  .booking-page .estimate-panel {
+    display: grid;
+  }
+}
+
+/* Tablet */
+
+@media (max-width: 1099px) {
+  .booking-page .booking-shell {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .booking-page .booking-mobile-summary {
+    display: flex;
+  }
+
+  .booking-page .estimate-panel {
+    display: none;
+  }
+
+  .booking-page .scheduling-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-page .scheduling-choice-grid .choice-card {
+    min-height: 0;
+  }
+}
+
+/* Phones */
+
+@media (max-width: 719px) {
+  .booking-page .page-hero {
+    padding: 42px 0 34px;
+  }
+
+  .booking-page > .section {
+    padding: 24px 0 52px;
+  }
+
+  .booking-page > .section > .container {
+    padding-left: 14px;
+    padding-right: 14px;
+  }
+
+  .booking-page .booking-shell,
+  .booking-page .booking-form {
+    gap: 16px;
+  }
+
+  .booking-page .form-section {
+    border-radius: 12px;
+    gap: 18px;
+    padding: 18px;
+  }
+
+  .booking-page .form-section > h2 {
+    font-size: 1.3rem;
+  }
+
+  .booking-page .form-grid,
+  .booking-page .scheduling-fields,
+  .booking-page .choice-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .booking-page .scheduling-preference-field {
+    grid-column: auto;
+  }
+
+  .booking-page .field input,
+  .booking-page .field select {
+    min-height: 50px;
+  }
+
+  .booking-page .booking-mobile-summary {
+    padding: 13px 14px;
+  }
+
+  .booking-page .booking-mobile-summary strong {
+    font-size: 1.65rem;
+  }
+
+  .booking-page .submit-area {
+    border-radius: 12px;
+    padding: 14px;
+  }
+}
