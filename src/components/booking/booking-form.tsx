@@ -1,8 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";
-import { CalendarCheck, CheckCircle2, Send } from "lucide-react";
+import { useCallback, useMemo, useState } from "react";import {
+  useCallback,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { useActionFeedback } from "@/components/action-feedback";
 import { SiteFeedbackNudge } from "@/components/site-feedback-nudge";
 import { TurnstileWidget } from "@/components/turnstile-widget";
@@ -14,7 +18,10 @@ import {
   launchPromo,
   neighborhoods,
 } from "@/lib/site";
-import { getGa4ServerContext } from "@/lib/client-analytics";
+import {
+  getGa4ServerContext,
+  trackAnalyticsEvent,
+} from "@/lib/client-analytics";
 import {
   america250Promotion,
   isAmerica250PromoActive,
@@ -140,7 +147,7 @@ export function BookingForm({
 }) {
   const feedback = useActionFeedback();
   const america250Active = isAmerica250PromoActive();
-
+  const bookingStartedTracked = useRef(false);  
   const [form, setForm] = useState<FormState>(() => ({
     ...initialState,
     customer: {
@@ -245,6 +252,22 @@ export function BookingForm({
     });
   }
 
+function handleBookingStart() {
+  if (bookingStartedTracked.current) {
+    return;
+  }
+
+  bookingStartedTracked.current = true;
+
+  trackAnalyticsEvent("booking_started", {
+    service_type: "bin_cleaning",
+    service_frequency: form.service.frequency,
+    bin_count: form.service.binCount,
+    value: estimatedPrice,
+    currency: "USD",
+  });
+}
+  
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
@@ -280,6 +303,14 @@ export function BookingForm({
         form.payment.preference === "stripe" &&
         data.checkoutUrl
       ) {
+        trackAnalyticsEvent("checkout_started", {
+          service_type: "bin_cleaning",
+          service_frequency: form.service.frequency,
+          bin_count: form.service.binCount,
+          value: estimatedPrice,
+          currency: "USD",
+        });
+      
         feedback.success(
           "Booking saved. Opening secure checkout...",
         );
@@ -385,6 +416,7 @@ export function BookingForm({
       <form
         id="booking-form"
         className="booking-form"
+        onFocusCapture={handleBookingStart}
         onSubmit={handleSubmit}
       >
         <label className="form-honeypot" aria-hidden="true">
