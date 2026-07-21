@@ -3,12 +3,8 @@ import {
   type InitialBookingCustomer,
 } from "@/components/booking/booking-form";
 import { publicPageMetadata } from "@/lib/seo";
-import {
-  bookingBillingAfterLaunchNotice,
-  neighborhoods,
-} from "@/lib/site";
+import { neighborhoods } from "@/lib/site";
 import type { ServiceFrequency } from "@/types/booking";
-import { LaunchStatusCard } from "@/components/launch-status-card";
 
 export const metadata = publicPageMetadata({
   title: "Book Garbage Bin Cleaning",
@@ -37,32 +33,53 @@ export default async function BookPage({ searchParams }: BookPageProps) {
     <main>
       <section className="page-hero">
         <div className="container section-header">
-          <p className="section-kicker">Book in under 2 minutes</p>
-          <h1>Join a local route.</h1>
+          <p className="section-kicker">
+            Now booking local routes
+          </p>
+
+          <h1>Let’s get those bins handled.</h1>
+
           <p>
-            Tell us what needs cleaning, choose your preferred payment method, and
-            share your normal collection schedule. Card payments are collected through
-            secure Stripe Checkout. Your requested service date remains subject to
-            route availability.
+            Trash cans get gross. We clean, sanitize, and deodorize
+            them right at the curb—starting at $25.
+          </p>
+
+          <div className="hero-actions">
+            <a
+              className="button button-dark"
+              href="#booking-form"
+            >
+              Start My Booking
+            </a>
+          </div>
+
+          <p className="muted">
+            No need to be home • Secure checkout • Completion photos included
           </p>
         </div>
       </section>
+
       <section className="section section-cream">
         <div className="container">
           <div className="booking-launch-grid">
-            <LaunchStatusCard variant="card" className="launch-info-card" />
-            <article className="launch-info-card">
-              <p className="section-kicker">Payment options</p>
-              <h2>Choose what works for you.</h2>
-              <p>{bookingBillingAfterLaunchNotice}</p>
-            </article>
+            <div
+              className="form-status-message form-status-success"
+              role="status"
+            >
+              <strong>Now booking neighborhood routes.</strong>{" "}
+              Tell us your normal collection day and we’ll coordinate
+              the cleaning around when your bins are emptied.
+            </div>
           </div>
+
           <BookingForm
             initialCustomer={parseCustomerParams(params)}
             initialFrequency={parseFrequencyParam(params.frequency)}
             initialReferralCode={params.ref ?? ""}
             serviceAreaChecked={params.serviceAreaChecked === "yes"}
-            turnstileSiteKey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""}
+            turnstileSiteKey={
+              process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? ""
+            }
           />
         </div>
       </section>
