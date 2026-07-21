@@ -40,32 +40,45 @@ export default function Home() {
         <div className="hero-scrim" />
 
         <div className="container hero-content">
-          <h1>Fresh Starts at the Curb.</h1>
-
+          <p className="section-kicker">
+            Garbage bin cleaning in Summerville
+          </p>
+        
+          <h1>Your bins have seen some things.</h1>
+        
           <p className="hero-subtitle">
-            Curbside bin cleaning and grime cleanup for Cane Bay, Summerville,
-            and nearby neighborhoods.
+            We clean, sanitize, and deodorize trash and recycling bins
+            right at the curb—so you don’t have to scrub them, smell
+            them, or investigate whatever is happening below the bag line.
           </p>
-
-          <p className="trust-line">
-            Locally owned • Veteran-owned • Route-based service
+        
+          <p className="offer-badge">
+            Recurring service starts at $25 for up to 2 bins.
           </p>
-
+        
+          <div
+            className="hero-chip-list"
+            aria-label="Service highlights"
+          >
+            <span>No need to be home</span>
+            <span>Completion photos included</span>
+            <span>Local and veteran-owned</span>
+          </div>
+        
           <div className="hero-actions">
             <Link className="button button-primary" href="/book">
               <CalendarCheck size={20} aria-hidden="true" />
-              Book Curbside Cleaning
+              Get the Gross Stuff Handled
             </Link>
-
+        
             <Link className="button button-secondary" href="#pricing">
               <DollarSign size={20} aria-hidden="true" />
               See Pricing
             </Link>
           </div>
-
+        
           <p className="hero-note">
-            Card payments are handled through secure Stripe Checkout. Your requested
-            service date remains subject to route availability.
+            Tell us your normal collection day. We’ll coordinate the rest.
           </p>
         </div>
       </section>
@@ -73,18 +86,20 @@ export default function Home() {
       <section className="launch-special-band">
         <div className="container">
           <article className="launch-special-card">
-            <p className="section-kicker">Founding Neighbor Special</p>
-      
-            <h2>First recurring 2-bin cleaning only $25.</h2>
-      
-            <p>
-              Join a recurring neighborhood route and save on your first qualifying
-              2-bin cleaning. Your booking total and requested service frequency are
-              shown before checkout.
+            <p className="section-kicker">
+              Founding Neighbor Special
             </p>
-      
+          
+            <h2>Your first recurring 2-bin cleaning is $25.</h2>
+          
+            <p>
+              Choose monthly, every-other-month, or quarterly service.
+              Your first qualifying 2-bin cleaning is $25, and your exact
+              plan price is shown before checkout.
+            </p>
+          
             <Link className="button button-primary" href="/book">
-              Book Your Cleaning
+              Get My Bins Handled
             </Link>
           </article>
         </div>
