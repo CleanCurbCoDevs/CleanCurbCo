@@ -1,3 +1,4 @@
+import "./book.css";
 import {
   BookingForm,
   type InitialBookingCustomer,
