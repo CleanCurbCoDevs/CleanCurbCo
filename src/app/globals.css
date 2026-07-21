@@ -855,6 +855,27 @@ h3,
   color: rgba(255, 255, 255, 0.72);
 }
 
+.pricing-fine-print {
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: grid;
+  gap: 6px;
+  margin-top: 20px;
+  padding: 14px 16px;
+}
+
+.pricing-fine-print p {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.pricing-fine-print strong {
+  color: var(--ink);
+}
+
+
 .check-list {
   display: grid;
   gap: 9px;
