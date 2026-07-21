@@ -1364,6 +1364,53 @@ h3,
   gap: 24px;
 }
 
+.booking-optional-details {
+  background: #fbfbf8;
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  border-radius: var(--radius);
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.booking-optional-details[open] {
+  border-color: rgba(138, 0, 196, 0.28);
+}
+
+.booking-optional-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  list-style: none;
+  min-height: 50px;
+  padding: 12px 14px;
+}
+
+.booking-optional-details summary::-webkit-details-marker {
+  display: none;
+}
+
+.booking-optional-details summary span {
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.booking-optional-details summary small {
+  color: var(--purple);
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.booking-optional-content {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+  padding: 14px;
+}
+
 .booking-mobile-summary {
   align-items: center;
   background: var(--ink);
