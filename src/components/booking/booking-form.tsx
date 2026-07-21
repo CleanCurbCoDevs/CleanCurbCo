@@ -418,6 +418,22 @@ function handleBookingStart() {
 
   return (
     <div className="booking-shell">
+      <div
+        className="booking-mobile-summary"
+        aria-live="polite"
+      >
+        <div>
+          <span>Estimated visit</span>
+          <strong>${estimatedPrice}</strong>
+        </div>
+  
+        <p>
+          {formatFrequency(form.service.frequency)} ·{" "}
+          {form.service.binCount}{" "}
+          {form.service.binCount === 1 ? "bin" : "bins"}
+        </p>
+      </div>
+  
       <form
         id="booking-form"
         className="booking-form"
