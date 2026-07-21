@@ -46,7 +46,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
           <div className="hero-actions">
             <a
-              className="button button-dark"
+              className="button button-primary booking-hero-cta"
               href="#booking-form"
             >
               Start My Booking
