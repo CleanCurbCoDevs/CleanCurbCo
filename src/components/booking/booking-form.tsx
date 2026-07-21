@@ -540,16 +540,30 @@ function handleBookingStart() {
               </select>
             </label>
 
-            <TextField
-              label="Referral code, if you have one"
-              value={form.referralCode}
-              onChange={(value) =>
-                setForm((current) => ({
-                  ...current,
-                  referralCode: normalizeReferralCode(value),
-                }))
-              }
-            />
+            <details className="booking-optional-details">
+              <summary>
+                <span>Have a referral code?</span>
+            
+                <small>
+                  {form.referralCode
+                    ? `Applied: ${form.referralCode}`
+                    : "Optional"}
+                </small>
+              </summary>
+            
+              <div className="booking-optional-content">
+                <TextField
+                  label="Referral code"
+                  value={form.referralCode}
+                  onChange={(value) =>
+                    setForm((current) => ({
+                      ...current,
+                      referralCode: normalizeReferralCode(value),
+                    }))
+                  }
+                />
+              </div>
+            </details>
           </div>
         </section>
 
@@ -621,26 +635,42 @@ function handleBookingStart() {
             </div>
           </div>
 
-          <div>
-            <p className="option-label">Add-ons</p>
-            <div className="choice-grid">
-              {addOns.map((addOn) => (
-                <label className="choice-card" key={addOn.id}>
-                  <input
-                    type="checkbox"
-                    checked={form.service.addOns.includes(addOn.id)}
-                    onChange={(event) =>
-                      toggleArrayValue("addOns", addOn.id, event.target.checked)
-                    }
-                  />
-                  <span>
-                    {addOn.name} | {addOn.price}
-                    <small>{addOn.description}</small>
-                  </span>
-                </label>
-              ))}
+          <details className="booking-optional-details">
+            <summary>
+              <span>Add something extra</span>
+          
+              <small>
+                {form.service.addOns.length
+                  ? `${form.service.addOns.length} selected`
+                  : "Optional"}
+              </small>
+            </summary>
+          
+            <div className="booking-optional-content">
+              <div className="choice-grid">
+                {addOns.map((addOn) => (
+                  <label className="choice-card" key={addOn.id}>
+                    <input
+                      type="checkbox"
+                      checked={form.service.addOns.includes(addOn.id)}
+                      onChange={(event) =>
+                        toggleArrayValue(
+                          "addOns",
+                          addOn.id,
+                          event.target.checked,
+                        )
+                      }
+                    />
+          
+                    <span>
+                      {addOn.name} | {addOn.price}
+                      <small>{addOn.description}</small>
+                    </span>
+                  </label>
+                ))}
+              </div>
             </div>
-          </div>
+          </details>
         </section>
 
         <section className="form-section scheduling-section">
@@ -878,22 +908,37 @@ function handleBookingStart() {
             </label>
           </div>
 
-          <label className="field">
-            <span>Notes</span>
-            <textarea
-              value={form.instructions.notes}
-              onChange={(event) =>
-                setForm((current) => ({
-                  ...current,
-                  instructions: {
-                    ...current.instructions,
-                    notes: event.target.value,
-                  },
-                }))
-              }
-              placeholder="Gate code, bin location, heavy odor, dog in yard, HOA instructions, broken lid/wheel, anything else"
-            />
-          </label>
+          <details className="booking-optional-details">
+            <summary>
+              <span>Anything else we should know?</span>
+          
+              <small>
+                {form.instructions.notes.trim()
+                  ? "Notes added"
+                  : "Optional"}
+              </small>
+            </summary>
+          
+            <div className="booking-optional-content">
+              <label className="field">
+                <span>Service notes</span>
+          
+                <textarea
+                  value={form.instructions.notes}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      instructions: {
+                        ...current.instructions,
+                        notes: event.target.value,
+                      },
+                    }))
+                  }
+                  placeholder="Gate code, bin location, heavy odor, dog in yard, HOA instructions, broken lid or wheel, or anything else"
+                />
+              </label>
+            </div>
+          </details>
         </section>
 
         <section className="form-section">
