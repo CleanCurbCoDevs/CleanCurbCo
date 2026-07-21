@@ -3962,6 +3962,10 @@ form.data-row label textarea,
     grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.7fr);
   }
 
+  .booking-mobile-summary {
+    display: none;
+  }
+  
   .footer-grid {
     grid-template-columns: 1.2fr repeat(3, minmax(0, 1fr));
   }
