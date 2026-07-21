@@ -382,7 +382,11 @@ export function BookingForm({
 
   return (
     <div className="booking-shell">
-      <form className="booking-form" onSubmit={handleSubmit}>
+      <form
+        id="booking-form"
+        className="booking-form"
+        onSubmit={handleSubmit}
+      >
         <label className="form-honeypot" aria-hidden="true">
           <span>Website</span>
           <input
@@ -406,7 +410,17 @@ export function BookingForm({
         ) : null}
 
         <section className="form-section">
-          <h2>Customer Info</h2>
+          <p className="section-kicker">
+            First things first
+          </p>
+        
+          <h2>Where are we cleaning?</h2>
+        
+          <p className="muted">
+            A few details now means less back-and-forth later.
+            Give us the basics once, and we’ll handle the gross part.
+          </p>
+        
           <div className="form-grid">
             <TextField
               label="First name"
