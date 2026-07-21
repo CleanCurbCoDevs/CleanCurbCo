@@ -26,10 +26,7 @@ import { ServiceAreaChecker } from "@/components/service-area-checker";
 import { ServiceCard } from "@/components/service-card";
 import {
   addOns,
-  futureBillingNote,
   futureServices,
-  launchBillingNote,
-  launchPromo,
   oneTimeRows,
   recurringPlans,
   serviceAreas,
@@ -66,19 +63,19 @@ const proofPhotos = [
 const pricingPlanLinks = {
   one_time: {
     href: "/book?frequency=one-time",
-    label: "Book One-Time Clean",
+    label: "Choose One-Time",
   },
   monthly: {
     href: "/book?frequency=monthly",
-    label: "Book Monthly Plan",
+    label: "Choose Monthly",
   },
   every_other_month: {
     href: "/book?frequency=every-other-month",
-    label: "Book Every-Other-Month Plan",
+    label: "Choose Every 2 Months",
   },
   quarterly: {
     href: "/book?frequency=quarterly",
-    label: "Book Quarterly Plan",
+    label: "Choose Quarterly",
   },
 } as const;
 
@@ -241,67 +238,52 @@ export function PricingSection() {
   return (
     <section className="section section-cream" id="pricing">
       <div className="container">
-        <div className="promo-strip">
-          <p className="section-kicker">Founding Neighbor Special</p>
-          <h2>
-            Get your first 2-bin cleaning for <strong>$25</strong> when you
-            join any recurring plan.
-          </h2>
-          <p>{launchPromo}</p>
-        </div>
-        <SectionHeader kicker="Pricing" title="Simple pricing. Cleaner bins.">
-          We clean by neighborhood route to keep service affordable, reliable,
-          and efficient. Extra recurring bins are typically +$8-$10 each.
-          Recurring service keeps the stink from getting a comeback tour.
+        <SectionHeader
+          kicker="Pricing"
+          title="Pick your level of fresh."
+        >
+          Choose a one-time reset or keep the stink from making
+          a comeback with recurring service.
         </SectionHeader>
-        <div className="billing-note-grid">
-          <article className="billing-note-card">
-            <p className="section-kicker">Card payments</p>
-            <h3>Secure Stripe Checkout.</h3>
-            <p>{launchBillingNote}</p>
-          </article>
-        
-          <article className="billing-note-card">
-            <p className="section-kicker">Recurring service</p>
-            <h3>Your requested cleaning frequency.</h3>
-            <p>{futureBillingNote}</p>
-          </article>
-        </div>
-        <div className="route-status-card">
-          <div>
-            <p className="section-kicker">Route status</p>
-            <h3>Now booking Summerville-area route days.</h3>
-            <p>
-              We schedule neighborhood routes around local collection days so bins can
-              be cleaned after they are emptied.
-            </p>
-          </div>
-        
-          <Link className="button button-primary" href="/book">
-            Book Your Cleaning
-          </Link>
-        </div>
+
         <div className="grid grid-4">
           <article className="card pricing-card">
-            <span className="plan-badge">One-Time Clean</span>
+            <span className="plan-badge">
+              One-Time Clean
+            </span>
+
             <div>
               <h3>One-Time Clean</h3>
-              <p>Great for a reset, move-in, or the bin that went rogue.</p>
+              <p>
+                Great for a reset, move-in, or the bin that
+                went rogue.
+              </p>
             </div>
+
             <ul className="check-list">
               {oneTimeRows.map((row) => (
                 <li key={row.label}>
-                  <CheckCircle2 size={18} aria-hidden="true" />
+                  <CheckCircle2
+                    size={18}
+                    aria-hidden="true"
+                  />
+
                   <span>
-                    {row.label}: <strong>{row.price}</strong>
+                    {row.label}:{" "}
+                    <strong>{row.price}</strong>
                   </span>
                 </li>
               ))}
             </ul>
-            <Link className="button button-dark" href={pricingPlanLinks.one_time.href}>
+
+            <Link
+              className="button button-dark"
+              href={pricingPlanLinks.one_time.href}
+            >
               {pricingPlanLinks.one_time.label}
             </Link>
           </article>
+
           {recurringPlans.map((plan) => (
             <PricingCard
               key={plan.id}
@@ -316,6 +298,21 @@ export function PricingSection() {
               featured={plan.featured}
             />
           ))}
+        </div>
+
+        <div className="pricing-fine-print">
+          <p>
+            <strong>
+              Recurring plans include up to 2 bins.
+            </strong>{" "}
+            Extra recurring bins are typically $8–$10 each.
+          </p>
+
+          <p>
+            Card payments use secure Stripe Checkout.
+            Route timing is coordinated around your normal
+            collection day.
+          </p>
         </div>
       </div>
     </section>
