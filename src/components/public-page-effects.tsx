@@ -63,9 +63,13 @@ export function PublicPageEffects() {
     document.documentElement.classList.remove("effects-reduced-motion");
     document.documentElement.classList.add("page-effects-mounted");
 
-    const revealElements = Array.from(
-      document.querySelectorAll<HTMLElement>(effectSelector),
-    );
+    const disableScrollFade = pathname === "/book";
+    
+    const revealElements = disableScrollFade
+      ? []
+      : Array.from(
+          document.querySelectorAll<HTMLElement>(effectSelector),
+        );
 
     revealElements.forEach((element) => {
       element.classList.add("scroll-fade-item");
