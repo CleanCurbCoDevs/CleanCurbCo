@@ -1,12 +1,17 @@
 "use client";
 
 import Link from "next/link";
-import { useCallback, useMemo, useState } from "react";import {
+import {
   useCallback,
   useMemo,
   useRef,
   useState,
 } from "react";
+import {
+  CalendarCheck,
+  CheckCircle2,
+  Send,
+} from "lucide-react";
 import { useActionFeedback } from "@/components/action-feedback";
 import { SiteFeedbackNudge } from "@/components/site-feedback-nudge";
 import { TurnstileWidget } from "@/components/turnstile-widget";
