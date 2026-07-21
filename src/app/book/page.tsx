@@ -30,7 +30,7 @@ export default async function BookPage({ searchParams }: BookPageProps) {
   const params = await searchParams;
 
   return (
-    <main>
+    <main className="booking-page">
       <section className="page-hero">
         <div className="container section-header">
           <p className="section-kicker">
