@@ -475,7 +475,7 @@ h3,
   background: var(--ink);
   color: white;
   display: grid;
-  min-height: 86svh;
+  min-height: 72svh;
   overflow: hidden;
   position: relative;
 }
@@ -497,12 +497,12 @@ h3,
 
 .hero-content {
   display: grid;
-  gap: 18px;
+  gap: 16px;
   justify-items: center;
   margin: 0 auto;
-  max-width: 760px;
-  padding-bottom: 76px;
-  padding-top: 76px;
+  max-width: 680px;
+  padding-bottom: 64px;
+  padding-top: 64px;
   position: relative;
   text-align: center;
   z-index: 2;
