@@ -40,30 +40,16 @@ export default function Home() {
         <div className="hero-scrim" />
 
         <div className="container hero-content">
-          <p className="section-kicker">
-            Garbage bin cleaning in Summerville
-          </p>
-        
           <h1>Your bins have seen some things.</h1>
         
           <p className="hero-subtitle">
             We clean, sanitize, and deodorize trash and recycling bins
-            right at the curb—so you don’t have to scrub them, smell
-            them, or investigate whatever is happening below the bag line.
+            right at the curb—so you don’t have to.
           </p>
         
-          <p className="offer-badge">
-            Recurring service starts at $25 for up to 2 bins.
+          <p className="trust-line">
+            Starting at $25 • Local and veteran-owned
           </p>
-        
-          <div
-            className="hero-chip-list"
-            aria-label="Service highlights"
-          >
-            <span>No need to be home</span>
-            <span>Completion photos included</span>
-            <span>Local and veteran-owned</span>
-          </div>
         
           <div className="hero-actions">
             <Link className="button button-primary" href="/book">
@@ -78,7 +64,7 @@ export default function Home() {
           </div>
         
           <p className="hero-note">
-            Tell us your normal collection day. We’ll coordinate the rest.
+            No need to be home. Completion photos included.
           </p>
         </div>
       </section>
