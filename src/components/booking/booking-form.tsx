@@ -3,6 +3,7 @@
 import Link from "next/link";
 import {
   useCallback,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -467,12 +468,14 @@ export function BookingForm({
             First things first
           </p>
         
-          <h2>Where are we cleaning?</h2>
-        
-          <p className="muted">
-            A few details now means less back-and-forth later.
-            Give us the basics once, and we’ll handle the gross part.
-          </p>
+          <div className="booking-section-heading">
+            <h2>Where are we cleaning?</h2>
+          
+            <InfoTip label="Why we need these details">
+              A few details now means less back-and-forth later.
+              Give us the basics once, and we’ll handle the gross part.
+            </InfoTip>
+          </div>
         
           <div className="form-grid">
             <TextField
@@ -567,16 +570,30 @@ export function BookingForm({
           </div>
         </section>
 
-        <section className="form-section">
+        <section className="form-section service-selection-section">
           <h2>Service Selection</h2>
-
-          <div className="form-grid">
-            <label className="field">
-              <span>Number of bins</span>
+        
+          <div className="form-grid service-selection-fields">
+            <div className="field">
+              <div className="field-label-row">
+                <label htmlFor="booking-bin-count">
+                  Number of bins
+                </label>
+        
+                <InfoTip label="About bin pricing">
+                  Each additional bin adds $10. For more than 10
+                  bins, contact us for a custom quote.
+                </InfoTip>
+              </div>
+        
               <select
+                id="booking-bin-count"
                 value={form.service.binCount}
                 onChange={(event) =>
-                  updateService("binCount", Number(event.target.value))
+                  updateService(
+                    "binCount",
+                    Number(event.target.value),
+                  )
                 }
               >
                 <option value={1}>1</option>
@@ -590,16 +607,11 @@ export function BookingForm({
                 <option value={9}>9</option>
                 <option value={10}>10</option>
               </select>
-              
-              <small>
-                Each additional bin adds $10. For more than 10 bins, contact us for a
-                custom quote.
-              </small>
-              
-            </label>
-
+            </div>
+        
             <label className="field">
               <span>Frequency</span>
+        
               <select
                 value={form.service.frequency}
                 onChange={(event) =>
@@ -611,62 +623,83 @@ export function BookingForm({
               >
                 <option value="one_time">One-time</option>
                 <option value="monthly">Monthly</option>
-                <option value="every_other_month">Every other month</option>
+                <option value="every_other_month">
+                  Every other month
+                </option>
                 <option value="quarterly">Quarterly</option>
               </select>
             </label>
           </div>
-
-          <div>
+        
+          <div className="booking-option-group">
             <p className="option-label">Bin types</p>
-            <div className="choice-grid">
+        
+            <div className="choice-grid bin-type-grid">
               {binTypes.map((type) => (
                 <label className="choice-card" key={type}>
                   <input
                     type="checkbox"
                     checked={form.service.binTypes.includes(type)}
                     onChange={(event) =>
-                      toggleArrayValue("binTypes", type, event.target.checked)
+                      toggleArrayValue(
+                        "binTypes",
+                        type,
+                        event.target.checked,
+                      )
                     }
                   />
+        
                   <span>{type}</span>
                 </label>
               ))}
             </div>
           </div>
-
+        
           <details className="booking-optional-details">
             <summary>
               <span>Add something extra</span>
-          
+        
               <small>
                 {form.service.addOns.length
                   ? `${form.service.addOns.length} selected`
                   : "Optional"}
               </small>
             </summary>
-          
+        
             <div className="booking-optional-content">
               <div className="choice-grid">
                 {addOns.map((addOn) => (
-                  <label className="choice-card" key={addOn.id}>
-                    <input
-                      type="checkbox"
-                      checked={form.service.addOns.includes(addOn.id)}
-                      onChange={(event) =>
-                        toggleArrayValue(
-                          "addOns",
+                  <div
+                    className="choice-card choice-card-with-info"
+                    key={addOn.id}
+                  >
+                    <label className="choice-card-control">
+                      <input
+                        type="checkbox"
+                        checked={form.service.addOns.includes(
                           addOn.id,
-                          event.target.checked,
-                        )
-                      }
-                    />
-          
-                    <span>
-                      {addOn.name} | {addOn.price}
-                      <small>{addOn.description}</small>
-                    </span>
-                  </label>
+                        )}
+                        onChange={(event) =>
+                          toggleArrayValue(
+                            "addOns",
+                            addOn.id,
+                            event.target.checked,
+                          )
+                        }
+                      />
+        
+                      <span>
+                        {addOn.name} | {addOn.price}
+                      </span>
+                    </label>
+        
+                    <InfoTip
+                      align="right"
+                      label={`About ${addOn.name}`}
+                    >
+                      {addOn.description}
+                    </InfoTip>
+                  </div>
                 ))}
               </div>
             </div>
@@ -674,22 +707,25 @@ export function BookingForm({
         </section>
 
         <section className="form-section scheduling-section">
-          <h2>Scheduling</h2>
+          <div className="booking-section-heading">
+            <h2>Scheduling</h2>
         
-          <p className="muted">
-            Tell us when your bins are normally emptied. We use that
-            information to schedule your cleaning as soon after collection as
-            practical.
-          </p>
+            <InfoTip label="How route scheduling works">
+              Tell us when your bins are normally emptied. We use
+              that information to schedule your cleaning as soon
+              after collection as practical.
+            </InfoTip>
+          </div>
         
           <div className="scheduling-fields">
-            <label className="field">
-              <span>
+            <div className="field">
+              <label htmlFor="booking-collection-day">
                 Regular collection day
                 <span className="required-mark"> *</span>
-              </span>
+              </label>
         
               <select
+                id="booking-collection-day"
                 value={form.scheduling.collectionDay}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -718,15 +754,26 @@ export function BookingForm({
                 </option>
                 <option value="not_sure">I’m not sure</option>
               </select>
-            </label>
+            </div>
         
-            <label className="field">
-              <span>
-                Typical collection time
-                <span className="required-mark"> *</span>
-              </span>
+            <div className="field">
+              <div className="field-label-row">
+                <label htmlFor="booking-collection-time">
+                  Typical collection time
+                  <span className="required-mark"> *</span>
+                </label>
+        
+                <InfoTip
+                  align="right"
+                  label="About collection times"
+                >
+                  An estimate is completely fine. Collection
+                  schedules sometimes change.
+                </InfoTip>
+              </div>
         
               <select
+                id="booking-collection-time"
                 value={form.scheduling.collectionTimeWindow}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -734,7 +781,8 @@ export function BookingForm({
                     scheduling: {
                       ...current.scheduling,
                       collectionTimeWindow:
-                        event.target.value as CollectionTimeWindow | "",
+                        event.target
+                          .value as CollectionTimeWindow | "",
                     },
                   }))
                 }
@@ -756,17 +804,22 @@ export function BookingForm({
                 <option value="varies">The time varies</option>
                 <option value="not_sure">I’m not sure</option>
               </select>
+            </div>
         
-              <small>
-                An estimate is completely fine. Collection schedules sometimes
-                change.
-              </small>
-            </label>
+            <div className="field scheduling-preference-field">
+              <div className="field-label-row">
+                <label htmlFor="booking-cleaning-timing">
+                  Preferred cleaning timing
+                </label>
         
-            <label className="field scheduling-preference-field">
-              <span>Preferred cleaning timing</span>
+                <InfoTip label="About cleaning timing">
+                  Same-day service happens only after the normal
+                  collection window has ended.
+                </InfoTip>
+              </div>
         
               <select
+                id="booking-cleaning-timing"
                 value={form.scheduling.sameDayPreference}
                 onChange={(event) =>
                   setForm((current) => ({
@@ -785,14 +838,11 @@ export function BookingForm({
                 <option value="next_day_preferred">
                   The following day
                 </option>
-                <option value="no_preference">No preference</option>
+                <option value="no_preference">
+                  No preference
+                </option>
               </select>
-        
-              <small>
-                Same-day service happens only after the normal collection window
-                has ended.
-              </small>
-            </label>
+            </div>
           </div>
         
           <div className="choice-grid scheduling-choice-grid">
@@ -800,44 +850,57 @@ export function BookingForm({
               {
                 value: "next_available_route_day",
                 title: "Use my regular collection schedule",
-                note: "Recommended — we’ll place you on the best available route after your bins are emptied.",
+                note:
+                  "Recommended — we’ll place you on the best available route after your bins are emptied.",
               },
               {
                 value: "specific_day",
                 title: "I need a specific date",
-                note: "We’ll review route availability before confirming.",
+                note:
+                  "We’ll review route availability before confirming.",
               },
               {
                 value: "urgent",
                 title: "One-time urgent cleaning",
-                note: "Subject to route availability and possible additional cost.",
+                note:
+                  "Subject to route availability and possible additional cost.",
               },
             ].map((option) => (
-              <label className="choice-card" key={option.value}>
-                <input
-                  type="radio"
-                  name="schedulingPreference"
-                  value={option.value}
-                  checked={
-                    form.scheduling.preference === option.value
-                  }
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      scheduling: {
-                        ...current.scheduling,
-                        preference:
-                          event.target
-                            .value as SchedulingPreference,
-                      },
-                    }))
-                  }
-                />
-                <span>
-                  {option.title}
-                  <small>{option.note}</small>
-                </span>
-              </label>
+              <div
+                className="choice-card choice-card-with-info"
+                key={option.value}
+              >
+                <label className="choice-card-control">
+                  <input
+                    type="radio"
+                    name="schedulingPreference"
+                    value={option.value}
+                    checked={
+                      form.scheduling.preference === option.value
+                    }
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        scheduling: {
+                          ...current.scheduling,
+                          preference:
+                            event.target
+                              .value as SchedulingPreference,
+                        },
+                      }))
+                    }
+                  />
+        
+                  <span>{option.title}</span>
+                </label>
+        
+                <InfoTip
+                  align="right"
+                  label={`About ${option.title}`}
+                >
+                  {option.note}
+                </InfoTip>
+              </div>
             ))}
           </div>
         
@@ -941,15 +1004,18 @@ export function BookingForm({
           </details>
         </section>
 
-        <section className="form-section">
-          <h2>Payment Method</h2>
+        <section className="form-section payment-section">
+          <div className="booking-section-heading">
+            <h2>Payment Method</h2>
         
-          <p className="muted">
-            Card payment is handled through secure Stripe Checkout after your booking
-            details are saved. Venmo Business, Zelle, and pay-in-person selections
-            require manual confirmation and are not considered paid until payment is
-            received and verified.
-          </p>
+            <InfoTip label="How payment works">
+              Card payment is handled through secure Stripe
+              Checkout after your booking details are saved.
+              Venmo Business, Zelle, and pay-in-person selections
+              require manual confirmation and are not considered
+              paid until payment is received and verified.
+            </InfoTip>
+          </div>
         
           <div className="choice-grid">
             {[
@@ -978,48 +1044,40 @@ export function BookingForm({
                   "Payment must be collected and recorded during the service visit before the stop is completed.",
               },
             ].map((option) => (
-              <label className="choice-card" key={option.value}>
-                <input
-                  type="radio"
-                  name="paymentPreference"
-                  value={option.value}
-                  checked={form.payment.preference === option.value}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      payment: {
-                        preference:
-                          event.target.value as CustomerPaymentPreference,
-                      },
-                    }))
-                  }
-                />
-        
-                <span>
-                  {option.title}
-                  <small>{option.note}</small>
-                </span>
-              </label>
+              <div
+                className="choice-card choice-card-with-info"
+                key={option.value}
+              >
+                <label className="choice-card-control">
+                  <input
+                    type="radio"
+                    name="paymentPreference"
+                    value={option.value}
+                    checked={form.payment.preference === option.value}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        payment: {
+                          preference:
+                            event.target
+                              .value as CustomerPaymentPreference,
+                        },
+                      }))
+                    }
+                  />
+              
+                  <span>{option.title}</span>
+                </label>
+              
+                <InfoTip
+                  align="right"
+                  label={`About ${option.title}`}
+                >
+                  {option.note}
+                </InfoTip>
+              </div>
             ))}
           </div>
-        
-          {form.payment.preference === "stripe" ? (
-            <p className="muted">
-              Your estimated booking total will be collected through secure Stripe
-              Checkout. Starting-at add-ons or additional work will not be added
-              without your approval.
-            </p>
-          ) : form.payment.preference === "cash_in_person" ? (
-            <p className="muted">
-              Your field technician will receive a payment-due alert and must record
-              the service amount and any optional tip separately.
-            </p>
-          ) : (
-            <p className="muted">
-              Your booking will remain unpaid until the external payment is received
-              and manually verified by Clean Curb Co.
-            </p>
-          )}
         </section>
         
         <section className="form-section">
@@ -1107,12 +1165,17 @@ export function BookingForm({
             />
           )}
 
+        <div className="submit-button-row">
           <button
             className="button button-dark"
             type="submit"
-            disabled={isSubmitting || (!turnstileDisabled && !turnstileToken)}
+            disabled={
+              isSubmitting ||
+              (!turnstileDisabled && !turnstileToken)
+            }
           >
             <Send size={20} aria-hidden="true" />
+        
             {isSubmitting
               ? form.payment.preference === "stripe"
                 ? "Opening Secure Checkout..."
@@ -1121,12 +1184,16 @@ export function BookingForm({
                 ? "Continue to Secure Checkout"
                 : "Submit My Booking"}
           </button>
-
-          <p className="muted">
-            Your requested service date remains subject to route availability. Your
-            selected payment preference and required acknowledgments will be saved with
-            your booking.
-          </p>
+        
+          <InfoTip
+            align="right"
+            label="About submitting your booking"
+          >
+            Your requested service date remains subject to route
+            availability. Your selected payment preference and
+            required acknowledgments will be saved with your
+            booking.
+          </InfoTip>
         </div>
       </form>
 
@@ -1218,6 +1285,105 @@ export function BookingForm({
         </p>
       </aside>
     </div>
+  );
+}
+
+function InfoTip({
+  label,
+  children,
+  align = "left",
+}: {
+  label: string;
+  children: React.ReactNode;
+  align?: "left" | "right";
+}) {
+  const rootRef = useRef<HTMLSpanElement>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
+  const [isPinned, setIsPinned] = useState(false);
+
+  useEffect(() => {
+    if (!isPinned) {
+      return;
+    }
+
+    function handleOutsideClick(event: PointerEvent) {
+      const target = event.target as Node;
+
+      if (!rootRef.current?.contains(target)) {
+        setIsPinned(false);
+      }
+    }
+
+    function handleEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setIsPinned(false);
+      }
+    }
+
+    document.addEventListener("pointerdown", handleOutsideClick);
+    document.addEventListener("keydown", handleEscape);
+
+    return () => {
+      document.removeEventListener(
+        "pointerdown",
+        handleOutsideClick,
+      );
+      document.removeEventListener("keydown", handleEscape);
+    };
+  }, [isPinned]);
+
+  const isVisible = isPreviewing || isPinned;
+
+  return (
+    <span
+      ref={rootRef}
+      className={[
+        "booking-info-tip",
+        `booking-info-tip-${align}`,
+        isPinned ? "is-pinned" : "",
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      onMouseEnter={() => setIsPreviewing(true)}
+      onMouseLeave={() => setIsPreviewing(false)}
+      onFocusCapture={() => setIsPreviewing(true)}
+      onBlurCapture={(event) => {
+        const nextTarget = event.relatedTarget as Node | null;
+
+        if (
+          !nextTarget ||
+          !event.currentTarget.contains(nextTarget)
+        ) {
+          setIsPreviewing(false);
+        }
+      }}
+    >
+      <button
+        type="button"
+        className="booking-info-button"
+        aria-expanded={isPinned}
+        aria-label={label}
+        onClick={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          setIsPinned((current) => !current);
+        }}
+      >
+        ?
+      </button>
+
+      <span
+        className={[
+          "booking-info-popover",
+          isVisible ? "is-visible" : "",
+        ]
+          .filter(Boolean)
+          .join(" ")}
+        role="tooltip"
+      >
+        {children}
+      </span>
+    </span>
   );
 }
 
