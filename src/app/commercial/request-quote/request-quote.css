@@ -1,0 +1,471 @@
+.commercial-quote-page {
+  background: var(--cream);
+}
+
+.commercial-quote-hero {
+  background:
+    radial-gradient(
+      circle at 86% 20%,
+      rgba(138, 0, 196, 0.34),
+      transparent 28%
+    ),
+    radial-gradient(
+      circle at 10% 100%,
+      rgba(0, 255, 56, 0.12),
+      transparent 30%
+    ),
+    linear-gradient(135deg, #050505, #111111 62%, #1d1024);
+  color: white;
+  padding: clamp(64px, 9vw, 110px) 0;
+}
+
+.commercial-quote-hero-grid {
+  align-items: center;
+  display: grid;
+  gap: clamp(34px, 7vw, 80px);
+  grid-template-columns: 1fr;
+}
+
+.commercial-quote-hero-copy {
+  display: grid;
+  gap: 18px;
+}
+
+.commercial-back-link {
+  align-items: center;
+  color: rgba(255, 255, 255, 0.76);
+  display: inline-flex;
+  font-size: 0.92rem;
+  font-weight: 900;
+  gap: 8px;
+  justify-self: start;
+}
+
+.commercial-back-link:hover {
+  color: var(--lime);
+}
+
+.commercial-quote-eyebrow {
+  color: var(--lime);
+  font-size: 0.78rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  margin: 8px 0 0;
+  text-transform: uppercase;
+}
+
+.commercial-quote-hero h1 {
+  color: white;
+  font-size: clamp(3rem, 8vw, 6rem);
+  font-weight: 1000;
+  letter-spacing: -0.055em;
+  line-height: 0.92;
+  margin: 0;
+  max-width: 850px;
+}
+
+.commercial-quote-hero-copy > p:last-child {
+  color: rgba(255, 255, 255, 0.78);
+  font-size: clamp(1.05rem, 2vw, 1.25rem);
+  line-height: 1.62;
+  margin: 0;
+  max-width: 720px;
+}
+
+.commercial-quote-hero-card {
+  background: rgba(255, 255, 255, 0.075);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-left: 6px solid var(--gold);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 26px 70px rgba(0, 0, 0, 0.32);
+  padding: clamp(23px, 5vw, 34px);
+}
+
+.commercial-quote-hero-card h2 {
+  color: white;
+  font-size: 1.65rem;
+  font-weight: 1000;
+  margin: 0 0 20px;
+}
+
+.commercial-quote-hero-card ul {
+  display: grid;
+  gap: 18px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commercial-quote-hero-card li {
+  align-items: flex-start;
+  display: flex;
+  gap: 13px;
+}
+
+.commercial-quote-hero-card li > svg {
+  color: var(--lime);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.commercial-quote-hero-card li span {
+  color: rgba(255, 255, 255, 0.72);
+  display: grid;
+  gap: 3px;
+  line-height: 1.48;
+}
+
+.commercial-quote-hero-card strong {
+  color: white;
+}
+
+.commercial-quote-form-section {
+  padding: clamp(54px, 8vw, 96px) 0;
+}
+
+.commercial-quote-shell {
+  display: grid;
+  gap: 30px;
+  margin: 0 auto;
+  max-width: 1050px;
+}
+
+.commercial-form-heading {
+  display: grid;
+  gap: 13px;
+  max-width: 800px;
+}
+
+.commercial-form-heading .section-kicker {
+  margin: 0;
+}
+
+.commercial-form-heading h2 {
+  font-size: clamp(2rem, 5vw, 3.7rem);
+  font-weight: 1000;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0;
+}
+
+.commercial-form-heading > p:last-child {
+  color: var(--muted);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.commercial-quote-form {
+  display: grid;
+  gap: 22px;
+}
+
+.commercial-form-group {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 18px 46px rgba(5, 5, 5, 0.07);
+  display: grid;
+  gap: 22px;
+  margin: 0;
+  min-width: 0;
+  padding: clamp(20px, 4vw, 32px);
+}
+
+.commercial-form-group legend {
+  align-items: center;
+  display: flex;
+  gap: 13px;
+  padding: 0 10px 0 0;
+}
+
+.commercial-form-group legend > span:last-child {
+  display: grid;
+  font-size: 1.25rem;
+  font-weight: 1000;
+  gap: 2px;
+}
+
+.commercial-form-group legend small {
+  color: var(--purple);
+  font-size: 0.7rem;
+  font-weight: 1000;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.commercial-group-icon {
+  align-items: center;
+  background: var(--ink);
+  border: 2px solid var(--gold);
+  border-radius: var(--radius);
+  color: var(--lime);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.commercial-group-help {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: -4px 0 0;
+}
+
+.commercial-form-grid {
+  display: grid;
+  gap: 17px;
+  grid-template-columns: 1fr;
+}
+
+.commercial-field {
+  display: grid;
+  gap: 7px;
+  min-width: 0;
+}
+
+.commercial-field > span {
+  color: var(--ink);
+  font-size: 0.9rem;
+  font-weight: 900;
+}
+
+.commercial-field input,
+.commercial-field select,
+.commercial-field textarea {
+  background: #fbfbf8;
+  border: 1px solid rgba(17, 17, 17, 0.2);
+  border-radius: var(--radius);
+  color: var(--ink);
+  min-height: 48px;
+  outline: none;
+  padding: 11px 12px;
+  transition:
+    border-color 150ms ease,
+    box-shadow 150ms ease,
+    background 150ms ease;
+  width: 100%;
+}
+
+.commercial-field textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.commercial-field .commercial-description-field {
+  min-height: 170px;
+}
+
+.commercial-field input:focus,
+.commercial-field select:focus,
+.commercial-field textarea:focus {
+  background: white;
+  border-color: var(--purple);
+  box-shadow: 0 0 0 3px rgba(138, 0, 196, 0.11);
+}
+
+.commercial-field select:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.commercial-service-options {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: 1fr;
+}
+
+.commercial-check-card {
+  align-items: center;
+  background: #fbfbf8;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  gap: 11px;
+  min-height: 54px;
+  padding: 12px 14px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.commercial-check-card:hover {
+  border-color: rgba(138, 0, 196, 0.35);
+  transform: translateY(-1px);
+}
+
+.commercial-check-card:has(input:checked) {
+  background: rgba(0, 255, 56, 0.09);
+  border-color: rgba(0, 180, 40, 0.42);
+}
+
+.commercial-check-card input,
+.commercial-acknowledgment input {
+  accent-color: var(--purple);
+  flex: 0 0 auto;
+  height: 19px;
+  width: 19px;
+}
+
+.commercial-check-card span {
+  font-weight: 900;
+  line-height: 1.35;
+}
+
+.commercial-service-detail-grid {
+  border-top: 1px solid var(--line);
+  padding-top: 22px;
+}
+
+.commercial-acknowledgment {
+  align-items: flex-start;
+  background: #f7e6aa;
+  border: 1px solid rgba(215, 169, 40, 0.65);
+  border-radius: var(--radius);
+  cursor: pointer;
+  display: flex;
+  gap: 12px;
+  line-height: 1.5;
+  padding: 16px;
+}
+
+.commercial-acknowledgment input {
+  margin-top: 3px;
+}
+
+.commercial-acknowledgment span {
+  display: grid;
+  gap: 3px;
+}
+
+.commercial-submit-panel {
+  background:
+    radial-gradient(
+      circle at top right,
+      rgba(138, 0, 196, 0.28),
+      transparent 32%
+    ),
+    var(--ink);
+  border: 3px solid var(--gold);
+  border-radius: var(--radius-lg);
+  color: white;
+  display: grid;
+  gap: 18px;
+  padding: clamp(22px, 5vw, 32px);
+}
+
+.commercial-submit-panel h3 {
+  color: white;
+  font-size: 1.55rem;
+  font-weight: 1000;
+  margin: 0 0 5px;
+}
+
+.commercial-submit-panel p {
+  color: rgba(255, 255, 255, 0.72);
+  line-height: 1.5;
+  margin: 0;
+}
+
+.commercial-submit-panel .turnstile-panel {
+  background: rgba(255, 255, 255, 0.07);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.commercial-submit-panel .turnstile-panel .muted {
+  color: rgba(255, 255, 255, 0.72);
+}
+
+.commercial-submit-button {
+  justify-self: start;
+}
+
+.commercial-form-error {
+  background: rgba(225, 52, 47, 0.16);
+  border: 1px solid rgba(225, 52, 47, 0.5);
+  border-radius: var(--radius);
+  color: #ffd5d3 !important;
+  font-weight: 850;
+  padding: 13px;
+}
+
+.commercial-quote-confirmation {
+  background: white;
+  border: 3px solid var(--gold);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+  display: grid;
+  gap: 15px;
+  margin: 0 auto;
+  max-width: 820px;
+  padding: clamp(28px, 6vw, 48px);
+  text-align: center;
+}
+
+.commercial-quote-confirmation > svg {
+  color: var(--purple);
+  margin: 0 auto;
+}
+
+.commercial-quote-confirmation .section-kicker {
+  margin: 0;
+}
+
+.commercial-quote-confirmation h2 {
+  font-size: clamp(2rem, 6vw, 3.5rem);
+  font-weight: 1000;
+  letter-spacing: -0.04em;
+  line-height: 1;
+  margin: 0;
+}
+
+.commercial-quote-confirmation > p {
+  color: var(--muted);
+  line-height: 1.62;
+  margin: 0;
+}
+
+.commercial-confirmation-note {
+  background: #f7e6aa;
+  border-radius: var(--radius);
+  display: grid;
+  gap: 4px;
+  line-height: 1.5;
+  padding: 16px;
+}
+
+.commercial-request-id {
+  font-family: var(--font-geist-mono), ui-monospace, monospace;
+  font-size: 0.88rem;
+}
+
+.required-mark {
+  color: var(--red);
+}
+
+@media (min-width: 640px) {
+  .commercial-form-grid,
+  .commercial-service-options {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .commercial-field-wide {
+    grid-column: 1 / -1;
+  }
+}
+
+@media (min-width: 900px) {
+  .commercial-quote-hero-grid {
+    grid-template-columns:
+      minmax(0, 1.25fr)
+      minmax(340px, 0.75fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .commercial-submit-button {
+    width: 100%;
+  }
+}
