@@ -20,8 +20,7 @@ export default function ContactPage() {
           <p className="section-kicker">Contact</p>
           <h1>Questions, route requests, or waitlist notes?</h1>
           <p>
-            Send a note and we will follow up. The company that communicates
-            has to start somewhere.
+            Send a note and we’ll follow up. Weird bin situations included.
           </p>
         </div>
       </section>
@@ -42,8 +41,8 @@ export default function ContactPage() {
 
           <article className="contact-choice-card">
             <MapPin size={24} aria-hidden="true" />
-            <p className="section-kicker">Route / waitlist question?</p>
-            <h2>Not sure whether you fit the route?</h2>
+            <p className="section-kicker">Route question?</p>
+            <h2>Not sure whether your address fits the route?</h2>
             <p>
               Send your neighborhood, general location, and what you need cleaned.
               We will let you know whether it fits the current route plan.
