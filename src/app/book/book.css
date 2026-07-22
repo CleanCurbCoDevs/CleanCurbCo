@@ -1,173 +1,124 @@
-  .booking-route-confirmation {
-    align-items: flex-start;
-    background: rgba(0, 255, 0, 0.12);
-    border: 1px solid rgba(0, 150, 0, 0.2);
-    border-radius: var(--radius);
-    color: var(--ink);
-    display: flex;
-    gap: 10px;
-    min-width: 0;
-    padding: 14px;
-  }
-  
-  .booking-route-confirmation svg {
-    color: #178000;
-    flex: 0 0 auto;
-    margin-top: 1px;
-  }
-  
-  .booking-route-confirmation p {
-    font-weight: 850;
-    line-height: 1.45;
-    margin: 0;
-  }
-  
-  .booking-shell {
-    display: grid;
-    gap: 24px;
-  }
-  
-  .booking-optional-details {
-    background: #fbfbf8;
-    border: 1px solid rgba(17, 17, 17, 0.14);
-    border-radius: var(--radius);
-    grid-column: 1 / -1;
-    min-width: 0;
-    overflow: hidden;
-  }
-  
-  .booking-optional-details[open] {
-    border-color: rgba(138, 0, 196, 0.28);
-  }
-  
-  .booking-optional-details summary {
-    align-items: center;
-    cursor: pointer;
-    display: flex;
-    gap: 14px;
-    justify-content: space-between;
-    list-style: none;
-    min-height: 50px;
-    padding: 12px 14px;
-  }
-  
-  .booking-optional-details summary::-webkit-details-marker {
-    display: none;
-  }
-  
-  .booking-optional-details summary span {
-    color: var(--ink);
-    font-weight: 950;
-  }
-  
-  .booking-optional-details summary small {
-    color: var(--purple);
-    flex: 0 0 auto;
-    font-size: 0.82rem;
-    font-weight: 900;
-  }
-  
-  .booking-optional-content {
-    border-top: 1px solid var(--line);
-    display: grid;
-    gap: 12px;
-    padding: 14px;
-  }
-  
-  .booking-mobile-summary {
-    align-items: center;
-    background: var(--ink);
-    border: 2px solid var(--gold);
-    border-radius: var(--radius);
-    color: white;
-    display: flex;
-    gap: 16px;
-    justify-content: space-between;
-    padding: 14px 16px;
-  }
-  
-  .booking-mobile-summary div {
-    display: grid;
-    gap: 2px;
-  }
-  
-  .booking-mobile-summary span {
-    color: rgba(255, 255, 255, 0.72);
-    font-size: 0.82rem;
-    font-weight: 900;
-    text-transform: uppercase;
-  }
-  
-  .booking-mobile-summary strong {
-    color: var(--lime);
-    font-size: 1.8rem;
-    font-weight: 1000;
-  }
-  
-  .booking-mobile-summary p {
-    color: rgba(255, 255, 255, 0.82);
-    font-size: 0.92rem;
-    font-weight: 850;
-    margin: 0;
-    text-align: right;
-  }
-  
-  .booking-form {
-    display: grid;
-    gap: 18px;
-    scroll-margin-top: 110px;
-  }
-  
-  .booking-launch-grid {
-    display: grid;
-    gap: 16px;
-    margin: 0 0 24px;
-  }
-  
-  .choice-fieldset,
-  .booking-choice-group {
-    border: 0;
-    margin: 0;
-    max-width: 100%;
-    min-inline-size: 0;
-    min-width: 0;
-    padding: 0;
-  }
-  
-  .choice-fieldset legend,
-  .booking-choice-group legend {
-    font-size: 0.92rem;
-    font-weight: 900;
-    margin: 0 0 7px;
-    padding: 0;
-  }
-  
-  .booking-choice-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .booking-choice-card span {
-    overflow-wrap: break-word;
-  }
-  
-  
-  .booking-choice-grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .billing-note-grid,
-  .booking-launch-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
-  
-  
-  .booking-shell {
-    grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.7fr);
-  }
-  
-  .booking-mobile-summary {
-    display: none;
-  }
+/* =========================================================
+   Public booking page foundations
+   ========================================================= */
+
+.booking-page .booking-route-confirmation {
+  align-items: flex-start;
+  background: rgba(0, 255, 0, 0.12);
+  border: 1px solid rgba(0, 150, 0, 0.2);
+  border-radius: var(--radius);
+  color: var(--ink);
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+  padding: 14px;
+}
+
+.booking-page .booking-route-confirmation svg {
+  color: #178000;
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.booking-page .booking-route-confirmation p {
+  font-weight: 850;
+  line-height: 1.45;
+  margin: 0;
+}
+
+.booking-page .booking-shell {
+  display: grid;
+}
+
+.booking-page .booking-form {
+  display: grid;
+  scroll-margin-top: 110px;
+}
+
+.booking-page .booking-launch-grid {
+  display: grid;
+  gap: 16px;
+}
+
+.booking-page .booking-optional-details {
+  border: 1px solid rgba(17, 17, 17, 0.14);
+  grid-column: 1 / -1;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.booking-page .booking-optional-details[open] {
+  border-color: rgba(138, 0, 196, 0.28);
+}
+
+.booking-page .booking-optional-details summary {
+  align-items: center;
+  cursor: pointer;
+  display: flex;
+  gap: 14px;
+  justify-content: space-between;
+  list-style: none;
+}
+
+.booking-page
+  .booking-optional-details
+  summary::-webkit-details-marker {
+  display: none;
+}
+
+.booking-page .booking-optional-details summary span {
+  color: var(--ink);
+  font-weight: 950;
+}
+
+.booking-page .booking-optional-details summary small {
+  color: var(--purple);
+  flex: 0 0 auto;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.booking-page .booking-optional-content {
+  border-top: 1px solid var(--line);
+  display: grid;
+  gap: 12px;
+}
+
+.booking-page .booking-mobile-summary {
+  align-items: center;
+  background: var(--ink);
+  border: 2px solid var(--gold);
+  color: white;
+  display: flex;
+  gap: 16px;
+  justify-content: space-between;
+}
+
+.booking-page .booking-mobile-summary div {
+  display: grid;
+  gap: 2px;
+}
+
+.booking-page .booking-mobile-summary span {
+  color: rgba(255, 255, 255, 0.72);
+  font-size: 0.82rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.booking-page .booking-mobile-summary strong {
+  color: var(--lime);
+  font-size: 1.8rem;
+  font-weight: 1000;
+}
+
+.booking-page .booking-mobile-summary p {
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.92rem;
+  font-weight: 850;
+  margin: 0;
+  text-align: right;
+}
 
 /* =========================================================
    Booking page layout overhaul
