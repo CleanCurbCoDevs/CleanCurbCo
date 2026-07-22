@@ -257,21 +257,21 @@ export function BookingForm({
     });
   }
 
-function handleBookingStart() {
-  if (bookingStartedTracked.current) {
-    return;
+  function handleBookingStart() {
+    if (bookingStartedTracked.current) {
+      return;
+    }
+  
+    bookingStartedTracked.current = true;
+  
+    trackAnalyticsEvent("booking_started", {
+      service_type: "bin_cleaning",
+      service_frequency: form.service.frequency,
+      bin_count: form.service.binCount,
+      value: estimatedPrice,
+      currency: "USD",
+    });
   }
-
-  bookingStartedTracked.current = true;
-
-  trackAnalyticsEvent("booking_started", {
-    service_type: "bin_cleaning",
-    service_frequency: form.service.frequency,
-    bin_count: form.service.binCount,
-    value: estimatedPrice,
-    currency: "USD",
-  });
-}
   
   async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
