@@ -1195,7 +1195,8 @@ export function BookingForm({
             booking.
           </InfoTip>
         </div>
-      </form>
+      </div>
+    </form>
 
       <aside className="estimate-panel">
         <CalendarCheck size={30} aria-hidden="true" />
