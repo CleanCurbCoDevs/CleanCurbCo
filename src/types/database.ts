@@ -8,6 +8,17 @@ import type {
   SameDayPreference,
 } from "@/types/booking";
 
+import type {
+  CommercialDesiredFrequency,
+  CommercialPreferredContactMethod,
+  CommercialPropertyType,
+  CommercialServiceInterest,
+  CommercialServicePlan,
+  CommercialSiteCondition,
+  CommercialStartTimeframe,
+  CommercialWaterAvailability,
+} from "@/types/commercial";
+
 export type AppRole = "customer" | "technician" | "admin" | "owner";
 export type ServiceFrequency =
   | "one_time"
@@ -599,6 +610,65 @@ export type CareerApplicationRow = {
   admin_notes: string | null;
 };
 
+export type CommercialQuoteRequestStatus =
+  | "new"
+  | "reviewing"
+  | "site_visit_needed"
+  | "quoted"
+  | "won"
+  | "lost"
+  | "closed";
+
+export type CommercialQuoteRequestRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+
+  status: CommercialQuoteRequestStatus;
+
+  business_name: string;
+  contact_name: string;
+  contact_role: string | null;
+  email: string;
+  phone: string;
+  preferred_contact_method:
+    CommercialPreferredContactMethod;
+
+  property_type: CommercialPropertyType;
+  property_type_other: string | null;
+
+  street_address: string;
+  city: string;
+  state: string;
+  zip_code: string;
+  location_count: number;
+  access_restrictions: string | null;
+
+  service_interests: CommercialServiceInterest[];
+  service_other: string | null;
+  container_count: number | null;
+  container_sizes: string | null;
+  site_condition: CommercialSiteCondition;
+  water_spigot_available:
+    CommercialWaterAvailability;
+  service_plan: CommercialServicePlan;
+  desired_frequency:
+    CommercialDesiredFrequency | null;
+  collection_schedule: string | null;
+
+  desired_start_timeframe:
+    CommercialStartTimeframe;
+  project_description: string;
+  additional_notes: string | null;
+  acknowledgment_accepted: boolean;
+
+  photo_paths: string[];
+
+  source: string;
+  submission_request_id: string | null;
+  admin_notes: string | null;
+};
+
 export type ContactMessageRow = {
   id: string;
   created_at: string;
@@ -841,6 +911,35 @@ export type Database = {
         Update: Partial<ContactMessageRow>;
         Relationships: [];
       };
+
+      commercial_quote_requests: {
+        Row: CommercialQuoteRequestRow;
+        Insert: Partial<CommercialQuoteRequestRow> &
+          Pick<
+            CommercialQuoteRequestRow,
+            | "business_name"
+            | "contact_name"
+            | "email"
+            | "phone"
+            | "preferred_contact_method"
+            | "property_type"
+            | "street_address"
+            | "city"
+            | "state"
+            | "zip_code"
+            | "location_count"
+            | "service_interests"
+            | "site_condition"
+            | "water_spigot_available"
+            | "service_plan"
+            | "desired_start_timeframe"
+            | "project_description"
+            | "acknowledgment_accepted"
+          >;
+        Update: Partial<CommercialQuoteRequestRow>;
+        Relationships: [];
+      };
+    
       maintenance_waitlist: {
         Row: {
           id: string;
