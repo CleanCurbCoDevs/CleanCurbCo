@@ -1,7 +1,6 @@
 import { Camera, Droplets, Sparkles, SprayCan, Truck } from "lucide-react";
 import {
   AddOnsSection,
-  FutureServicesSection,
   HowItWorksSection,
 } from "@/components/sections/home-sections";
 import { SectionHeader } from "@/components/section-header";
@@ -10,7 +9,7 @@ import { publicPageMetadata } from "@/lib/seo";
 export const metadata = publicPageMetadata({
   title: "Services",
   description:
-    "Residential garbage bin cleaning, sanitizing, deodorizing, and supportive outdoor add-ons in Cane Bay, SC.",
+    "Residential garbage bin cleaning, sanitizing, deodorizing, and curbside service throughout Summerville, Cane Bay, Goose Creek, Moncks Corner, and nearby communities.",
   path: "/services",
 });
 
@@ -48,10 +47,11 @@ export default function ServicesPage() {
       <section className="page-hero">
         <div className="container section-header">
           <p className="section-kicker">Services</p>
-          <h1>Residential garbage bin cleaning first.</h1>
+          <h1>Residential garbage bin cleaning, done right.</h1>
           <p>
-            Cleaner, fresher trash and recycling bins for Cane Bay neighbors.
-            Simple route-day service, clear updates, and proof when the job is done.
+            Cleaner, fresher trash and recycling bins throughout the
+            Summerville area. Simple route-day service, clear updates,
+            and proof when the job is done.
           </p>
         </div>
       </section>
@@ -61,7 +61,7 @@ export default function ServicesPage() {
             kicker="Flagship service"
             title="The bin reset your garage has been quietly begging for."
           >
-            Our launch focus is residential garbage bin cleaning: sanitizing,
+            Our core residential service includes: sanitizing,
             deodorizing, grime removal, curbside convenience, and completion
             photos after service.
           </SectionHeader>
@@ -81,7 +81,6 @@ export default function ServicesPage() {
       </section>
       <HowItWorksSection />
       <AddOnsSection />
-      <FutureServicesSection />
     </main>
   );
 }
