@@ -35,6 +35,17 @@ import {
   calculateBookingEstimate,
   shouldApplyFoundingNeighborSpecial,
 } from "@/lib/pricing";
+import {
+  calculateCommercialPricing,
+} from "@/lib/commercial-pricing";
+
+import {
+  normalizeCommercialPricingInput,
+} from "@/lib/commercial-pricing-input";
+
+import {
+  commercialPricingProfileRowToValues,
+} from "@/lib/commercial-pricing-profile";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { createRequestId, logger, maskEmail, maskPhone } from "@/lib/server/logger";
@@ -43,6 +54,10 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, isValidEmail, pickEnum } from "@/lib/validation";
 import type { BookingStatus, PaymentStatus } from "@/types/booking";
+import {
+  commercialPricingModels,
+  type CommercialPricingModel,
+} from "@/types/commercial-pricing";
 import type {
   BookingRow,
   CareerApplicationStatus,
@@ -53,6 +68,7 @@ import type {
   ReferralStatus,
   RouteDayStatus,
   CommercialQuoteRequestStatus,
+  CommercialQuoteRow,
 } from "@/types/database";
 
 type AdminClient = ReturnType<typeof getSupabaseAdmin>;
@@ -1995,6 +2011,736 @@ export async function updateCommercialQuoteAdminAction(
   return actionSuccess(
     `Commercial quote marked ${humanizeStatus(status)}.`,
   );
+}
+
+export async function saveCommercialQuoteDraftAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireAdmin(
+    "/admin/commercial-quotes",
+  );
+
+  if (auth.status !== "ok") {
+    return actionFailure(
+      "Admin access is required.",
+    );
+  }
+
+  const auditRequestId =
+    createRequestId();
+
+  const commercialQuoteRequestId =
+    cleanString(
+      formData.get(
+        "commercialQuoteRequestId",
+      ),
+      80,
+    );
+
+  const commercialQuoteId =
+    cleanString(
+      formData.get(
+        "commercialQuoteId",
+      ),
+      80,
+    ) || null;
+
+  const pricingProfileId =
+    cleanString(
+      formData.get(
+        "pricingProfileId",
+      ),
+      80,
+    ) || null;
+
+  if (!commercialQuoteRequestId) {
+    return actionFailure(
+      "The commercial request ID is missing.",
+    );
+  }
+
+  const pricingModel =
+    pickEnum<CommercialPricingModel>(
+      formData.get("pricingModel"),
+      commercialPricingModels,
+      "commercial_site",
+    );
+
+  const includeRecurring =
+    formData.get(
+      "includeRecurring",
+    ) === "true";
+
+  const initialRaw =
+    parseCommercialJson(
+      formData.get(
+        "initialInputJson",
+      ),
+    );
+
+  const recurringRaw =
+    parseCommercialJson(
+      formData.get(
+        "recurringInputJson",
+      ),
+    );
+
+  const scopeSummary =
+    cleanLongText(
+      formData.get("scopeSummary"),
+      5_000,
+    );
+
+  if (!scopeSummary) {
+    return actionFailure(
+      "Add a customer-facing scope summary before saving.",
+    );
+  }
+
+  const includedServices =
+    parseCommercialLines(
+      formData.get(
+        "includedServices",
+      ),
+    );
+
+  const assumptions =
+    parseCommercialLines(
+      formData.get("assumptions"),
+    );
+
+  const exclusions =
+    parseCommercialLines(
+      formData.get("exclusions"),
+    );
+
+  const paymentTerms =
+    cleanLongText(
+      formData.get("paymentTerms"),
+      2_000,
+    ) ||
+    "Payment terms will be confirmed before service is scheduled.";
+
+  const internalNotes =
+    cleanLongText(
+      formData.get("internalNotes"),
+      5_000,
+    ) || null;
+
+  const recurringFrequency =
+    includeRecurring
+      ? cleanString(
+          formData.get(
+            "recurringFrequency",
+          ),
+          80,
+        ) || null
+      : null;
+
+  const validUntilInput =
+    cleanString(
+      formData.get("validUntil"),
+      20,
+    );
+
+  const validUntil =
+    /^\d{4}-\d{2}-\d{2}$/.test(
+      validUntilInput,
+    )
+      ? validUntilInput
+      : null;
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: commercialRequest,
+    error: requestError,
+  } = await admin
+    .from(
+      "commercial_quote_requests",
+    )
+    .select("*")
+    .eq(
+      "id",
+      commercialQuoteRequestId,
+    )
+    .maybeSingle();
+
+  if (
+    requestError ||
+    !commercialRequest
+  ) {
+    logger.warn(
+      "admin_commercial_quote_request_missing_for_draft",
+      {
+        requestId:
+          auditRequestId,
+
+        action:
+          "commercial_quote_draft_save",
+
+        metadata: {
+          commercialQuoteRequestId,
+        },
+
+        error: requestError,
+      },
+    );
+
+    return actionFailure(
+      "The commercial request could not be found.",
+    );
+  }
+
+  let pricingProfileRow:
+    Database["public"]["Tables"]["commercial_pricing_profiles"]["Row"] | null =
+    null;
+
+  if (pricingProfileId) {
+    const {
+      data: selectedProfile,
+    } = await admin
+      .from(
+        "commercial_pricing_profiles",
+      )
+      .select("*")
+      .eq("id", pricingProfileId)
+      .maybeSingle();
+
+    pricingProfileRow =
+      selectedProfile ?? null;
+  }
+
+  if (!pricingProfileRow) {
+    const {
+      data: activeProfile,
+    } = await admin
+      .from(
+        "commercial_pricing_profiles",
+      )
+      .select("*")
+      .eq("is_active", true)
+      .maybeSingle();
+
+    pricingProfileRow =
+      activeProfile ?? null;
+  }
+
+  const pricingProfile =
+    commercialPricingProfileRowToValues(
+      pricingProfileRow,
+    );
+
+  const initialInput =
+    normalizeCommercialPricingInput(
+      initialRaw,
+      pricingModel,
+      "initial",
+    );
+
+  const initialCalculation =
+    calculateCommercialPricing(
+      pricingProfile,
+      initialInput,
+    );
+
+  const recurringInput =
+    includeRecurring
+      ? normalizeCommercialPricingInput(
+          recurringRaw,
+          pricingModel,
+          "recurring",
+        )
+      : null;
+
+  const recurringCalculation =
+    recurringInput
+      ? calculateCommercialPricing(
+          pricingProfile,
+          recurringInput,
+        )
+      : null;
+
+  const finalInitialPriceCents =
+    parseCommercialCents(
+      formData.get(
+        "finalInitialPriceCents",
+      ),
+      initialCalculation
+        .suggestedPriceCents,
+    );
+
+  const finalRecurringPriceCents =
+    recurringCalculation
+      ? parseCommercialCents(
+          formData.get(
+            "finalRecurringPriceCents",
+          ),
+          recurringCalculation
+            .suggestedPriceCents,
+        )
+      : null;
+
+  let previousDraft:
+    CommercialQuoteRow | null =
+    null;
+
+  if (commercialQuoteId) {
+    const {
+      data: selectedDraft,
+    } = await admin
+      .from("commercial_quotes")
+      .select("*")
+      .eq("id", commercialQuoteId)
+      .eq(
+        "request_id",
+        commercialQuoteRequestId,
+      )
+      .eq("status", "draft")
+      .maybeSingle();
+
+    previousDraft =
+      selectedDraft ?? null;
+  }
+
+  if (!previousDraft) {
+    const {
+      data: latestDraft,
+    } = await admin
+      .from("commercial_quotes")
+      .select("*")
+      .eq(
+        "request_id",
+        commercialQuoteRequestId,
+      )
+      .eq("status", "draft")
+      .order(
+        "version_number",
+        {
+          ascending: false,
+        },
+      )
+      .limit(1)
+      .maybeSingle();
+
+    previousDraft =
+      latestDraft ?? null;
+  }
+
+  const estimatedOtherCostsCents =
+    initialCalculation
+      .mobilizationCents +
+    initialCalculation
+      .specialCostsCents +
+    initialCalculation
+      .routeAdjustmentsCents;
+
+  const estimatedContributionCents =
+    finalInitialPriceCents -
+    initialCalculation.laborCents -
+    initialCalculation.suppliesCents -
+    estimatedOtherCostsCents;
+
+  const quoteUpdate:
+    Database["public"]["Tables"]["commercial_quotes"]["Update"] =
+    {
+      pricing_profile_id:
+        pricingProfileRow?.id ??
+        null,
+
+      status: "draft",
+      pricing_model:
+        pricingModel,
+
+      currency:
+        pricingProfile.currency,
+
+      pricing_profile_snapshot:
+        toCommercialJsonRecord(
+          pricingProfile,
+        ),
+
+      calculator_input:
+        toCommercialJsonRecord({
+          initial: initialInput,
+
+          recurring:
+            recurringInput,
+        }),
+
+      calculator_output:
+        toCommercialJsonRecord({
+          initial:
+            initialCalculation,
+
+          recurring:
+            recurringCalculation,
+
+          finalInitialPriceCents,
+
+          finalRecurringPriceCents,
+        }),
+
+      estimated_person_hours:
+        initialCalculation
+          .estimatedPersonHours,
+
+      estimated_labor_cents:
+        initialCalculation
+          .laborCents,
+
+      estimated_supplies_cents:
+        initialCalculation
+          .suppliesCents,
+
+      estimated_other_costs_cents:
+        estimatedOtherCostsCents,
+
+      estimated_contribution_cents:
+        estimatedContributionCents,
+
+      suggested_initial_price_cents:
+        initialCalculation
+          .suggestedPriceCents,
+
+      final_initial_price_cents:
+        finalInitialPriceCents,
+
+      suggested_recurring_price_cents:
+        recurringCalculation
+          ?.suggestedPriceCents ??
+        null,
+
+      final_recurring_price_cents:
+        finalRecurringPriceCents,
+
+      recurring_frequency:
+        recurringFrequency,
+
+      scope_summary:
+        scopeSummary,
+
+      internal_notes:
+        internalNotes,
+
+      included_services:
+        includedServices,
+
+      assumptions,
+      exclusions,
+
+      payment_terms:
+        paymentTerms,
+
+      valid_until:
+        validUntil,
+
+      updated_by_user_id:
+        auth.userId,
+    };
+
+  let savedQuote:
+    CommercialQuoteRow | null =
+    null;
+
+  let saveError:
+    unknown = null;
+
+  if (previousDraft) {
+    const result = await admin
+      .from("commercial_quotes")
+      .update(quoteUpdate)
+      .eq(
+        "id",
+        previousDraft.id,
+      )
+      .select("*")
+      .single();
+
+    savedQuote =
+      result.data ?? null;
+
+    saveError =
+      result.error;
+  } else {
+    const insertPayload:
+      Database["public"]["Tables"]["commercial_quotes"]["Insert"] =
+      {
+        request_id:
+          commercialQuoteRequestId,
+
+        pricing_model:
+          pricingModel,
+
+        ...quoteUpdate,
+
+        created_by_user_id:
+          auth.userId,
+      };
+
+    const result = await admin
+      .from("commercial_quotes")
+      .insert(insertPayload)
+      .select("*")
+      .single();
+
+    savedQuote =
+      result.data ?? null;
+
+    saveError =
+      result.error;
+  }
+
+  if (
+    saveError ||
+    !savedQuote
+  ) {
+    logger.error(
+      "admin_commercial_quote_draft_save_failed",
+      {
+        requestId:
+          auditRequestId,
+
+        action:
+          "commercial_quote_draft_save",
+
+        userId: auth.userId,
+        role: auth.profile.role,
+
+        metadata: {
+          commercialQuoteRequestId,
+          commercialQuoteId,
+          pricingModel,
+        },
+
+        error: saveError,
+      },
+    );
+
+    return actionFailure(
+      "The commercial quote draft could not be saved.",
+    );
+  }
+
+  if (
+    commercialRequest.status ===
+    "new"
+  ) {
+    await admin
+      .from(
+        "commercial_quote_requests",
+      )
+      .update({
+        status: "reviewing",
+      })
+      .eq(
+        "id",
+        commercialRequest.id,
+      );
+  }
+
+  await writeAdminAuditLog({
+    action:
+      previousDraft
+        ? "commercial_quote_draft_updated"
+        : "commercial_quote_draft_created",
+
+    actor_user_id:
+      auth.userId,
+
+    actor_email:
+      actorEmail(auth),
+
+    actor_role:
+      auth.profile.role,
+
+    target_type:
+      "commercial_quote",
+
+    target_id:
+      savedQuote.id,
+
+    customer_id: null,
+    booking_id: null,
+
+    before_summary:
+      previousDraft
+        ? {
+            versionNumber:
+              previousDraft
+                .version_number,
+
+            pricingModel:
+              previousDraft
+                .pricing_model,
+
+            initialPrice:
+              previousDraft
+                .final_initial_price_cents,
+
+            recurringPrice:
+              previousDraft
+                .final_recurring_price_cents,
+          }
+        : {},
+
+    after_summary: {
+      versionNumber:
+        savedQuote.version_number,
+
+      pricingModel:
+        savedQuote.pricing_model,
+
+      initialPrice:
+        savedQuote
+          .final_initial_price_cents,
+
+      recurringPrice:
+        savedQuote
+          .final_recurring_price_cents,
+
+      estimatedPersonHours:
+        savedQuote
+          .estimated_person_hours,
+
+      estimatedContribution:
+        savedQuote
+          .estimated_contribution_cents,
+    },
+
+    note: internalNotes,
+
+    request_id:
+      auditRequestId,
+
+    status: "success",
+
+    metadata: {
+      commercialQuoteRequestId,
+      businessName:
+        commercialRequest
+          .business_name,
+    },
+  });
+
+  logger.info(
+    "admin_commercial_quote_draft_saved",
+    {
+      requestId:
+        auditRequestId,
+
+      action:
+        "commercial_quote_draft_save",
+
+      userId: auth.userId,
+      role: auth.profile.role,
+
+      metadata: {
+        commercialQuoteRequestId,
+        commercialQuoteId:
+          savedQuote.id,
+
+        versionNumber:
+          savedQuote
+            .version_number,
+
+        pricingModel,
+      },
+    },
+  );
+
+  revalidatePath("/admin");
+
+  revalidatePath(
+    "/admin/commercial-quotes",
+  );
+
+  revalidatePath(
+    `/admin/commercial-quotes/${commercialQuoteRequestId}/quote`,
+  );
+
+  return actionSuccess(
+    `Commercial quote draft v${savedQuote.version_number} saved.`,
+  );
+}
+
+function parseCommercialJson(
+  value: FormDataEntryValue | null,
+): unknown {
+  if (
+    typeof value !== "string" ||
+    !value.trim()
+  ) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(value);
+  } catch {
+    return null;
+  }
+}
+
+function parseCommercialCents(
+  value: FormDataEntryValue | null,
+  fallback: number,
+) {
+  const parsed =
+    typeof value === "string"
+      ? Number(value)
+      : Number.NaN;
+
+  if (!Number.isFinite(parsed)) {
+    return Math.max(
+      0,
+      Math.round(fallback),
+    );
+  }
+
+  return Math.max(
+    0,
+    Math.min(
+      100_000_000,
+      Math.round(parsed),
+    ),
+  );
+}
+
+function parseCommercialLines(
+  value: FormDataEntryValue | null,
+) {
+  const text =
+    cleanLongText(
+      value,
+      10_000,
+    );
+
+  if (!text) {
+    return [];
+  }
+
+  return Array.from(
+    new Set(
+      text
+        .split(/\r?\n/)
+        .map((line) =>
+          line.trim(),
+        )
+        .filter(Boolean)
+        .map((line) =>
+          line.slice(0, 500),
+        ),
+    ),
+  ).slice(0, 30);
+}
+
+function toCommercialJsonRecord(
+  value: unknown,
+): Record<string, unknown> {
+  return JSON.parse(
+    JSON.stringify(value),
+  ) as Record<string, unknown>;
 }
 
 export async function updateReferralAdminAction(formData: FormData) {
