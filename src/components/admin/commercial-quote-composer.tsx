@@ -52,6 +52,10 @@ import {
   type CommercialVisitType,
 } from "@/types/commercial-pricing";
 
+import {
+  CommercialMeasurementEditor,
+} from "@/components/admin/commercial-measurement-editor";
+
 import type {
   CommercialQuoteRequestRow,
   CommercialQuoteRow,
@@ -824,7 +828,7 @@ export function CommercialQuoteComposer({
                   />
 
                   <NumberField
-                    label="Concrete pads"
+                    label="Unmeasured concrete pads"
                     value={
                       activeInput
                         .workUnits
@@ -1087,7 +1091,7 @@ export function CommercialQuoteComposer({
                     />
 
                     <NumberField
-                      label="Concrete pads"
+                      label="Unmeasured concrete pads"
                       value={
                         activeInput
                           .centralWorkUnits
@@ -1263,6 +1267,12 @@ export function CommercialQuoteComposer({
                 </>
               ) : null}
 
+              <CommercialMeasurementEditor
+                input={activeInput}
+                pricingProfile={pricingProfile}
+                onChange={replaceActiveInput}
+              />
+              
               <p className="commercial-builder-subheading">
                 Labor and operating assumptions
               </p>
@@ -1530,6 +1540,42 @@ export function CommercialQuoteComposer({
                 calculation={
                   activeCalculation
                 }
+                <div>
+                  <span>
+                    Measured surface
+                  </span>
+                
+                  <strong>
+                    {calculation.measuredSquareFeet}{" "}
+                    sq. ft.
+                  </strong>
+                </div>
+                
+                <div>
+                  <span>
+                    Surface market
+                  </span>
+                
+                  <strong>
+                    {formatCurrency(
+                      calculation
+                        .surfaceMarketCents,
+                    )}
+                  </strong>
+                </div>
+                
+                <div>
+                  <span>
+                    Quote recovery
+                  </span>
+                
+                  <strong>
+                    {formatCurrency(
+                      calculation
+                        .assessmentRecoveryCents,
+                    )}
+                  </strong>
+                </div>
                 finalPriceCents={
                   activeEstimate ===
                   "initial"
@@ -1648,7 +1694,31 @@ export function CommercialQuoteComposer({
               />
             ) : null}
           </div>
-
+            {calculation
+              .surfaceMarketCents > 0 ? (
+              <span>
+                Measured surface model
+                <strong>
+                  {formatCurrency(
+                    calculation
+                      .surfaceMarketCents,
+                  )}
+                </strong>
+              </span>
+            ) : null}
+            
+            {calculation
+              .assessmentRecoveryCents > 0 ? (
+              <span>
+                Free quote cost recovery
+                <strong>
+                  {formatCurrency(
+                    calculation
+                      .assessmentRecoveryCents,
+                  )}
+                </strong>
+              </span>
+            ) : null}
           {includeRecurring ? (
             <label className="commercial-builder-field commercial-builder-frequency">
               <span>
@@ -1924,7 +1994,9 @@ function CalculationSummary({
     calculation
       .specialCostsCents -
     calculation
-      .routeAdjustmentsCents;
+      .routeAdjustmentsCents -
+    calculation
+      .assessmentRecoveryCents;
 
   return (
     <div className="commercial-builder-summary">
@@ -2040,7 +2112,9 @@ function CalculationCard({
     calculation
       .specialCostsCents -
     calculation
-      .routeAdjustmentsCents;
+      .routeAdjustmentsCents -
+    calculation
+      .assessmentRecoveryCents;
 
   return (
     <article className="commercial-builder-result-card">
@@ -2122,6 +2196,13 @@ function CalculationCard({
         <small className="commercial-builder-minimum-note">
           Minimum invoice protection
           was applied.
+        </small>
+      ) : null}
+      {calculation
+        .siteVisitRecommended ? (
+        <small className="commercial-builder-site-visit-note">
+          Onsite assessment recommended
+          before this quote is finalized.
         </small>
       ) : null}
     </article>
@@ -2341,6 +2422,48 @@ function createDefaultPricingInput(
       visitType === "initial"
         ? null
         : 5,
+
+    surfaceMeasurements: [],
+
+    quoteAssessment: {
+      method: "online",
+      assessorCount: 1,
+    
+      travelMinutes: 0,
+      onsiteMinutes: 0,
+    
+      adminMinutes:
+        visitType === "initial"
+          ? 20
+          : 0,
+    
+      roundTripMiles: 0,
+      otherCostsCents: 0,
+    
+      notes: "",
+    },
+    
+    siteContext: {
+      propertyType:
+        request.property_type,
+    
+      photoCount:
+        request.photo_paths.length,
+    
+      waterAvailability:
+        request
+          .water_spigot_available,
+    
+      surfaceWorkExpected:
+        request.service_interests.some(
+          (service) =>
+            [
+              "trash_enclosures",
+              "concrete_pads",
+              "other_exterior_cleaning",
+            ].includes(service),
+        ),
+    },
   };
 
   if (model === "hoa_route") {
