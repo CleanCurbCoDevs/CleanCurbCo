@@ -25,6 +25,7 @@ import type {
   ServiceEventRow,
   ServicePhotoRow,
   ServiceVisitRow,
+  CommercialQuoteRequestRow,
 } from "@/types/database";
 
 export type AdminContext = {
@@ -33,6 +34,7 @@ export type AdminContext = {
   deletionRequests: AccountDeletionRequestRow[];
   adminNotifications: AdminNotificationRow[];
   contacts: ContactMessageRow[];
+  commercialQuotes: CommercialQuoteRequestRow[];
   requests: CustomerRequestRow[];
   referrals: ReferralRow[];
   activity: ActivityEventRow[];
@@ -63,6 +65,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
       deletionRequests: [],
       adminNotifications: [],
       contacts: [],
+      commercialQuotes: [],
       requests: [],
       referrals: [],
       activity: [],
@@ -90,6 +93,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     deletionRequestsResult,
     adminNotificationsResult,
     contactsResult,
+    commercialQuotesResult,
     requestsResult,
     referralsResult,
     activityResult,
@@ -125,6 +129,10 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
         .limit(100),
       admin
         .from("contact_messages")
+        .select("*")
+        .order("created_at", { ascending: false }),
+      admin
+        .from("commercial_quote_requests")
         .select("*")
         .order("created_at", { ascending: false }),
       admin
@@ -208,6 +216,7 @@ export async function getAdminContext(nextPath = "/admin"): Promise<AdminContext
     deletionRequests: deletionRequestsResult.data ?? [],
     adminNotifications: adminNotificationsResult.data ?? [],
     contacts: contactsResult.data ?? [],
+    commercialQuotes: commercialQuotesResult.data ?? [],
     requests: requestsResult.data ?? [],
     referrals: referralsResult.data ?? [],
     activity: activityResult.data ?? [],
