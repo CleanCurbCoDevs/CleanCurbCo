@@ -52,6 +52,7 @@ import type {
   FieldStopStatus,
   ReferralStatus,
   RouteDayStatus,
+  CommercialQuoteRequestStatus,
 } from "@/types/database";
 
 type AdminClient = ReturnType<typeof getSupabaseAdmin>;
@@ -100,6 +101,17 @@ const accountDeletionDecisionStatuses: readonly AccountDeletionStatus[] = [
   "completed",
   "cancelled",
 ];
+
+const commercialQuoteStatuses:
+  readonly CommercialQuoteRequestStatus[] = [
+    "new",
+    "reviewing",
+    "site_visit_needed",
+    "quoted",
+    "won",
+    "lost",
+    "closed",
+  ];
 
 async function logActivity(
   admin: AdminClient,
@@ -1847,6 +1859,142 @@ async function applyApprovedCustomerRequest(
   }
 
   await admin.from("bookings").update(update).eq("id", booking.id);
+}
+
+export async function updateCommercialQuoteAdminAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireAdmin(
+    "/admin/commercial-quotes",
+  );
+
+  if (auth.status !== "ok") {
+    return actionFailure("Admin access is required.");
+  }
+
+  const requestId = createRequestId();
+
+  const commercialQuoteId = cleanString(
+    formData.get("commercialQuoteId"),
+    80,
+  );
+
+  if (!commercialQuoteId) {
+    return actionFailure(
+      "The commercial quote request ID is missing.",
+    );
+  }
+
+  const status = pickEnum<CommercialQuoteRequestStatus>(
+    formData.get("status"),
+    commercialQuoteStatuses,
+    "new",
+  );
+
+  const adminNotes =
+    cleanLongText(
+      formData.get("adminNotes"),
+      5000,
+    ) || null;
+
+  const admin = getSupabaseAdmin();
+
+  const {
+    data: previousQuote,
+    error: previousQuoteError,
+  } = await admin
+    .from("commercial_quote_requests")
+    .select("*")
+    .eq("id", commercialQuoteId)
+    .maybeSingle();
+
+  if (previousQuoteError || !previousQuote) {
+    logger.warn("admin_commercial_quote_not_found", {
+      requestId,
+      action: "commercial_quote_update",
+      metadata: {
+        commercialQuoteId,
+      },
+      error: previousQuoteError,
+    });
+
+    return actionFailure(
+      "That commercial quote request could not be found.",
+    );
+  }
+
+  const {
+    data: updatedQuote,
+    error: updateError,
+  } = await admin
+    .from("commercial_quote_requests")
+    .update({
+      status,
+      admin_notes: adminNotes,
+    })
+    .eq("id", commercialQuoteId)
+    .select("*")
+    .single();
+
+  if (updateError || !updatedQuote) {
+    logger.error("admin_commercial_quote_update_failed", {
+      requestId,
+      action: "commercial_quote_update",
+      metadata: {
+        commercialQuoteId,
+        status,
+      },
+      error: updateError,
+    });
+
+    return actionFailure(
+      "The commercial quote request could not be updated.",
+    );
+  }
+
+  await writeAdminAuditLog({
+    action: "commercial_quote_updated",
+    actor_user_id: auth.userId,
+    actor_email: actorEmail(auth),
+    actor_role: auth.profile.role,
+    target_type: "commercial_quote_request",
+    target_id: updatedQuote.id,
+    customer_id: null,
+    booking_id: null,
+    before_summary: {
+      status: previousQuote.status,
+      adminNotes: previousQuote.admin_notes,
+    },
+    after_summary: {
+      status: updatedQuote.status,
+      adminNotes: updatedQuote.admin_notes,
+    },
+    note: adminNotes,
+    request_id: requestId,
+    status: "success",
+    metadata: {
+      businessName: updatedQuote.business_name,
+    },
+  });
+
+  logger.info("admin_commercial_quote_updated", {
+    requestId,
+    action: "commercial_quote_update",
+    userId: auth.userId,
+    role: auth.profile.role,
+    metadata: {
+      commercialQuoteId: updatedQuote.id,
+      previousStatus: previousQuote.status,
+      status: updatedQuote.status,
+    },
+  });
+
+  revalidatePath("/admin");
+  revalidatePath("/admin/commercial-quotes");
+
+  return actionSuccess(
+    `Commercial quote marked ${humanizeStatus(status)}.`,
+  );
 }
 
 export async function updateReferralAdminAction(formData: FormData) {
