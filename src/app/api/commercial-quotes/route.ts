@@ -574,7 +574,22 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
-
+  
+  if (locationCount === null) {
+    logger.error("commercial_quote_location_count_invariant_failed", {
+      requestId,
+      route,
+    });
+  
+    return NextResponse.json(
+      {
+        error: "Please enter a valid number of locations.",
+        requestId,
+      },
+      { status: 400 },
+    );
+  }
+  
   const admin = getSupabaseAdmin();
 
   const { data: quote, error } = await admin
