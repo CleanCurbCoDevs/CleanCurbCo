@@ -78,6 +78,7 @@ function isCriticalEmailTemplate(templateKey: string) {
     templateKey.startsWith("admin_") ||
     [
       "booking_confirmation",
+      "commercial_quote_confirmation",
       "customer_request_received",
       "account_deletion_requested",
       "payment_setup_invite",
