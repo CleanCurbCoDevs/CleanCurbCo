@@ -6,11 +6,14 @@ import { CookieConsentProvider } from "@/components/cookie-consent-provider";
 import { PublicPageEffects } from "@/components/public-page-effects";
 import { SiteFooter } from "@/components/site-footer";
 import { SiteHeader } from "@/components/site-header";
+import { CommercialFooter } from "@/components/commercial/commercial-footer";
+import { CommercialHeader } from "@/components/commercial/commercial-header";
 import { getSiteUrl } from "@/lib/env";
 import { localBusinessStructuredData } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./globals.css";
 import "./tablet.css";
+import "./commercial/commercial-chrome.css";
 
 const geistSans = Geist({
   variable: "--font-geist-sans",
@@ -122,6 +125,8 @@ export default function RootLayout({
             <ChromeFrame
               header={<SiteHeader />}
               footer={<SiteFooter />}
+              commercialHeader={<CommercialHeader />}
+              commercialFooter={<CommercialFooter />}
             >
               <PublicPageEffects />
               {children}
