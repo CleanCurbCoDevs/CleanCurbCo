@@ -290,16 +290,6 @@ export function CommercialQuoteForm({
 
   return (
     <div className="commercial-quote-shell">
-      <div className="commercial-form-heading">
-        <p className="section-kicker">Request details</p>
-        <h2>Give us enough information to quote the real job.</h2>
-        <p>
-          Required fields are marked with an asterisk. Honest estimates are
-          perfectly fine. We are not expecting you to know the exact square
-          footage of the dumpster’s emotional damage.
-        </p>
-      </div>
-
       <form
         className="commercial-quote-form"
         onFocusCapture={handleFormStart}
