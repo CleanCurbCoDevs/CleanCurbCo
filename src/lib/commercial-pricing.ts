@@ -368,10 +368,6 @@ function calculateHoaRoutePricing(
     ) > 1
   ) {
     warnings.push(
-      "Multiple input.collectionZoneCount,
-    ) > 1
-  ) {
-    warnings.push(
       "Multiple collection zones were included. Confirm that the added-zone fee covers actual movement and setup time.",
     );
   }
