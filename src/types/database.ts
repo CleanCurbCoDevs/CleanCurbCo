@@ -28,6 +28,11 @@ import type {
   CommercialTaskMinuteDefaults,
 } from "@/types/commercial-pricing";
 
+import type {
+  CommercialSurfaceProductivityMap,
+  CommercialSurfaceRateMap,
+} from "@/types/commercial-measurement";
+
 export type AppRole = "customer" | "technician" | "admin" | "owner";
 export type ServiceFrequency =
   | "one_time"
@@ -710,7 +715,21 @@ export type CommercialPricingProfileRow = {
   hoa_unstaged_surcharge_per_bin_cents: number;
   hoa_additional_zone_fee_cents: number;
   hoa_coordination_fee_cents: number;
-
+  
+  assessment_vehicle_cost_per_mile_cents:
+    number;
+  
+  site_visit_recommended_sqft: number;
+  
+  site_visit_recommended_price_cents:
+    number;
+  
+  surface_rates_cents:
+    CommercialSurfaceRateMap;
+  
+  surface_person_minutes_per_100_sqft:
+    CommercialSurfaceProductivityMap;
+  
   task_minutes:
     CommercialTaskMinuteDefaults;
 
