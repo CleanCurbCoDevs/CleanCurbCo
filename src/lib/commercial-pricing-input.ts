@@ -1,7 +1,27 @@
 import {
+  commercialPropertyTypes,
   commercialSiteConditions,
+  commercialWaterAvailabilityValues,
+  type CommercialPropertyType,
   type CommercialSiteCondition,
+  type CommercialWaterAvailability,
 } from "@/types/commercial";
+
+import {
+  commercialMeasurementConfidences,
+  commercialMeasurementModes,
+  commercialMeasurementSources,
+  commercialQuoteAssessmentMethods,
+  commercialSurfaceTypes,
+  type CommercialMeasurementConfidence,
+  type CommercialMeasurementMode,
+  type CommercialMeasurementSource,
+  type CommercialQuoteAssessment,
+  type CommercialQuoteAssessmentMethod,
+  type CommercialSiteContext,
+  type CommercialSurfaceMeasurement,
+  type CommercialSurfaceType,
+} from "@/types/commercial-measurement";
 
 import {
   commercialAccessComplexities,
@@ -83,6 +103,21 @@ export function normalizeCommercialPricingInput(
             100,
             0,
           ),
+
+    surfaceMeasurements:
+      normalizeSurfaceMeasurements(
+        raw?.surfaceMeasurements,
+      ),
+    
+    quoteAssessment:
+      normalizeQuoteAssessment(
+        raw?.quoteAssessment,
+      ),
+    
+    siteContext:
+      normalizeSiteContext(
+        raw?.siteContext,
+      ),
   };
 
   if (expectedModel === "hoa_route") {
@@ -279,6 +314,214 @@ export function normalizeCommercialPricingInput(
         ),
     },
   };
+}
+
+function normalizeSurfaceMeasurements(
+  value: unknown,
+): CommercialSurfaceMeasurement[] {
+  if (!Array.isArray(value)) {
+    return [];
+  }
+
+  return value
+    .slice(0, 50)
+    .map((entry, index) => {
+      const raw = asRecord(entry);
+
+      return {
+        id: cleanText(
+          raw?.id,
+          `measurement-${index + 1}`,
+          80,
+        ),
+
+        label: cleanText(
+          raw?.label,
+          `Area ${index + 1}`,
+          120,
+        ),
+
+        surfaceType:
+          enumValue(
+            raw?.surfaceType,
+            commercialSurfaceTypes,
+            "concrete_pad",
+          ) as CommercialSurfaceType,
+
+        quantity: boundedNumber(
+          raw?.quantity,
+          0,
+          1_000,
+          1,
+        ),
+
+        dimensionMode:
+          enumValue(
+            raw?.dimensionMode,
+            commercialMeasurementModes,
+            "dimensions",
+          ) as CommercialMeasurementMode,
+
+        dimensionAFeet:
+          boundedNumber(
+            raw?.dimensionAFeet,
+            0,
+            100_000,
+            0,
+          ),
+
+        dimensionBFeet:
+          boundedNumber(
+            raw?.dimensionBFeet,
+            0,
+            100_000,
+            0,
+          ),
+
+        manualSquareFeet:
+          boundedNumber(
+            raw?.manualSquareFeet,
+            0,
+            100_000_000,
+            0,
+          ),
+
+        source:
+          enumValue(
+            raw?.source,
+            commercialMeasurementSources,
+            "customer_dimensions",
+          ) as CommercialMeasurementSource,
+
+        confidence:
+          enumValue(
+            raw?.confidence,
+            commercialMeasurementConfidences,
+            "preliminary",
+          ) as CommercialMeasurementConfidence,
+      };
+    });
+}
+
+function normalizeQuoteAssessment(
+  value: unknown,
+): CommercialQuoteAssessment {
+  const raw = asRecord(value);
+
+  return {
+    method:
+      enumValue(
+        raw?.method,
+        commercialQuoteAssessmentMethods,
+        "online",
+      ) as CommercialQuoteAssessmentMethod,
+
+    assessorCount:
+      boundedInteger(
+        raw?.assessorCount,
+        1,
+        20,
+        1,
+      ),
+
+    travelMinutes:
+      boundedNumber(
+        raw?.travelMinutes,
+        0,
+        10_000,
+        0,
+      ),
+
+    onsiteMinutes:
+      boundedNumber(
+        raw?.onsiteMinutes,
+        0,
+        10_000,
+        0,
+      ),
+
+    adminMinutes:
+      boundedNumber(
+        raw?.adminMinutes,
+        0,
+        10_000,
+        20,
+      ),
+
+    roundTripMiles:
+      boundedNumber(
+        raw?.roundTripMiles,
+        0,
+        100_000,
+        0,
+      ),
+
+    otherCostsCents:
+      boundedInteger(
+        raw?.otherCostsCents,
+        0,
+        100_000_000,
+        0,
+      ),
+
+    notes: cleanText(
+      raw?.notes,
+      "",
+      1_000,
+    ),
+  };
+}
+
+function normalizeSiteContext(
+  value: unknown,
+): CommercialSiteContext {
+  const raw = asRecord(value);
+
+  return {
+    propertyType:
+      enumValue(
+        raw?.propertyType,
+        commercialPropertyTypes,
+        "other",
+      ) as CommercialPropertyType,
+
+    photoCount:
+      boundedInteger(
+        raw?.photoCount,
+        0,
+        1_000,
+        0,
+      ),
+
+    waterAvailability:
+      enumValue(
+        raw?.waterAvailability,
+        commercialWaterAvailabilityValues,
+        "not_sure",
+      ) as CommercialWaterAvailability,
+
+    surfaceWorkExpected:
+      booleanValue(
+        raw?.surfaceWorkExpected,
+        false,
+      ),
+  };
+}
+
+function cleanText(
+  value: unknown,
+  fallback: string,
+  maximumLength: number,
+) {
+  if (typeof value !== "string") {
+    return fallback;
+  }
+
+  const cleaned = value
+    .trim()
+    .slice(0, maximumLength);
+
+  return cleaned || fallback;
 }
 
 function asRecord(
