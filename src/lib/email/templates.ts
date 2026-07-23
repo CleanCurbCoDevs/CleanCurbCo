@@ -4,15 +4,26 @@ import {
   bookingSuccessLaunchMessage,
   launchRouteHeadline,
 } from "@/lib/site";
+import {
+  commercialDesiredFrequencyLabels,
+  commercialPreferredContactMethodLabels,
+  commercialPropertyTypeLabels,
+  commercialServiceInterestLabels,
+  commercialServicePlanLabels,
+  commercialSiteConditionLabels,
+  commercialStartTimeframeLabels,
+  commercialWaterAvailabilityLabels,
+} from "@/types/commercial";
 import { formatFrequency } from "@/lib/pricing";
 import { policyWindowLabels, requestTypeLabels } from "@/lib/service-policy";
 import { america250Promotion } from "@/lib/promotions";
 import type {
   AccountDeletionRequestRow,
   BookingRow,
+  CareerApplicationRow,
+  CommercialQuoteRequestRow,
   ContactMessageRow,
   CustomerRequestRow,
-  CareerApplicationRow,
   ProfileRow,
   ReferralRow,
 } from "@/types/database";
@@ -41,13 +52,13 @@ function emailButton(href: string, label: string) {
 function securityNoticeHtml(action: string) {
   return `
     <p style="background:#f8f4e8;border:1px solid #dedbd0;border-radius:12px;padding:14px">
-      We received a request to ${escapeHtml(action)}. If you requested this, no action is needed. If you did not request this, contact Clean Curb Co. immediately and change your password.
+      We received a request to ${escapeHtml(action)}. If you requested this, no action is needed. If you did not request this,  Clean Curb Co. immediately and change your password.
     </p>
   `;
 }
 
 function securityNoticeText(action: string) {
-  return `We received a request to ${action}. If you requested this, no action is needed. If you did not request this, contact Clean Curb Co. immediately and change your password.`;
+  return `We received a request to ${action}. If you requested this, no action is needed. If you did not request this,  Clean Curb Co. immediately and change your password.`;
 }
 
 function textFooter(audience: EmailAudience = "customer") {
@@ -949,6 +960,348 @@ export function adminContactNotificationTemplate(
     ),
     text: internalText(
       `New contact message from ${message.name}: ${message.reason}. ${message.message}`,
+    ),
+  };
+}
+
+function multilineEmailValue(
+  value: string | null | undefined,
+  fallback = "Not provided",
+) {
+  const cleanValue = value?.trim();
+
+  if (!cleanValue) {
+    return escapeHtml(fallback);
+  }
+
+  return escapeHtml(cleanValue).replaceAll(
+    "\n",
+    "<br />",
+  );
+}
+
+function commercialServiceLabels(
+  quote: CommercialQuoteRequestRow,
+) {
+  const labels = quote.service_interests.map(
+    (interest) =>
+      commercialServiceInterestLabels[interest] ??
+      interest.replaceAll("_", " "),
+  );
+
+  if (
+    quote.service_other &&
+    quote.service_interests.includes(
+      "other_exterior_cleaning",
+    )
+  ) {
+    labels.push(quote.service_other);
+  }
+
+  return labels.join(", ");
+}
+
+function commercialPropertyLabel(
+  quote: CommercialQuoteRequestRow,
+) {
+  if (
+    quote.property_type === "other" &&
+    quote.property_type_other
+  ) {
+    return quote.property_type_other;
+  }
+
+  return (
+    commercialPropertyTypeLabels[
+      quote.property_type
+    ] ?? quote.property_type.replaceAll("_", " ")
+  );
+}
+
+function commercialQuoteCustomerSummaryHtml(
+  quote: CommercialQuoteRequestRow,
+) {
+  return `
+    <ul style="line-height:1.7;padding-left:18px">
+      <li>
+        <strong>Request ID:</strong>
+        ${escapeHtml(quote.id)}
+      </li>
+      <li>
+        <strong>Business:</strong>
+        ${escapeHtml(quote.business_name)}
+      </li>
+      <li>
+        <strong>Property:</strong>
+        ${escapeHtml(commercialPropertyLabel(quote))}
+      </li>
+      <li>
+        <strong>Address:</strong>
+        ${escapeHtml(quote.street_address)},
+        ${escapeHtml(quote.city)},
+        ${escapeHtml(quote.state)}
+        ${escapeHtml(quote.zip_code)}
+      </li>
+      <li>
+        <strong>Requested services:</strong>
+        ${escapeHtml(commercialServiceLabels(quote))}
+      </li>
+      <li>
+        <strong>Service plan:</strong>
+        ${escapeHtml(
+          commercialServicePlanLabels[
+            quote.service_plan
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Desired start:</strong>
+        ${escapeHtml(
+          commercialStartTimeframeLabels[
+            quote.desired_start_timeframe
+          ],
+        )}
+      </li>
+    </ul>
+  `;
+}
+
+function commercialQuoteAdminSummaryHtml(
+  quote: CommercialQuoteRequestRow,
+) {
+  const desiredFrequency = quote.desired_frequency
+    ? commercialDesiredFrequencyLabels[
+        quote.desired_frequency
+      ]
+    : "Not applicable";
+
+  return `
+    <ul style="line-height:1.7;padding-left:18px">
+      <li>
+        <strong>Request ID:</strong>
+        ${escapeHtml(quote.id)}
+      </li>
+      <li>
+        <strong>Status:</strong>
+        ${escapeHtml(quote.status)}
+      </li>
+      <li>
+        <strong>Business:</strong>
+        ${escapeHtml(quote.business_name)}
+      </li>
+      <li>
+        <strong>Contact:</strong>
+        ${escapeHtml(quote.contact_name)}
+      </li>
+      <li>
+        <strong>Role:</strong>
+        ${escapeHtml(
+          quote.contact_role ?? "Not provided",
+        )}
+      </li>
+      <li>
+        <strong>Email:</strong>
+        ${escapeHtml(quote.email)}
+      </li>
+      <li>
+        <strong>Phone:</strong>
+        ${escapeHtml(quote.phone)}
+      </li>
+      <li>
+        <strong>Preferred contact:</strong>
+        ${escapeHtml(
+          commercialPreferredContactMethodLabels[
+            quote.preferred_contact_method
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Property type:</strong>
+        ${escapeHtml(commercialPropertyLabel(quote))}
+      </li>
+      <li>
+        <strong>Address:</strong>
+        ${escapeHtml(quote.street_address)},
+        ${escapeHtml(quote.city)},
+        ${escapeHtml(quote.state)}
+        ${escapeHtml(quote.zip_code)}
+      </li>
+      <li>
+        <strong>Locations:</strong>
+        ${quote.location_count}
+      </li>
+      <li>
+        <strong>Requested services:</strong>
+        ${escapeHtml(commercialServiceLabels(quote))}
+      </li>
+      <li>
+        <strong>Container count:</strong>
+        ${escapeHtml(
+          quote.container_count ?? "Not provided",
+        )}
+      </li>
+      <li>
+        <strong>Container sizes:</strong>
+        ${escapeHtml(
+          quote.container_sizes ?? "Not provided",
+        )}
+      </li>
+      <li>
+        <strong>Condition:</strong>
+        ${escapeHtml(
+          commercialSiteConditionLabels[
+            quote.site_condition
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Exterior water:</strong>
+        ${escapeHtml(
+          commercialWaterAvailabilityLabels[
+            quote.water_spigot_available
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Service plan:</strong>
+        ${escapeHtml(
+          commercialServicePlanLabels[
+            quote.service_plan
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Desired frequency:</strong>
+        ${escapeHtml(desiredFrequency)}
+      </li>
+      <li>
+        <strong>Desired start:</strong>
+        ${escapeHtml(
+          commercialStartTimeframeLabels[
+            quote.desired_start_timeframe
+          ],
+        )}
+      </li>
+      <li>
+        <strong>Collection schedule:</strong>
+        ${escapeHtml(
+          quote.collection_schedule ??
+            "Not provided",
+        )}
+      </li>
+    </ul>
+
+    <p>
+      <strong>Access restrictions:</strong><br />
+      ${multilineEmailValue(
+        quote.access_restrictions,
+      )}
+    </p>
+
+    <p>
+      <strong>Project description:</strong><br />
+      ${multilineEmailValue(
+        quote.project_description,
+      )}
+    </p>
+
+    <p>
+      <strong>Additional notes:</strong><br />
+      ${multilineEmailValue(
+        quote.additional_notes,
+      )}
+    </p>
+  `;
+}
+
+export function commercialQuoteConfirmationTemplate(
+  quote: CommercialQuoteRequestRow,
+): EmailTemplate {
+  const body = `
+    <p>
+      Hi ${escapeHtml(quote.contact_name)},
+    </p>
+
+    <p>
+      We received the commercial cleaning request for
+      <strong>${escapeHtml(
+        quote.business_name,
+      )}</strong>.
+    </p>
+
+    <p>
+      We are reviewing the actual property—not
+      pretending every dumpster, enclosure, or
+      community route is the same job.
+    </p>
+
+    ${commercialQuoteCustomerSummaryHtml(quote)}
+
+    <p>
+      We may follow up for photos, measurements,
+      collection details, vendor requirements, or a
+      walkthrough before preparing a written scope.
+    </p>
+
+    <p style="background:#f8f4e8;border:1px solid #dedbd0;border-radius:12px;padding:14px">
+      <strong>Important:</strong>
+      No service has been scheduled, no price has been
+      accepted, and no contract has been created by
+      submitting this request.
+    </p>
+
+    <p>
+      Thanks for trusting a local, veteran-owned small
+      business with the gross stuff.
+    </p>
+  `;
+
+  return {
+    subject:
+      "We received your commercial quote request",
+    html: shell(
+      "Commercial quote request received",
+      body,
+    ),
+    text: customerText(
+      [
+        `Hi ${quote.contact_name},`,
+        `We received the commercial quote request for ${quote.business_name}.`,
+        `Request ID: ${quote.id}.`,
+        "We will review the property details and follow up if we need photos, measurements, vendor information, or a walkthrough.",
+        "No service has been scheduled and no contract or accepted price has been created by submitting this request.",
+      ].join("\n\n"),
+    ),
+  };
+}
+
+export function adminCommercialQuoteNotificationTemplate(
+  quote: CommercialQuoteRequestRow,
+): EmailTemplate {
+  return {
+    subject:
+      "[Admin] New commercial quote request",
+    html: shell(
+      "New commercial quote request",
+      commercialQuoteAdminSummaryHtml(quote),
+      {
+        audience: "internal",
+        preview:
+          `New commercial request from ${quote.business_name}.`,
+      },
+    ),
+    text: internalText(
+      [
+        "New commercial quote request.",
+        `Request ID: ${quote.id}`,
+        `Business: ${quote.business_name}`,
+        `Contact: ${quote.contact_name}`,
+        `Phone: ${quote.phone}`,
+        `Email: ${quote.email}`,
+        `Property: ${commercialPropertyLabel(quote)}`,
+        `Services: ${commercialServiceLabels(quote)}`,
+        `Description: ${quote.project_description}`,
+      ].join("\n"),
     ),
   };
 }
