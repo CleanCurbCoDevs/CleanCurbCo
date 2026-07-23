@@ -10,6 +10,9 @@ import {
   Sparkles,
   UserRound,
 } from "lucide-react";
+import {
+  CommercialQuotePhotoUpload,
+} from "@/components/commercial/commercial-quote-photo-upload";
 import { useActionFeedback } from "@/components/action-feedback";
 import { TurnstileWidget } from "@/components/turnstile-widget";
 import {
@@ -47,6 +50,14 @@ type SubmittedQuote = {
   businessName: string;
   contactName: string;
   createdAt: string;
+
+  photoUpload: {
+    offered: boolean;
+    token: string | null;
+    expiresAt: string | null;
+    maxFiles: number;
+    maxBytesPerFile: number;
+  };
 };
 
 const initialState: FormState = {
@@ -274,7 +285,17 @@ export function CommercialQuoteForm({
           property details and follow up if we need photos, measurements, or a
           walkthrough before preparing the scope.
         </p>
-
+        
+        {submittedQuote.photoUpload.offered &&
+        submittedQuote.photoUpload.token ? (
+          <CommercialQuotePhotoUpload
+            quoteId={submittedQuote.id}
+            uploadToken={
+              submittedQuote.photoUpload.token
+            }
+          />
+        ) : null}
+        
         <div className="commercial-confirmation-note">
           <strong>No service has been scheduled yet.</strong>
           A submitted request is not an accepted quote, contract, or confirmed
