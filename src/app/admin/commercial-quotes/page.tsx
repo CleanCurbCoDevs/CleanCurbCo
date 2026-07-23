@@ -677,7 +677,16 @@ export default async function CommercialQuotesPage({
                         <h2>
                           Review and update.
                         </h2>
-
+                        
+                        <div className="admin-action-cluster">
+                          <Link
+                            className="button button-primary"
+                            href={`/admin/commercial-quotes/${quote.id}/quote`}
+                          >
+                            Build / Edit Quote
+                          </Link>
+                        </div>
+                        
                         <FeedbackForm
                           action={
                             updateCommercialQuoteAdminAction
