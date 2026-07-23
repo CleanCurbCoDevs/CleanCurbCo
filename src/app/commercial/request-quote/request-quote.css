@@ -762,24 +762,13 @@
   .commercial-field-wide {
     grid-column: 1 / -1;
   }
-
-  .commercial-quote-hero-meta {
-    grid-template-columns: repeat(
-      3,
-      minmax(0, 1fr)
-    );
-  }
 }
 
 @media (min-width: 900px) {
-  .commercial-quote-hero-inner {
+  .commercial-quote-hero-grid {
     grid-template-columns:
-      minmax(0, 1fr)
-      minmax(260px, 0.42fr);
-  }
-
-  .commercial-quote-hero-meta {
-    grid-template-columns: 1fr;
+      minmax(0, 1.28fr)
+      minmax(340px, 0.72fr);
   }
 }
 
@@ -817,7 +806,16 @@
     width: 100%;
   }
 
-  .commercial-quote-hero-meta {
-    border-left-width: 2px;
+  .commercial-quote-hero {
+    padding: 52px 0 62px;
+  }
+  
+  .commercial-quote-hero h1 {
+    font-size: clamp(2.65rem, 14vw, 4rem);
+  }
+  
+  .commercial-quote-hero-card {
+    border-radius: 8px;
+    padding: 23px 20px;
   }
 }
