@@ -663,7 +663,9 @@ export type CommercialQuoteRequestRow = {
   acknowledgment_accepted: boolean;
 
   photo_paths: string[];
-
+  photo_upload_token_hash: string | null;
+  photo_upload_expires_at: string | null;
+  
   source: string;
   submission_request_id: string | null;
   admin_notes: string | null;
