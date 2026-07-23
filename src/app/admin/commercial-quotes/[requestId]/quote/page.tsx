@@ -4,6 +4,8 @@ import type {
 
 import Link from "next/link";
 
+import "./commercial-quote-builder.css";
+
 import {
   CommercialQuoteComposer,
 } from "@/components/admin/commercial-quote-composer";
