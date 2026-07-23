@@ -6,21 +6,44 @@ import { SiteFeedbackNudge } from "@/components/site-feedback-nudge";
 export function ChromeFrame({
   header,
   footer,
+  commercialHeader,
+  commercialFooter,
   children,
 }: {
   header: React.ReactNode;
   footer: React.ReactNode;
+  commercialHeader: React.ReactNode;
+  commercialFooter: React.ReactNode;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
-  const hidePublicChrome = pathname.startsWith("/field");
+
+  const hidePublicChrome =
+    pathname.startsWith("/field");
+
+  const useCommercialChrome =
+    pathname === "/commercial" ||
+    pathname.startsWith("/commercial/");
+
+  if (hidePublicChrome) {
+    return <>{children}</>;
+  }
 
   return (
     <>
-      {hidePublicChrome ? null : header}
+      {useCommercialChrome
+        ? commercialHeader
+        : header}
+
       {children}
-      {hidePublicChrome ? null : <SiteFeedbackNudge />}
-      {hidePublicChrome ? null : footer}
+
+      {useCommercialChrome
+        ? null
+        : <SiteFeedbackNudge />}
+
+      {useCommercialChrome
+        ? commercialFooter
+        : footer}
     </>
   );
 }
