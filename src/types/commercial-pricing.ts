@@ -2,6 +2,14 @@ import type {
   CommercialSiteCondition,
 } from "@/types/commercial";
 
+import type {
+  CommercialQuoteAssessment,
+  CommercialSiteContext,
+  CommercialSurfaceMeasurement,
+  CommercialSurfaceProductivityMap,
+  CommercialSurfaceRateMap,
+} from "@/types/commercial-measurement";
+
 export const commercialPricingModels = [
   "commercial_site",
   "hoa_route",
@@ -108,7 +116,18 @@ export type CommercialPricingProfileValues = {
   hoaUnstagedSurchargePerBinCents: number;
   hoaAdditionalZoneFeeCents: number;
   hoaCoordinationFeeCents: number;
-
+  
+  assessmentVehicleCostPerMileCents: number;
+  
+  siteVisitRecommendedSquareFeet: number;
+  siteVisitRecommendedPriceCents: number;
+  
+  surfaceRatesCents:
+    CommercialSurfaceRateMap;
+  
+  surfacePersonMinutesPer100SquareFeet:
+    CommercialSurfaceProductivityMap;
+  
   taskMinutes: CommercialTaskMinuteDefaults;
   conditionMultipliers: CommercialConditionMultipliers;
   accessMultipliers: CommercialAccessMultipliers;
@@ -148,7 +167,17 @@ type CommercialPricingInputBase = {
    * Leave null to use the active pricing profile default.
    */
   uncertaintyPercent: number | null;
-};
+
+  surfaceMeasurements:
+    CommercialSurfaceMeasurement[];
+  
+  quoteAssessment:
+    CommercialQuoteAssessment;
+  
+  siteContext:
+    CommercialSiteContext;
+  };
+
 
 export type CommercialSitePricingInput =
   CommercialPricingInputBase & {
@@ -201,6 +230,23 @@ export type CommercialPricingCalculation = {
   estimatedPersonHours: number;
   estimatedOnsiteMinutes: number;
 
+  measuredSquareFeet: number;
+
+  surfacePersonMinutes: number;
+  surfaceLaborCents: number;
+  surfaceMarketCents: number;
+  
+  assessmentInternalCostCents: number;
+  assessmentRecoveryCents: number;
+  
+  /**
+   * Clean Curb Co. commercial quotes are always free.
+   */
+  customerQuoteFeeCents: 0;
+  
+  siteVisitRecommended: boolean;
+  siteVisitReasons: string[];
+  
   laborCents: number;
   mobilizationCents: number;
   suppliesCents: number;
@@ -253,7 +299,30 @@ export const DEFAULT_COMMERCIAL_PRICING_PROFILE:
     hoaUnstagedSurchargePerBinCents: 400,
     hoaAdditionalZoneFeeCents: 5000,
     hoaCoordinationFeeCents: 7500,
-
+    
+    assessmentVehicleCostPerMileCents: 70,
+    
+    siteVisitRecommendedSquareFeet: 1500,
+    siteVisitRecommendedPriceCents: 100000,
+    
+    surfaceRatesCents: {
+      concrete_pad: 40,
+      enclosure_floor: 45,
+      enclosure_walls: 50,
+      general_exterior: 30,
+      grease_area: 65,
+      other: 40,
+    },
+    
+    surfacePersonMinutesPer100SquareFeet: {
+      concrete_pad: 20,
+      enclosure_floor: 24,
+      enclosure_walls: 30,
+      general_exterior: 18,
+      grease_area: 35,
+      other: 24,
+    },
+    
     taskMinutes: {
       dumpsterExterior: 30,
       trashEnclosure: 60,
