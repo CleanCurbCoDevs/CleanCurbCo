@@ -819,3 +819,241 @@
     padding: 23px 20px;
   }
 }
+.commercial-photo-upload-panel {
+  background:
+    linear-gradient(
+      135deg,
+      rgba(215, 169, 40, 0.12),
+      rgba(138, 0, 196, 0.055)
+    ),
+    white;
+  border: 1px solid #d4cec1;
+  border-left: 6px solid var(--gold);
+  border-radius: 5px;
+  display: grid;
+  gap: 18px;
+  margin-top: 8px;
+  padding: clamp(20px, 4vw, 28px);
+  text-align: left;
+}
+
+.commercial-photo-upload-heading {
+  align-items: flex-start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns:
+    46px minmax(0, 1fr);
+}
+
+.commercial-photo-upload-icon {
+  align-items: center;
+  background: #111;
+  border: 1px solid #443b28;
+  border-radius: 4px;
+  color: var(--gold);
+  display: inline-flex;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.commercial-photo-upload-heading > div {
+  display: grid;
+  gap: 6px;
+}
+
+.commercial-photo-upload-heading .section-kicker {
+  margin: 0;
+}
+
+.commercial-photo-upload-heading h3 {
+  font-size: clamp(1.4rem, 3vw, 1.9rem);
+  font-weight: 1000;
+  letter-spacing: -0.03em;
+  margin: 0;
+}
+
+.commercial-photo-upload-heading p:last-child {
+  color: var(--muted);
+  line-height: 1.55;
+  margin: 0;
+}
+
+.commercial-photo-guidance {
+  background: #f3efe2;
+  border: 1px solid #ddd4ba;
+  border-radius: 4px;
+  display: grid;
+  gap: 4px;
+  line-height: 1.5;
+  padding: 14px;
+}
+
+.commercial-photo-guidance span {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.commercial-photo-privacy-note {
+  color: var(--muted);
+  font-size: 0.82rem;
+  line-height: 1.5;
+  margin: -5px 0 0;
+}
+
+.commercial-photo-picker {
+  align-items: center;
+  background: #f8f6f0;
+  border: 2px dashed #b9b09e;
+  border-radius: 5px;
+  cursor: pointer;
+  display: flex;
+  gap: 13px;
+  min-height: 82px;
+  padding: 17px;
+  transition:
+    background 150ms ease,
+    border-color 150ms ease;
+}
+
+.commercial-photo-picker:hover {
+  background: white;
+  border-color: var(--purple);
+}
+
+.commercial-photo-picker input {
+  height: 1px;
+  opacity: 0;
+  overflow: hidden;
+  position: absolute;
+  width: 1px;
+}
+
+.commercial-photo-picker > svg {
+  color: var(--purple);
+  flex: 0 0 auto;
+}
+
+.commercial-photo-picker > span {
+  display: grid;
+  gap: 3px;
+}
+
+.commercial-photo-picker strong {
+  font-weight: 1000;
+}
+
+.commercial-photo-picker small {
+  color: var(--muted);
+}
+
+.commercial-photo-preview-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+}
+
+.commercial-photo-preview-card {
+  background: white;
+  border: 1px solid #d4cec1;
+  border-radius: 4px;
+  display: grid;
+  grid-template-columns:
+    68px minmax(0, 1fr) auto;
+  min-width: 0;
+  overflow: hidden;
+}
+
+.commercial-photo-preview-image {
+  background-color: #ddd8cc;
+  background-position: center;
+  background-size: cover;
+  min-height: 68px;
+}
+
+.commercial-photo-preview-info {
+  align-content: center;
+  display: grid;
+  gap: 3px;
+  min-width: 0;
+  padding: 9px;
+}
+
+.commercial-photo-preview-info strong {
+  font-size: 0.78rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commercial-photo-preview-info small {
+  color: var(--muted);
+  font-size: 0.7rem;
+}
+
+.commercial-photo-preview-card button {
+  align-self: center;
+  background: transparent;
+  border: 0;
+  color: var(--red);
+  cursor: pointer;
+  padding: 10px;
+}
+
+.commercial-photo-actions {
+  align-items: center;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 13px;
+}
+
+.commercial-photo-progress {
+  color: var(--purple);
+  font-size: 0.9rem;
+  font-weight: 900;
+  margin: 0;
+}
+
+.commercial-photo-result {
+  align-items: flex-start;
+  background: #f3efe2;
+  border: 1px solid #d9d0ba;
+  border-radius: 4px;
+  display: flex;
+  gap: 12px;
+  padding: 15px;
+  text-align: left;
+}
+
+.commercial-photo-result-success {
+  background: rgba(0, 255, 56, 0.08);
+  border-color: rgba(0, 160, 35, 0.35);
+}
+
+.commercial-photo-result > svg {
+  color: var(--purple);
+  flex: 0 0 auto;
+}
+
+.commercial-photo-result > div {
+  display: grid;
+  gap: 3px;
+}
+
+.commercial-photo-result p {
+  color: var(--muted);
+  line-height: 1.45;
+  margin: 0;
+}
+
+@media (max-width: 639px) {
+  .commercial-photo-preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .commercial-photo-actions,
+  .commercial-photo-actions .button {
+    width: 100%;
+  }
+}
