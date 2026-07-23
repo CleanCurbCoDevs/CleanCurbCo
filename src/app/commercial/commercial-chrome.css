@@ -1,0 +1,587 @@
+/*
+ * Clean Curb Co. Commercial
+ *
+ * Gold-forward, graphite-heavy commercial chrome.
+ * These classes are deliberately isolated from the
+ * residential header and footer.
+ */
+
+.commercial-site-header {
+  background: #0a0a0a;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  color: white;
+  position: sticky;
+  top: 0;
+  z-index: 50;
+}
+
+.commercial-utility-bar {
+  background:
+    linear-gradient(
+      90deg,
+      #bd8e12,
+      var(--gold) 48%,
+      #e7c55f
+    );
+  color: var(--ink);
+  min-height: 34px;
+}
+
+.commercial-utility-inner {
+  align-items: center;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  min-height: 34px;
+}
+
+.commercial-utility-message {
+  align-items: center;
+  display: inline-flex;
+  font-size: 0.74rem;
+  font-weight: 950;
+  gap: 7px;
+  letter-spacing: 0.015em;
+}
+
+.commercial-utility-actions {
+  align-items: center;
+  display: flex;
+  font-size: 0.73rem;
+  font-weight: 950;
+  gap: 16px;
+}
+
+.commercial-utility-actions a {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.commercial-utility-actions a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.commercial-header-main {
+  background:
+    linear-gradient(
+      90deg,
+      rgba(255, 255, 255, 0.025),
+      transparent 40%
+    ),
+    #0a0a0a;
+}
+
+.commercial-header-inner {
+  align-items: center;
+  display: flex;
+  gap: 20px;
+  justify-content: space-between;
+  min-height: 76px;
+}
+
+.commercial-brand {
+  align-items: center;
+  display: inline-flex;
+  flex: 0 1 auto;
+  gap: 12px;
+  min-width: 0;
+}
+
+.commercial-brand-mark {
+  align-items: center;
+  background: white;
+  border: 2px solid var(--gold);
+  border-radius: 5px;
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 50px;
+  justify-content: center;
+  overflow: hidden;
+  padding: 2px;
+  width: 50px;
+}
+
+.commercial-brand-image {
+  height: 100%;
+  object-fit: contain;
+  width: 100%;
+}
+
+.commercial-brand-copy {
+  border-left: 1px solid rgba(255, 255, 255, 0.2);
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+  padding-left: 12px;
+}
+
+.commercial-brand-name {
+  color: white;
+  font-size: 0.98rem;
+  font-weight: 1000;
+  letter-spacing: -0.02em;
+  line-height: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.commercial-brand-division {
+  color: var(--gold-soft);
+  font-family:
+    var(--font-geist-mono),
+    ui-monospace,
+    monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  line-height: 1;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.commercial-desktop-nav {
+  align-items: center;
+  display: none;
+  gap: 5px;
+}
+
+.commercial-desktop-nav > a:not(
+  .commercial-header-cta
+) {
+  border-bottom: 2px solid transparent;
+  color: rgba(255, 255, 255, 0.76);
+  font-size: 0.86rem;
+  font-weight: 850;
+  padding: 11px 10px 9px;
+}
+
+.commercial-desktop-nav > a:not(
+  .commercial-header-cta
+):hover {
+  border-bottom-color: var(--gold);
+  color: white;
+}
+
+.commercial-header-cta,
+.commercial-footer-primary-cta {
+  align-items: center;
+  background: var(--gold);
+  border: 1px solid #efcd6d;
+  border-radius: 5px;
+  color: var(--ink);
+  display: inline-flex;
+  font-weight: 1000;
+  gap: 9px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 15px;
+  transition:
+    background 150ms ease,
+    transform 150ms ease;
+}
+
+.commercial-header-cta:hover,
+.commercial-footer-primary-cta:hover {
+  background: var(--gold-soft);
+  transform: translateY(-1px);
+}
+
+.commercial-mobile-menu {
+  flex: 0 0 auto;
+  position: relative;
+}
+
+.commercial-mobile-menu summary {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  border-radius: 5px;
+  cursor: pointer;
+  display: inline-flex;
+  font-size: 0.82rem;
+  font-weight: 900;
+  gap: 7px;
+  list-style: none;
+  min-height: 42px;
+  padding: 0 12px;
+}
+
+.commercial-mobile-menu summary::-webkit-details-marker {
+  display: none;
+}
+
+.commercial-mobile-menu[open] summary {
+  border-color: var(--gold);
+  color: var(--gold-soft);
+}
+
+.commercial-mobile-menu-panel {
+  background: #111111;
+  border: 1px solid rgba(215, 169, 40, 0.55);
+  border-radius: 7px;
+  box-shadow: 0 22px 55px rgba(0, 0, 0, 0.42);
+  display: grid;
+  gap: 5px;
+  min-width: min(290px, calc(100vw - 32px));
+  padding: 9px;
+  position: absolute;
+  right: 0;
+  top: calc(100% + 10px);
+}
+
+.commercial-mobile-menu-panel a {
+  align-items: center;
+  border-radius: 4px;
+  color: rgba(255, 255, 255, 0.82);
+  display: flex;
+  font-size: 0.88rem;
+  font-weight: 850;
+  justify-content: space-between;
+  min-height: 43px;
+  padding: 10px 11px;
+}
+
+.commercial-mobile-menu-panel a:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: white;
+}
+
+.commercial-mobile-menu-panel
+  .commercial-mobile-quote-link {
+  background: var(--gold);
+  color: var(--ink);
+  font-weight: 1000;
+}
+
+.commercial-mobile-menu-panel
+  .commercial-mobile-quote-link:hover {
+  background: var(--gold-soft);
+  color: var(--ink);
+}
+
+.commercial-mobile-menu-panel
+  .commercial-mobile-residential-link {
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.62);
+  margin-top: 3px;
+}
+
+.commercial-site-footer {
+  background: #090909;
+  color: white;
+}
+
+.commercial-footer-cta-band {
+  background:
+    radial-gradient(
+      circle at 86% 0%,
+      rgba(138, 0, 196, 0.3),
+      transparent 32%
+    ),
+    linear-gradient(
+      125deg,
+      #19130a,
+      #0a0a0a 55%,
+      #111111
+    );
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+  border-top: 5px solid var(--gold);
+}
+
+.commercial-footer-cta-inner {
+  align-items: start;
+  display: grid;
+  gap: 27px;
+  padding-bottom: clamp(38px, 6vw, 62px);
+  padding-top: clamp(38px, 6vw, 62px);
+}
+
+.commercial-footer-cta-inner > div:first-child {
+  display: grid;
+  gap: 12px;
+  max-width: 780px;
+}
+
+.commercial-footer-kicker {
+  color: var(--gold);
+  font-family:
+    var(--font-geist-mono),
+    ui-monospace,
+    monospace;
+  font-size: 0.74rem;
+  font-weight: 950;
+  letter-spacing: 0.11em;
+  margin: 0;
+  text-transform: uppercase;
+}
+
+.commercial-footer-cta-inner h2 {
+  color: white;
+  font-size: clamp(2rem, 5vw, 3.8rem);
+  font-weight: 1000;
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+  margin: 0;
+}
+
+.commercial-footer-cta-inner p:last-child {
+  color: rgba(255, 255, 255, 0.7);
+  line-height: 1.62;
+  margin: 0;
+  max-width: 690px;
+}
+
+.commercial-footer-cta-actions {
+  align-items: stretch;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 11px;
+}
+
+.commercial-footer-phone-cta {
+  align-items: center;
+  border: 1px solid rgba(255, 255, 255, 0.24);
+  border-radius: 5px;
+  color: white;
+  display: inline-flex;
+  font-weight: 900;
+  gap: 8px;
+  justify-content: center;
+  min-height: 44px;
+  padding: 9px 15px;
+}
+
+.commercial-footer-phone-cta:hover {
+  border-color: var(--gold);
+  color: var(--gold-soft);
+}
+
+.commercial-footer-grid {
+  display: grid;
+  gap: 36px;
+  grid-template-columns: 1fr;
+  padding-bottom: 50px;
+  padding-top: 50px;
+}
+
+.commercial-footer-brand {
+  display: grid;
+  gap: 16px;
+  max-width: 430px;
+}
+
+.commercial-footer-brand-heading {
+  align-items: center;
+  display: flex;
+  gap: 12px;
+}
+
+.commercial-footer-brand-icon {
+  align-items: center;
+  background: var(--gold);
+  border-radius: 5px;
+  color: var(--ink);
+  display: inline-flex;
+  flex: 0 0 auto;
+  height: 46px;
+  justify-content: center;
+  width: 46px;
+}
+
+.commercial-footer-brand-heading > div {
+  display: grid;
+  gap: 4px;
+}
+
+.commercial-footer-brand-heading strong {
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 1000;
+}
+
+.commercial-footer-brand-heading span:last-child {
+  color: var(--gold-soft);
+  font-family:
+    var(--font-geist-mono),
+    ui-monospace,
+    monospace;
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.commercial-footer-brand > p {
+  color: rgba(255, 255, 255, 0.65);
+  line-height: 1.6;
+  margin: 0;
+}
+
+.commercial-footer-brand
+  .commercial-footer-positioning {
+  border-left: 3px solid var(--gold);
+  color: rgba(255, 255, 255, 0.82);
+  font-weight: 800;
+  padding-left: 13px;
+}
+
+.commercial-footer-column {
+  min-width: 0;
+}
+
+.commercial-footer-column h2 {
+  color: var(--gold-soft);
+  font-size: 0.75rem;
+  font-weight: 1000;
+  letter-spacing: 0.09em;
+  margin: 0 0 15px;
+  text-transform: uppercase;
+}
+
+.commercial-footer-column ul {
+  display: grid;
+  gap: 10px;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.commercial-footer-column li,
+.commercial-footer-column a,
+.commercial-footer-location {
+  color: rgba(255, 255, 255, 0.64);
+  font-size: 0.86rem;
+  line-height: 1.45;
+}
+
+.commercial-footer-column a,
+.commercial-footer-location {
+  align-items: flex-start;
+  display: inline-flex;
+  gap: 7px;
+}
+
+.commercial-footer-column a:hover {
+  color: white;
+}
+
+.commercial-footer-property-list li {
+  padding-left: 15px;
+  position: relative;
+}
+
+.commercial-footer-property-list li::before {
+  background: var(--gold);
+  content: "";
+  height: 5px;
+  left: 0;
+  position: absolute;
+  top: 0.6em;
+  width: 5px;
+}
+
+.commercial-footer-bottom {
+  background: #050505;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.commercial-footer-bottom-inner {
+  color: rgba(255, 255, 255, 0.45);
+  display: flex;
+  flex-direction: column;
+  font-size: 0.72rem;
+  gap: 7px;
+  justify-content: space-between;
+  padding-bottom: 18px;
+  padding-top: 18px;
+}
+
+@media (min-width: 720px) {
+  .commercial-footer-grid {
+    grid-template-columns:
+      minmax(260px, 1.5fr)
+      repeat(2, minmax(160px, 0.75fr));
+  }
+
+  .commercial-footer-column:last-child {
+    grid-column: 2 / -1;
+  }
+
+  .commercial-footer-bottom-inner {
+    align-items: center;
+    flex-direction: row;
+  }
+}
+
+@media (min-width: 960px) {
+  .commercial-desktop-nav {
+    display: flex;
+  }
+
+  .commercial-mobile-menu {
+    display: none;
+  }
+
+  .commercial-footer-cta-inner {
+    align-items: end;
+    grid-template-columns:
+      minmax(0, 1fr)
+      auto;
+  }
+
+  .commercial-footer-cta-actions {
+    justify-content: flex-end;
+  }
+
+  .commercial-footer-grid {
+    grid-template-columns:
+      minmax(270px, 1.45fr)
+      repeat(3, minmax(155px, 0.75fr));
+  }
+
+  .commercial-footer-column:last-child {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 640px) {
+  .commercial-utility-message {
+    display: none;
+  }
+
+  .commercial-utility-inner {
+    justify-content: center;
+  }
+
+  .commercial-utility-actions {
+    justify-content: space-between;
+    width: 100%;
+  }
+
+  .commercial-brand-mark {
+    height: 44px;
+    width: 44px;
+  }
+
+  .commercial-brand-copy {
+    gap: 3px;
+    padding-left: 10px;
+  }
+
+  .commercial-brand-name {
+    font-size: 0.88rem;
+  }
+
+  .commercial-brand-division {
+    font-size: 0.59rem;
+    letter-spacing: 0.08em;
+  }
+
+  .commercial-footer-cta-actions,
+  .commercial-footer-primary-cta,
+  .commercial-footer-phone-cta {
+    width: 100%;
+  }
+}
