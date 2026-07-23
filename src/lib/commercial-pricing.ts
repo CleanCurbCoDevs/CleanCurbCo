@@ -10,31 +10,61 @@ import type {
   CommercialWorkUnits,
 } from "@/types/commercial-pricing";
 
+import {
+  calculateCommercialAssessmentInternalCost,
+  calculateCommercialSurfaceSquareFeet,
+} from "@/lib/commercial-measurements";
+
+type CommercialCorePricingCalculation =
+  Omit<
+    CommercialPricingCalculation,
+    | "measuredSquareFeet"
+    | "surfacePersonMinutes"
+    | "surfaceLaborCents"
+    | "surfaceMarketCents"
+    | "assessmentInternalCostCents"
+    | "assessmentRecoveryCents"
+    | "customerQuoteFeeCents"
+    | "siteVisitRecommended"
+    | "siteVisitReasons"
+  >;
+
 export function calculateCommercialPricing(
   profile: CommercialPricingProfileValues,
   input: CommercialPricingInput,
 ): CommercialPricingCalculation {
   switch (input.model) {
     case "commercial_site":
-      return calculateCommercialSitePricing(
+      return applyMeasurementAndAssessmentPricing(
         profile,
         input,
+        calculateCommercialSitePricing(
+          profile,
+          input,
+        ),
       );
 
     case "hoa_route":
-      return calculateHoaRoutePricing(
+      return applyMeasurementAndAssessmentPricing(
         profile,
         input,
+        calculateHoaRoutePricing(
+          profile,
+          input,
+        ),
       );
 
     case "apartment_hybrid":
-      return calculateApartmentPricing(
+      return applyMeasurementAndAssessmentPricing(
         profile,
         input,
+        calculateApartmentPricing(
+          profile,
+          input,
+        ),
       );
   }
 }
-
 function calculateCommercialSitePricing(
   profile: CommercialPricingProfileValues,
   input: CommercialSitePricingInput,
@@ -698,6 +728,439 @@ function calculateApartmentPricing(
 
     warnings,
   };
+}
+
+function applyMeasurementAndAssessmentPricing(
+  profile: CommercialPricingProfileValues,
+  input: CommercialPricingInput,
+  calculation:
+    CommercialCorePricingCalculation,
+): CommercialPricingCalculation {
+  const conditionMultiplier =
+    getConditionMultiplier(
+      profile,
+      input.condition,
+    );
+
+  const accessMultiplier =
+    getAccessMultiplier(
+      profile,
+      input.accessComplexity,
+    );
+
+  const surfacePricing =
+    calculateMeasuredSurfacePricing(
+      profile,
+      input,
+      conditionMultiplier,
+      accessMultiplier,
+    );
+
+  const assessment =
+    calculateCommercialAssessmentInternalCost(
+      profile,
+      input.quoteAssessment,
+    );
+
+  const assessmentInternalCostCents =
+    input.visitType === "initial"
+      ? assessment.totalCents
+      : 0;
+
+  /**
+   * Quotes remain free to the customer.
+   * The internal cost is recovered through the initial
+   * proposed service price.
+   */
+  const assessmentRecoveryCents =
+    assessmentInternalCostCents;
+
+  const estimatedPersonMinutes =
+    calculation.estimatedPersonMinutes +
+    surfacePricing.personMinutes;
+
+  const laborCents =
+    calculation.laborCents +
+    surfacePricing.laborCents;
+
+  const coreCostBeforeUncertainty =
+    Math.max(
+      0,
+      calculation.costModelCents -
+        calculation.uncertaintyCents,
+    );
+
+  const serviceCostBeforeUncertainty =
+    Math.max(
+      0,
+      coreCostBeforeUncertainty +
+        surfacePricing.laborCents,
+    );
+
+  const uncertaintyCents =
+    calculatePercentageCents(
+      serviceCostBeforeUncertainty,
+      calculation.uncertaintyPercent,
+    );
+
+  const costModelCents =
+    serviceCostBeforeUncertainty +
+    uncertaintyCents +
+    assessmentRecoveryCents;
+
+  const baseMarketCents =
+    input.model === "commercial_site"
+      ? Math.max(
+          0,
+          calculation.marketModelCents -
+            calculation.uncertaintyCents,
+        )
+      : calculation.marketModelCents;
+
+  const marketModelCents =
+    Math.max(
+      0,
+      baseMarketCents +
+        surfacePricing.marketCents +
+        assessmentRecoveryCents,
+    );
+
+  const preRoundSuggestedPriceCents =
+    Math.max(
+      calculation.minimumCents,
+      costModelCents,
+      marketModelCents,
+    );
+
+  const suggestedPriceCents =
+    roundUpCents(
+      preRoundSuggestedPriceCents,
+      profile.roundingIncrementCents,
+    );
+
+  const siteVisitReasons =
+    getSiteVisitReasons(
+      profile,
+      input,
+      surfacePricing.squareFeet,
+      suggestedPriceCents,
+    );
+
+  const warnings =
+    calculation.warnings.filter(
+      (warning) => {
+        if (
+          surfacePricing.personMinutes <=
+          0
+        ) {
+          return true;
+        }
+
+        return (
+          !warning.startsWith(
+            "No standard work units",
+          ) &&
+          !warning.startsWith(
+            "No central waste-area work",
+          )
+        );
+      },
+    );
+
+  if (siteVisitReasons.length) {
+    warnings.push(
+      `Onsite assessment recommended: ${siteVisitReasons.join(
+        " ",
+      )}`,
+    );
+  }
+
+  return {
+    ...calculation,
+
+    estimatedPersonMinutes:
+      roundTwoDecimals(
+        estimatedPersonMinutes,
+      ),
+
+    estimatedPersonHours:
+      roundTwoDecimals(
+        estimatedPersonMinutes / 60,
+      ),
+
+    estimatedOnsiteMinutes:
+      calculateOnsiteMinutes(
+        estimatedPersonMinutes,
+        input.crewSize,
+      ),
+
+    measuredSquareFeet:
+      surfacePricing.squareFeet,
+
+    surfacePersonMinutes:
+      surfacePricing.personMinutes,
+
+    surfaceLaborCents:
+      surfacePricing.laborCents,
+
+    surfaceMarketCents:
+      surfacePricing.marketCents,
+
+    assessmentInternalCostCents,
+
+    assessmentRecoveryCents,
+
+    customerQuoteFeeCents: 0,
+
+    siteVisitRecommended:
+      siteVisitReasons.length > 0,
+
+    siteVisitReasons,
+
+    laborCents,
+
+    uncertaintyCents,
+
+    costModelCents,
+    marketModelCents,
+
+    minimumApplied:
+      calculation.minimumCents >=
+      Math.max(
+        costModelCents,
+        marketModelCents,
+      ),
+
+    preRoundSuggestedPriceCents,
+    suggestedPriceCents,
+
+    warnings,
+  };
+}
+
+function calculateMeasuredSurfacePricing(
+  profile: CommercialPricingProfileValues,
+  input: CommercialPricingInput,
+  conditionMultiplier: number,
+  accessMultiplier: number,
+) {
+  let squareFeet = 0;
+  let personMinutes = 0;
+  let marketCents = 0;
+
+  for (
+    const measurement of
+    input.surfaceMeasurements
+  ) {
+    const measurementSquareFeet =
+      calculateCommercialSurfaceSquareFeet(
+        measurement,
+      );
+
+    if (
+      measurementSquareFeet <= 0
+    ) {
+      continue;
+    }
+
+    const rateCents =
+      profile.surfaceRatesCents[
+        measurement.surfaceType
+      ] ?? 0;
+
+    const productivityMinutes =
+      profile
+        .surfacePersonMinutesPer100SquareFeet[
+        measurement.surfaceType
+      ] ?? 0;
+
+    squareFeet +=
+      measurementSquareFeet;
+
+    personMinutes +=
+      (
+        measurementSquareFeet / 100
+      ) *
+      productivityMinutes *
+      conditionMultiplier *
+      accessMultiplier;
+
+    marketCents += Math.round(
+      measurementSquareFeet *
+        rateCents *
+        conditionMultiplier *
+        accessMultiplier,
+    );
+  }
+
+  const laborCents =
+    calculateLaborCents(
+      personMinutes,
+      profile.laborRateCents,
+    );
+
+  return {
+    squareFeet:
+      roundTwoDecimals(squareFeet),
+
+    personMinutes:
+      roundTwoDecimals(
+        personMinutes,
+      ),
+
+    laborCents,
+
+    marketCents:
+      Math.max(
+        0,
+        Math.round(marketCents),
+      ),
+  };
+}
+
+function getSiteVisitReasons(
+  profile: CommercialPricingProfileValues,
+  input: CommercialPricingInput,
+  measuredSquareFeet: number,
+  suggestedPriceCents: number,
+) {
+  if (input.visitType !== "initial") {
+    return [];
+  }
+
+  const measurementsWithArea =
+    input.surfaceMeasurements.filter(
+      (measurement) =>
+        calculateCommercialSurfaceSquareFeet(
+          measurement,
+        ) > 0,
+    );
+
+  const allMeasurementsVerified =
+    measurementsWithArea.length > 0 &&
+    measurementsWithArea.every(
+      (measurement) =>
+        measurement.confidence ===
+        "field_verified",
+    );
+
+  const onsiteAssessmentCompleted =
+    input.quoteAssessment.method ===
+      "onsite" &&
+    allMeasurementsVerified;
+
+  if (onsiteAssessmentCompleted) {
+    return [];
+  }
+
+  const reasons: string[] = [];
+
+  if (
+    input.quoteAssessment.method ===
+      "onsite" &&
+    !allMeasurementsVerified
+  ) {
+    reasons.push(
+      "The onsite assessment is selected, but the measurements are not marked field verified.",
+    );
+  }
+
+  if (
+    input.siteContext
+      .surfaceWorkExpected &&
+    measuredSquareFeet <= 0
+  ) {
+    reasons.push(
+      "No usable surface measurements have been entered.",
+    );
+  }
+
+  if (
+    measurementsWithArea.some(
+      (measurement) =>
+        measurement.confidence ===
+        "preliminary",
+    )
+  ) {
+    reasons.push(
+      "One or more measurements are still preliminary.",
+    );
+  }
+
+  if (
+    input.condition === "heavy" ||
+    input.condition === "not_sure"
+  ) {
+    reasons.push(
+      "The reported site condition is heavy or uncertain.",
+    );
+  }
+
+  if (
+    input.accessComplexity ===
+    "difficult"
+  ) {
+    reasons.push(
+      "Access is marked difficult.",
+    );
+  }
+
+  if (
+    input.siteContext.photoCount < 2
+  ) {
+    reasons.push(
+      "Fewer than two useful property photos are available.",
+    );
+  }
+
+  if (
+    input.siteContext
+      .surfaceWorkExpected &&
+    input.siteContext
+      .waterAvailability !== "yes"
+  ) {
+    reasons.push(
+      "Water availability has not been confirmed.",
+    );
+  }
+
+  if (
+    input.siteContext.propertyType ===
+      "restaurant_food_service" &&
+    (
+      input.siteContext.photoCount < 3 ||
+      input.condition === "heavy" ||
+      input.condition === "not_sure"
+    )
+  ) {
+    reasons.push(
+      "Food-service waste areas benefit from confirming grease, drainage, and access onsite.",
+    );
+  }
+
+  if (
+    measuredSquareFeet >=
+    profile
+      .siteVisitRecommendedSquareFeet
+  ) {
+    reasons.push(
+      "The measured surface area exceeds the configured remote-quote threshold.",
+    );
+  }
+
+  if (
+    suggestedPriceCents >=
+    profile
+      .siteVisitRecommendedPriceCents
+  ) {
+    reasons.push(
+      "The proposed project value exceeds the configured remote-quote threshold.",
+    );
+  }
+
+  return Array.from(
+    new Set(reasons),
+  );
 }
 
 function calculateWorkPersonMinutes(
