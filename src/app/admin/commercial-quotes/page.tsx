@@ -10,8 +10,12 @@ import {
   updateCommercialQuoteAdminAction,
 } from "@/app/admin/actions";
 import { humanizeStatus } from "@/lib/booking-utils";
+import {
+  COMMERCIAL_QUOTE_PHOTO_BUCKET,
+} from "@/lib/commercial-photo-config";
 import { getAdminContext } from "@/lib/admin-data";
 import { includesSearch } from "@/lib/admin-operations";
+import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   commercialDesiredFrequencyLabels,
   commercialPreferredContactMethodLabels,
@@ -102,7 +106,10 @@ export default async function CommercialQuotesPage({
     context.commercialQuotes,
     params,
   );
-
+  
+  const photoUrlsByPath =
+    await getCommercialPhotoUrls(quotes);
+  
   const stats = getCommercialQuoteStats(
     context.commercialQuotes,
   );
@@ -310,7 +317,17 @@ export default async function CommercialQuotesPage({
 
               const serviceLabels =
                 getServiceLabels(quote);
-
+              
+              const quotePhotos = (
+                quote.photo_paths ?? []
+              ).map((path, index) => ({
+                path,
+                index,
+                url:
+                  photoUrlsByPath.get(path) ??
+                  null,
+              }));
+              
               const fullAddress = [
                 quote.street_address,
                 quote.city,
@@ -582,15 +599,42 @@ export default async function CommercialQuotesPage({
                             }
                           />
 
-                          <InfoTile
-                            label="Photos"
-                            value={
-                              quote.photo_paths.length
-                                ? `${quote.photo_paths.length} uploaded`
-                                : "None uploaded"
-                            }
-                          />
+                      <InfoTile
+                        label="Photos"
+                        value={
+                          quote.photo_paths.length
+                            ? `${quote.photo_paths.length} uploaded`
+                            : "None uploaded"
+                        }
+                      />
+                      </div>
+                      
+                      {quotePhotos.length ? (
+                        <div className="commercial-admin-photo-grid">
+                          {quotePhotos.map((photo) =>
+                            photo.url ? (
+                              <a
+                                aria-label={`Open property photo ${
+                                  photo.index + 1
+                                }`}
+                                className="commercial-admin-photo-card"
+                                href={photo.url}
+                                key={photo.path}
+                                rel="noreferrer"
+                                style={{
+                                  backgroundImage:
+                                    `url("${photo.url}")`,
+                                }}
+                                target="_blank"
+                              >
+                                <span>
+                                  Photo {photo.index + 1}
+                                </span>
+                              </a>
+                            ) : null,
+                          )}
                         </div>
+                      ) : null}
                       </section>
 
                       <section className="detail-panel">
@@ -1039,6 +1083,53 @@ function getServiceLabels(
   }
 
   return labels;
+}
+
+async function getCommercialPhotoUrls(
+  quotes: CommercialQuoteRequestRow[],
+) {
+  const paths = Array.from(
+    new Set(
+      quotes.flatMap(
+        (quote) =>
+          quote.photo_paths ?? [],
+      ),
+    ),
+  );
+
+  if (!paths.length) {
+    return new Map<string, string>();
+  }
+
+  const {
+    data,
+    error,
+  } = await getSupabaseAdmin()
+    .storage
+    .from(
+      COMMERCIAL_QUOTE_PHOTO_BUCKET,
+    )
+    .createSignedUrls(
+      paths,
+      60 * 60,
+    );
+
+  if (error || !data) {
+    return new Map<string, string>();
+  }
+
+  return new Map(
+    data.flatMap((photo) =>
+      photo.signedUrl
+        ? [
+            [
+              photo.path,
+              photo.signedUrl,
+            ] as const,
+          ]
+        : [],
+    ),
+  );
 }
 
 function formatDateTime(value: string) {
