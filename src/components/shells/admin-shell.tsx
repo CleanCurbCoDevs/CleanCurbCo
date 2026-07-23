@@ -12,6 +12,10 @@ import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
 const primaryLinks = [
   { label: "Dashboard", href: "/admin" },
   { label: "Bookings", href: "/admin/bookings" },
+  {
+    label: "Commercial",
+    href: "/admin/commercial-quotes",
+  },
   { label: "Routes", href: "/admin/routes" },
   { label: "Payments", href: "/admin/payments" },
   { label: "Customers", href: "/admin/customers" },
