@@ -19,6 +19,15 @@ import type {
   CommercialWaterAvailability,
 } from "@/types/commercial";
 
+import type {
+  CommercialAccessMultipliers,
+  CommercialHoaPricingTier,
+  CommercialPricingModel,
+  CommercialQuoteLineItemType,
+  CommercialQuoteStatus,
+  CommercialTaskMinuteDefaults,
+} from "@/types/commercial-pricing";
+
 export type AppRole = "customer" | "technician" | "admin" | "owner";
 export type ServiceFrequency =
   | "one_time"
@@ -671,6 +680,153 @@ export type CommercialQuoteRequestRow = {
   admin_notes: string | null;
 };
 
+export type CommercialPricingProfileRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+
+  name: string;
+  is_active: boolean;
+  currency: string;
+
+  labor_rate_cents: number;
+
+  initial_commercial_minimum_cents: number;
+  recurring_commercial_minimum_cents: number;
+
+  initial_mobilization_cents: number;
+  recurring_mobilization_cents: number;
+
+  light_supplies_cents: number;
+  moderate_supplies_cents: number;
+  heavy_supplies_cents: number;
+
+  default_uncertainty_percent: number;
+  rounding_increment_cents: number;
+
+  hoa_route_minimum_cents: number;
+  apartment_minimum_cents: number;
+
+  hoa_unstaged_surcharge_per_bin_cents: number;
+  hoa_additional_zone_fee_cents: number;
+  hoa_coordination_fee_cents: number;
+
+  task_minutes:
+    CommercialTaskMinuteDefaults;
+
+  condition_multipliers:
+    Record<CommercialSiteCondition, number>;
+
+  access_multipliers:
+    CommercialAccessMultipliers;
+
+  hoa_tiers:
+    CommercialHoaPricingTier[];
+};
+
+export type CommercialQuoteRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+
+  request_id: string;
+
+  supersedes_quote_id: string | null;
+  pricing_profile_id: string | null;
+
+  version_number: number;
+  quote_number: string | null;
+
+  status: CommercialQuoteStatus;
+  pricing_model: CommercialPricingModel;
+
+  currency: string;
+
+  pricing_profile_snapshot:
+    Record<string, unknown>;
+
+  calculator_input:
+    Record<string, unknown>;
+
+  calculator_output:
+    Record<string, unknown>;
+
+  sent_version_snapshot:
+    Record<string, unknown>;
+
+  estimated_person_hours: number;
+
+  estimated_labor_cents: number;
+  estimated_supplies_cents: number;
+  estimated_other_costs_cents: number;
+  estimated_contribution_cents: number;
+
+  suggested_initial_price_cents: number;
+  final_initial_price_cents: number;
+
+  suggested_recurring_price_cents:
+    number | null;
+
+  final_recurring_price_cents:
+    number | null;
+
+  recurring_frequency: string | null;
+
+  scope_summary: string;
+
+  customer_notes: string | null;
+  internal_notes: string | null;
+  revision_note: string | null;
+
+  included_services: string[];
+  assumptions: string[];
+  exclusions: string[];
+
+  payment_terms: string;
+  valid_until: string | null;
+
+  sent_at: string | null;
+  viewed_at: string | null;
+  accepted_at: string | null;
+  declined_at: string | null;
+  expired_at: string | null;
+
+  accepted_by_name: string | null;
+  accepted_by_email: string | null;
+
+  public_token_hash: string | null;
+  public_token_expires_at: string | null;
+
+  created_by_user_id: string | null;
+  updated_by_user_id: string | null;
+};
+
+export type CommercialQuoteLineItemRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+
+  quote_id: string;
+  sort_order: number;
+
+  item_type:
+    CommercialQuoteLineItemType;
+
+  name: string;
+  description: string | null;
+
+  quantity: number;
+  unit_label: string | null;
+
+  unit_price_cents: number;
+  amount_cents: number;
+
+  is_optional: boolean;
+  is_customer_visible: boolean;
+
+  metadata: Record<string, unknown>;
+};
+
 export type ContactMessageRow = {
   id: string;
   created_at: string;
@@ -941,7 +1097,57 @@ export type Database = {
         Update: Partial<CommercialQuoteRequestRow>;
         Relationships: [];
       };
-    
+
+      commercial_pricing_profiles: {
+        Row: CommercialPricingProfileRow;
+      
+        Insert:
+          Partial<CommercialPricingProfileRow> &
+          Pick<
+            CommercialPricingProfileRow,
+            "name"
+          >;
+      
+        Update:
+          Partial<CommercialPricingProfileRow>;
+      
+        Relationships: [];
+      };
+      
+      commercial_quotes: {
+        Row: CommercialQuoteRow;
+      
+        Insert:
+          Partial<CommercialQuoteRow> &
+          Pick<
+            CommercialQuoteRow,
+            | "request_id"
+            | "pricing_model"
+          >;
+      
+        Update:
+          Partial<CommercialQuoteRow>;
+      
+        Relationships: [];
+      };
+      
+      commercial_quote_line_items: {
+        Row: CommercialQuoteLineItemRow;
+      
+        Insert:
+          Partial<CommercialQuoteLineItemRow> &
+          Pick<
+            CommercialQuoteLineItemRow,
+            | "quote_id"
+            | "name"
+          >;
+      
+        Update:
+          Partial<CommercialQuoteLineItemRow>;
+      
+        Relationships: [];
+      };
+  
       maintenance_waitlist: {
         Row: {
           id: string;
