@@ -176,8 +176,7 @@
   border-left: 6px solid var(--gold);
   border-radius: 5px;
   box-shadow: 0 12px 34px rgba(5, 5, 5, 0.055);
-  display: grid;
-  gap: 24px;
+  display: block;
   margin: 0;
   min-width: 0;
   padding: clamp(21px, 4vw, 33px);
@@ -198,9 +197,20 @@
 .commercial-form-group legend {
   align-items: center;
   display: flex;
+  float: left;
   gap: 13px;
+  margin: 0 0 24px;
   max-width: 100%;
-  padding: 0 11px 0 0;
+  padding: 0;
+  width: 100%;
+}
+
+.commercial-form-group legend + * {
+  clear: both;
+}
+
+.commercial-form-group > *:not(legend) + * {
+  margin-top: 24px;
 }
 
 .commercial-form-group legend > span:last-child {
