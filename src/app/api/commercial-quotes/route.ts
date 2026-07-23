@@ -46,6 +46,17 @@ import {
   type CommercialStartTimeframe,
   type CommercialWaterAvailability,
 } from "@/types/commercial";
+import {
+  COMMERCIAL_QUOTE_MAX_PHOTO_BYTES,
+  COMMERCIAL_QUOTE_MAX_PHOTOS,
+  shouldOfferCommercialQuotePhotos,
+} from "@/lib/commercial-photo-config";
+import {
+  createCommercialPhotoUploadToken,
+  getCommercialPhotoUploadExpiration,
+  hashCommercialPhotoUploadToken,
+} from "@/lib/server/commercial-photo-token";
+
 
 type IncomingCommercialQuote = {
   website?: unknown;
@@ -589,6 +600,26 @@ export async function POST(request: Request) {
       { status: 400 },
     );
   }
+
+  const photoUploadOffered =
+    shouldOfferCommercialQuotePhotos({
+      propertyType,
+      serviceInterests,
+    });
+  
+  const photoUploadToken = photoUploadOffered
+    ? createCommercialPhotoUploadToken()
+    : null;
+  
+  const photoUploadExpiresAt = photoUploadOffered
+    ? getCommercialPhotoUploadExpiration()
+    : null;
+  
+  const photoUploadTokenHash = photoUploadToken
+    ? hashCommercialPhotoUploadToken(
+        photoUploadToken,
+      )
+    : null;
   
   const admin = getSupabaseAdmin();
 
@@ -629,6 +660,12 @@ export async function POST(request: Request) {
       additional_notes: additionalNotes,
       acknowledgment_accepted: acknowledgmentAccepted,
 
+      photo_upload_token_hash:
+        photoUploadTokenHash,
+      
+      photo_upload_expires_at:
+        photoUploadExpiresAt,
+            
       status: "new",
       source: "commercial_quote_form",
       submission_request_id: requestId,
@@ -705,12 +742,22 @@ export async function POST(request: Request) {
 
   return NextResponse.json(
     {
-      quote: {
-        id: quote.id,
-        businessName: quote.business_name,
-        contactName: quote.contact_name,
-        createdAt: quote.created_at,
+    quote: {
+      id: quote.id,
+      businessName: quote.business_name,
+      contactName: quote.contact_name,
+      createdAt: quote.created_at,
+    
+      photoUpload: {
+        offered: photoUploadOffered,
+        token: photoUploadToken,
+        expiresAt: photoUploadExpiresAt,
+        maxFiles:
+          COMMERCIAL_QUOTE_MAX_PHOTOS,
+        maxBytesPerFile:
+          COMMERCIAL_QUOTE_MAX_PHOTO_BYTES,
       },
+    },
       requestId,
     },
     { status: 201 },
