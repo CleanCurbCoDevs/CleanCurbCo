@@ -316,7 +316,7 @@ export function CommercialQuoteForm({
               <UserRound size={21} aria-hidden="true" />
             </span>
             <span>
-              <small>Section 1</small>
+              <small>01 / Contact</small>
               Contact information
             </span>
           </legend>
@@ -421,7 +421,7 @@ export function CommercialQuoteForm({
               <Building2 size={21} aria-hidden="true" />
             </span>
             <span>
-              <small>Section 2</small>
+              <small>02 / Property</small>
               Property information
             </span>
           </legend>
@@ -568,7 +568,7 @@ export function CommercialQuoteForm({
               <Sparkles size={21} aria-hidden="true" />
             </span>
             <span>
-              <small>Section 3</small>
+              <small>03 / Service scope</small>
               What needs cleaning
             </span>
           </legend>
@@ -757,7 +757,7 @@ export function CommercialQuoteForm({
               <ClipboardList size={21} aria-hidden="true" />
             </span>
             <span>
-              <small>Section 4</small>
+              <small>04 / Project details</small>
               Project details
             </span>
           </legend>
@@ -837,11 +837,17 @@ export function CommercialQuoteForm({
         </fieldset>
 
         <div className="commercial-submit-panel">
-          <div>
-            <h3>Ready to send it?</h3>
+          <div className="commercial-submit-copy">
+            <p className="commercial-submit-kicker">
+              Final step
+            </p>
+        
+            <h3>Review and send.</h3>
+        
             <p>
-              We will email a confirmation and follow up after reviewing the
-              property details.
+              We will email a confirmation and follow up after
+              reviewing the property details. No service is booked
+              until the scope and pricing are confirmed.
             </p>
           </div>
 
@@ -868,7 +874,7 @@ export function CommercialQuoteForm({
             <Send size={20} aria-hidden="true" />
             {isSubmitting
               ? "Sending Quote Request..."
-              : "Request Commercial Quote"}
+              : "Send Quote Request"}
           </button>
         </div>
       </form>
