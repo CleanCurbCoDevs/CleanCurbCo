@@ -450,8 +450,9 @@ export default async function CommercialQuotesPage({
                       />
                     </div>
 
-                    <div className="admin-detail-layout">
-                      <section className="detail-panel">
+                    <div className="commercial-quote-detail-layout">
+                    <div className="commercial-quote-detail-column">
+                      <section className="detail-panel commercial-quote-contact-panel">
                         <p className="section-kicker">
                           Contact & Property
                         </p>
@@ -526,7 +527,38 @@ export default async function CommercialQuotesPage({
                         />
                       </section>
 
-                      <section className="detail-panel">
+                      <section className="detail-panel commercial-quote-description-panel">
+                        <p className="section-kicker">
+                          Customer Description
+                        </p>
+                      
+                        <h2>
+                          What is going on out there.
+                        </h2>
+                      
+                        <QuoteTextBlock
+                          label="Property and problem"
+                          value={
+                            quote.project_description
+                          }
+                        />
+                      
+                        <QuoteTextBlock
+                          label="Additional customer notes"
+                          value={
+                            quote.additional_notes
+                          }
+                        />
+                      
+                        <InfoTile
+                          label="Request ID"
+                          value={quote.id}
+                        />
+                      </section>
+                    </div>
+
+                    <div className="commercial-quote-detail-column">
+                      <section className="detail-panel commercial-quote-scope-panel">
                         <p className="section-kicker">
                           Requested Scope
                         </p>
@@ -637,36 +669,7 @@ export default async function CommercialQuotesPage({
                       ) : null}
                       </section>
 
-                      <section className="detail-panel">
-                        <p className="section-kicker">
-                          Customer Description
-                        </p>
-
-                        <h2>
-                          What is going on out there.
-                        </h2>
-
-                        <QuoteTextBlock
-                          label="Property and problem"
-                          value={
-                            quote.project_description
-                          }
-                        />
-
-                        <QuoteTextBlock
-                          label="Additional customer notes"
-                          value={
-                            quote.additional_notes
-                          }
-                        />
-
-                        <InfoTile
-                          label="Request ID"
-                          value={quote.id}
-                        />
-                      </section>
-
-                      <section className="detail-panel">
+                      <section className="detail-panel commercial-quote-workflow-panel">
                         <p className="section-kicker">
                           Internal Workflow
                         </p>
@@ -746,11 +749,12 @@ export default async function CommercialQuotesPage({
                       </section>
                     </div>
                   </div>
-                </details>
-              );
-            })}
-          </div>
-        ) : (
+                </div>
+              </details>
+            );
+          })}
+        </div>
+      ) : (
           <section className="detail-panel">
             <p className="section-kicker">
               Queue Clear
