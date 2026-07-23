@@ -4,6 +4,9 @@ import Link from "next/link";
 import { AdminShell } from "@/components/shells/admin-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getAdminContext } from "@/lib/admin-data";
+import {
+  commercialPropertyTypeLabels,
+} from "@/types/commercial";
 
 export const metadata: Metadata = {
   title: "Admin Command Center",
@@ -22,6 +25,18 @@ const activeRequests = context.requests
   .filter((request) => ["new", "reviewing", "approved"].includes(request.status))
   .slice(0, 5);
 
+const recentCommercialQuotes =
+  context.commercialQuotes
+    .filter((quote) =>
+      [
+        "new",
+        "reviewing",
+        "site_visit_needed",
+        "quoted",
+      ].includes(quote.status),
+    )
+    .slice(0, 5);
+  
 const recentNotifications = context.adminNotifications.slice(0, 5);
 
   return (
@@ -41,6 +56,7 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
             <span className="status-badge">{context.bookings.length} bookings</span>
             <span className="status-badge">{context.profiles.length} customers</span>
             <span className="status-badge">{context.routeDays.length} routes</span>
+            <span className="status-badge">{context.commercialQuotes.length} commercial</span>
           </div>
         </div>
 
@@ -60,7 +76,19 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
               detail="Accept, follow up, or route."
               tone={stats.newBookings ? "warning" : "good"}
             />
-
+            
+            <CommandStatCard
+              href="/admin/commercial-quotes?status=new"
+              label="New commercial quotes"
+              value={stats.newCommercialQuotes}
+              detail="Review properties and determine next steps."
+              tone={
+                stats.newCommercialQuotes
+                  ? "warning"
+                  : "good"
+              }
+            />
+            
             <CommandStatCard
               href="/admin/bookings?status=needs_follow_up"
               label="Needs follow-up"
@@ -116,6 +144,11 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
               href="/admin/bookings"
               title="Bookings"
               description="Review new bookings, approve route dates, send payment setup, and manage booking status."
+            />
+            <WorkflowCard
+              href="/admin/commercial-quotes"
+              title="Commercial Quotes"
+              description="Review commercial property requests, walkthrough needs, scope details, quote status, and internal notes."
             />
             <WorkflowCard
               href="/admin/routes"
@@ -174,7 +207,49 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
               </Link>
             ))}
           </CommandFeedPanel>
-
+          
+          <CommandFeedPanel
+            title="Commercial quote pipeline"
+            empty="No active commercial quote requests."
+            actionHref="/admin/commercial-quotes"
+            actionLabel="View pipeline"
+          >
+            {recentCommercialQuotes.map((quote) => (
+              <Link
+                className="command-feed-row"
+                href={`/admin/commercial-quotes?q=${quote.id}`}
+                key={quote.id}
+              >
+                <div>
+                  <strong>{quote.business_name}</strong>
+          
+                  <span>
+                    {commercialPropertyTypeLabels[
+                      quote.property_type
+                    ] ??
+                      humanizeStatus(
+                        quote.property_type,
+                      )}
+                    {" | "}
+                    {quote.city}, {quote.state}
+                  </span>
+                </div>
+          
+                <div className="command-feed-meta">
+                  <span
+                    className={`status-badge status-${quote.status}`}
+                  >
+                    {humanizeStatus(quote.status)}
+                  </span>
+          
+                  <small>
+                    {formatDateTime(quote.created_at)}
+                  </small>
+                </div>
+              </Link>
+            ))}
+          </CommandFeedPanel>
+          
           <CommandFeedPanel
             title="Active customer requests"
             empty="No active customer requests."
@@ -334,18 +409,35 @@ function getCommandCenterStats(context: Awaited<ReturnType<typeof getAdminContex
   }).length;
 
   return {
-    newBookings: context.bookings.filter((booking) => booking.status === "new").length,
-    needsFollowUp: context.bookings.filter(
-      (booking) => booking.status === "needs_follow_up",
+    newBookings: context.bookings.filter(
+      (booking) =>
+        booking.status === "new",
     ).length,
+  
+    newCommercialQuotes:
+      context.commercialQuotes.filter(
+        (quote) => quote.status === "new",
+      ).length,
+  
+    needsFollowUp: context.bookings.filter(
+      (booking) =>
+        booking.status ===
+        "needs_follow_up",
+    ).length,
+  
     paymentIssues,
-    activeRequests: context.requests.filter((request) =>
-      activeRequestStatuses.includes(request.status),
+    activeRequests: context.requests.filter(
+      (request) =>
+        activeRequestStatuses.includes(
+          request.status,
+        ),
     ).length,
     routesNeedingWork,
-    checklistFollowUp: context.checklists.filter(
-      (checklist) => !checklist.service_completed,
-    ).length,
+    checklistFollowUp:
+      context.checklists.filter(
+        (checklist) =>
+          !checklist.service_completed,
+      ).length,
   };
 }
 
