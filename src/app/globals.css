@@ -9751,13 +9751,32 @@ form.data-row label textarea,
    COMMERCIAL QUOTE PHOTOS
    ========================================================= */
 
+.commercial-quote-detail-layout {
+  align-items: start;
+  display: grid;
+  gap: 14px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+}
+
+.commercial-quote-detail-column {
+  align-content: start;
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.commercial-quote-detail-column > .detail-panel {
+  min-width: 0;
+}
+
 .commercial-admin-photo-grid {
   display: grid;
   gap: 10px;
   grid-template-columns:
     repeat(
       auto-fit,
-      minmax(130px, 1fr)
+      minmax(145px, 1fr)
     );
   margin-top: 16px;
 }
@@ -9901,6 +9920,32 @@ form.data-row label textarea,
 .cookie-preference-reject:focus-visible {
   outline: 3px solid var(--gold-soft);
   outline-offset: 2px;
+}
+
+@media (max-width: 900px) {
+  .commercial-quote-detail-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .commercial-quote-detail-column {
+    display: contents;
+  }
+
+  .commercial-quote-contact-panel {
+    order: 1;
+  }
+
+  .commercial-quote-scope-panel {
+    order: 2;
+  }
+
+  .commercial-quote-description-panel {
+    order: 3;
+  }
+
+  .commercial-quote-workflow-panel {
+    order: 4;
+  }
 }
 
 /* =========================================================
