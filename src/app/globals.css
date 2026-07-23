@@ -9748,6 +9748,55 @@ form.data-row label textarea,
 }
 
 /* =========================================================
+   COMMERCIAL QUOTE PHOTOS
+   ========================================================= */
+
+.commercial-admin-photo-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns:
+    repeat(
+      auto-fit,
+      minmax(130px, 1fr)
+    );
+  margin-top: 16px;
+}
+
+.commercial-admin-photo-card {
+  align-items: flex-end;
+  aspect-ratio: 4 / 3;
+  background-color: #d9d4c8;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: cover;
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  display: flex;
+  overflow: hidden;
+  transition:
+    box-shadow 150ms ease,
+    transform 150ms ease;
+}
+
+.commercial-admin-photo-card span {
+  background: rgba(5, 5, 5, 0.78);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: 900;
+  padding: 7px 9px;
+  width: 100%;
+}
+
+.commercial-admin-photo-card:hover {
+  box-shadow:
+    0 0 0 3px
+    rgba(138, 0, 196, 0.14);
+  transform: translateY(-1px);
+}
+
+
+
+/* =========================================================
    COOKIE CONSENT
    ========================================================= */
 
