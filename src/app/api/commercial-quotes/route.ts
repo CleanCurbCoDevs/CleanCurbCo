@@ -661,7 +661,7 @@ export async function POST(request: Request) {
       type: "commercial_quote_received",
       title: "New commercial quote request",
       message: `${quote.business_name} submitted a commercial cleaning request.`,
-      href: "/admin",
+      href: `/admin/commercial-quotes?q=${quote.id}`,
       severity: "warning",
       metadata: {
         commercialQuoteId: quote.id,
