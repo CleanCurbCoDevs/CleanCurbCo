@@ -21,12 +21,8 @@ import { publicPageMetadata } from "@/lib/seo";
 import { brand } from "@/lib/site";
 import "./commercial.css";
 
-/*
- * Temporary landing point while the dedicated commercial quote form
- * is being built. Change this to "/commercial/request-quote" when
- * that route is complete.
- */
-const commercialQuoteHref = "/contact#contact-form";
+const commercialQuoteHref =
+  "/commercial/request-quote";
 
 const customerTypes = [
   {
