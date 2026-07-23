@@ -114,6 +114,52 @@ export function commercialPricingProfileRowToValues(
         fallback.hoaCoordinationFeeCents,
       ),
 
+    assessmentVehicleCostPerMileCents:
+      safeInteger(
+        row
+          .assessment_vehicle_cost_per_mile_cents,
+        fallback
+          .assessmentVehicleCostPerMileCents,
+      ),
+    
+    siteVisitRecommendedSquareFeet:
+      safeInteger(
+        row.site_visit_recommended_sqft,
+        fallback
+          .siteVisitRecommendedSquareFeet,
+      ),
+    
+    siteVisitRecommendedPriceCents:
+      safeInteger(
+        row
+          .site_visit_recommended_price_cents,
+        fallback
+          .siteVisitRecommendedPriceCents,
+      ),
+    
+    surfaceRatesCents: {
+      ...fallback.surfaceRatesCents,
+      ...(row.surface_rates_cents ?? {}),
+    },
+    
+    surfacePersonMinutesPer100SquareFeet: {
+      ...fallback
+        .surfacePersonMinutesPer100SquareFeet,
+    
+      ...(row
+        .surface_person_minutes_per_100_sqft ??
+        {}),
+    },
+
+    surfaceRatesCents: {
+      ...profile.surfaceRatesCents,
+    },
+    
+    surfacePersonMinutesPer100SquareFeet: {
+      ...profile
+        .surfacePersonMinutesPer100SquareFeet,
+    },
+        
     taskMinutes: {
       ...fallback.taskMinutes,
       ...(row.task_minutes ?? {}),
