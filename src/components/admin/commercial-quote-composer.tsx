@@ -4,6 +4,8 @@ import {
   Building2,
   Calculator,
   Copy,
+  Download,
+  Eye,
   Home,
   Save,
   TriangleAlert,
@@ -27,6 +29,12 @@ import {
 import {
   calculateCommercialPricing,
 } from "@/lib/commercial-pricing";
+
+import {
+  calculateCommercialRemainingBalanceCents,
+  calculateCommercialSchedulingDepositCents,
+  resolveCommercialPaymentTerms,
+} from "@/lib/commercial-quote-policy";
 
 import {
   normalizeCommercialPricingInput,
@@ -297,8 +305,10 @@ export function CommercialQuoteComposer({
     paymentTerms,
     setPaymentTerms,
   ] = useState(
-    existingDraft?.payment_terms ||
-      "Payment terms will be confirmed before service is scheduled.",
+    () =>
+      resolveCommercialPaymentTerms(
+        existingDraft?.payment_terms,
+      ),
   );
 
   const [
@@ -368,6 +378,27 @@ export function CommercialQuoteComposer({
         )
       : null;
 
+  const depositBasePriceCents =
+    finalInitialPriceCents > 0
+      ? finalInitialPriceCents
+      : finalRecurringPriceCents ??
+        0;
+  
+  const schedulingDepositCents =
+    calculateCommercialSchedulingDepositCents(
+      depositBasePriceCents,
+    );
+  
+  const remainingBalanceCents =
+    calculateCommercialRemainingBalanceCents(
+      depositBasePriceCents,
+    );
+  
+  const quotePdfUrl =
+    existingDraft
+      ? `/admin/commercial-quotes/${request.id}/quote/pdf`
+      : null;
+  
   const activeInput =
     activeEstimate === "initial"
       ? initialInput
@@ -1878,13 +1909,13 @@ export function CommercialQuoteComposer({
             <span>
               Draft total
             </span>
-
+        
             <strong>
               Initial:{" "}
               {formatCurrency(
                 finalInitialPriceCents,
               )}
-
+        
               {includeRecurring &&
               finalRecurringPriceCents !==
                 null
@@ -1892,26 +1923,71 @@ export function CommercialQuoteComposer({
                     finalRecurringPriceCents,
                   )}`
                 : ""}
+        
+              {schedulingDepositCents > 0
+                ? ` • Deposit: ${formatCurrency(
+                    schedulingDepositCents,
+                  )} • Remaining: ${formatCurrency(
+                    remainingBalanceCents,
+                  )}`
+                : ""}
             </strong>
-
+        
             <small>
-              Saving does not email the
-              customer or change this
-              request to Quoted.
+              PDF buttons use the last saved
+              draft. Save again after making
+              changes. Nothing is emailed yet.
             </small>
           </div>
-
-          <ActionSubmitButton
-            className="button button-primary"
-            pendingLabel="Saving Draft..."
-          >
-            <Save
-              size={19}
-              aria-hidden="true"
-            />
-
-            Save Quote Draft
-          </ActionSubmitButton>
+        
+          <div className="commercial-builder-save-actions">
+            <ActionSubmitButton
+              className="button button-primary"
+              pendingLabel="Saving Draft..."
+            >
+              <Save
+                size={19}
+                aria-hidden="true"
+              />
+        
+              Save Quote Draft
+            </ActionSubmitButton>
+        
+            {quotePdfUrl ? (
+              <>
+                <a
+                  className="button button-outline commercial-builder-pdf-button"
+                  href={quotePdfUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  <Eye
+                    size={19}
+                    aria-hidden="true"
+                  />
+        
+                  Preview PDF
+                </a>
+        
+                <a
+                  className="button button-outline commercial-builder-pdf-button"
+                  href={`${quotePdfUrl}?download=1`}
+                >
+                  <Download
+                    size={19}
+                    aria-hidden="true"
+                  />
+        
+                  Download PDF
+                </a>
+              </>
+            ) : (
+              <span className="commercial-builder-pdf-disabled">
+                Save this draft once to enable
+                PDF preview and download.
+              </span>
+            )}
+          </div>
         </footer>
       </FeedbackForm>
     </section>
