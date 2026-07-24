@@ -482,7 +482,7 @@ export function CommercialMeasurementEditor({
                 <span>
                   <small>
                     Internal assessment
-                    time
+                    labor
                   </small>
 
                   <strong>
@@ -667,7 +667,7 @@ function MeasurementRow({
             </option>
 
             <option value="manual_square_feet">
-              Enter total square feet
+              Enter square feet per area
             </option>
           </select>
         </label>
@@ -713,7 +713,7 @@ function MeasurementRow({
           </>
         ) : (
           <NumberInput
-            label="Total square feet"
+            label="Square feet per area"
             step={0.1}
             value={
               measurement.manualSquareFeet
