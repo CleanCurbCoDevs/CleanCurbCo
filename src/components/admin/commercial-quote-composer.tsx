@@ -143,6 +143,7 @@ export function CommercialQuoteComposer({
       "initial",
       startingModel,
       "initial",
+      request,
     );
 
   const savedRecurring =
@@ -151,6 +152,7 @@ export function CommercialQuoteComposer({
       "recurring",
       startingModel,
       "recurring",
+      request,
     );
 
   const [
@@ -1657,31 +1659,7 @@ export function CommercialQuoteComposer({
               />
             ) : null}
           </div>
-            {calculation
-              .surfaceMarketCents > 0 ? (
-              <span>
-                Measured surface model
-                <strong>
-                  {formatCurrency(
-                    calculation
-                      .surfaceMarketCents,
-                  )}
-                </strong>
-              </span>
-            ) : null}
-            
-            {calculation
-              .assessmentRecoveryCents > 0 ? (
-              <span>
-                Free quote cost recovery
-                <strong>
-                  {formatCurrency(
-                    calculation
-                      .assessmentRecoveryCents,
-                  )}
-                </strong>
-              </span>
-            ) : null}
+          
           {includeRecurring ? (
             <label className="commercial-builder-field commercial-builder-frequency">
               <span>
@@ -1959,7 +1937,7 @@ function CalculationSummary({
     calculation
       .routeAdjustmentsCents -
     calculation
-      .assessmentRecoveryCents;
+      .assessmentInternalCostCents;
 
   return (
     <div className="commercial-builder-summary">
@@ -2029,6 +2007,47 @@ function CalculationSummary({
 
       <div>
         <span>
+          Measured surface
+        </span>
+      
+        <strong>
+          {calculation.measuredSquareFeet.toLocaleString(
+            "en-US",
+            {
+              maximumFractionDigits: 2,
+            },
+          )}{" "}
+          sq. ft.
+        </strong>
+      </div>
+      
+      <div>
+        <span>
+          Surface market
+        </span>
+      
+        <strong>
+          {formatCurrency(
+            calculation.surfaceMarketCents,
+          )}
+        </strong>
+      </div>
+      
+      <div>
+        <span>
+          Free quote recovery
+        </span>
+      
+        <strong>
+          {formatCurrency(
+            calculation
+              .assessmentRecoveryCents,
+          )}
+        </strong>
+      </div>
+      
+      <div>
+        <span>
           Suggested
         </span>
 
@@ -2077,8 +2096,8 @@ function CalculationCard({
     calculation
       .routeAdjustmentsCents -
     calculation
-      .assessmentRecoveryCents;
-
+      .assessmentInternalCostCents;
+  
   return (
     <article className="commercial-builder-result-card">
       <p className="section-kicker">
@@ -2112,6 +2131,34 @@ function CalculationCard({
           </strong>
         </span>
 
+        {calculation.surfaceMarketCents >
+        0 ? (
+          <span>
+            Measured surface model
+        
+            <strong>
+              {formatCurrency(
+                calculation
+                  .surfaceMarketCents,
+              )}
+            </strong>
+          </span>
+        ) : null}
+        
+        {calculation.assessmentRecoveryCents >
+        0 ? (
+          <span>
+            Free quote cost recovery
+        
+            <strong>
+              {formatCurrency(
+                calculation
+                  .assessmentRecoveryCents,
+              )}
+            </strong>
+          </span>
+        ) : null}
+        
         {calculation
           .routeMarketCents > 0 ? (
           <span>
@@ -2538,6 +2585,7 @@ function getSavedPricingInput(
   key: EstimateKind,
   model: CommercialPricingModel,
   visitType: CommercialVisitType,
+  request: CommercialQuoteRequestRow,
 ) {
   if (!draft) {
     return null;
@@ -2553,14 +2601,56 @@ function getSavedPricingInput(
   }
 
   const savedValue =
-    calculatorInput[key];
+    asRecord(
+      calculatorInput[key],
+    );
 
   if (!savedValue) {
     return null;
   }
 
+  const defaults =
+    createDefaultPricingInput(
+      request,
+      model,
+      visitType,
+    );
+
+  const savedAssessment =
+    asRecord(
+      savedValue.quoteAssessment,
+    );
+
+  const savedSiteContext =
+    asRecord(
+      savedValue.siteContext,
+    );
+
   return normalizeCommercialPricingInput(
-    savedValue,
+    {
+      ...defaults,
+      ...savedValue,
+
+      surfaceMeasurements:
+        Array.isArray(
+          savedValue
+            .surfaceMeasurements,
+        )
+          ? savedValue
+              .surfaceMeasurements
+          : defaults
+              .surfaceMeasurements,
+
+      quoteAssessment: {
+        ...defaults.quoteAssessment,
+        ...(savedAssessment ?? {}),
+      },
+
+      siteContext: {
+        ...defaults.siteContext,
+        ...(savedSiteContext ?? {}),
+      },
+    },
     model,
     visitType,
   );
