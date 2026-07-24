@@ -60,16 +60,20 @@ export function calculateCommercialAssessmentInternalCost(
       ),
     ),
   );
-
+  const isOnsite =
+    assessment.method === "onsite";
+  
   const fieldPersonMinutes =
-    (
-      nonNegative(
-        assessment.travelMinutes,
-      ) +
-      nonNegative(
-        assessment.onsiteMinutes,
-      )
-    ) * assessorCount;
+    isOnsite
+      ? (
+          nonNegative(
+            assessment.travelMinutes,
+          ) +
+          nonNegative(
+            assessment.onsiteMinutes,
+          )
+        ) * assessorCount
+      : 0;
 
   const adminPersonMinutes =
     nonNegative(
@@ -89,15 +93,18 @@ export function calculateCommercialAssessmentInternalCost(
       ),
   );
 
-  const mileageCents = Math.round(
-    nonNegative(
-      assessment.roundTripMiles,
-    ) *
-      nonNegative(
-        profile
-          .assessmentVehicleCostPerMileCents,
-      ),
-  );
+  const mileageCents =
+    isOnsite
+      ? Math.round(
+          nonNegative(
+            assessment.roundTripMiles,
+          ) *
+            nonNegative(
+              profile
+                .assessmentVehicleCostPerMileCents,
+            ),
+        )
+      : 0;
 
   const otherCostsCents = Math.round(
     nonNegative(
