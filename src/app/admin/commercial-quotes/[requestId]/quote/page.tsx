@@ -19,6 +19,10 @@ import {
 } from "@/lib/commercial-pricing-profile";
 
 import {
+  COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT,
+} from "@/lib/commercial-quote-policy";
+
+import {
   getSupabaseAdmin,
 } from "@/lib/supabase/admin";
 
@@ -247,6 +251,11 @@ export default async function CommercialQuoteBuilderPage({
               }
             />
 
+            <ContextTile
+              label="Scheduling deposit"
+              value={`${COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT}% after agreement signing`}
+            />
+            
             <ContextTile
               label="Draft status"
               value={
