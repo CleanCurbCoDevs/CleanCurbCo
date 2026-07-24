@@ -68,7 +68,7 @@ export function calculateCommercialPricing(
 function calculateCommercialSitePricing(
   profile: CommercialPricingProfileValues,
   input: CommercialSitePricingInput,
-): CommercialPricingCalculation {
+): CommercialCorePricingCalculation {
   const crewSize = normalizeCrewSize(
     input.crewSize,
   );
@@ -232,7 +232,7 @@ function calculateCommercialSitePricing(
 function calculateHoaRoutePricing(
   profile: CommercialPricingProfileValues,
   input: CommercialHoaRoutePricingInput,
-): CommercialPricingCalculation {
+): CommercialCorePricingCalculation {
   const crewSize = normalizeCrewSize(
     input.crewSize,
   );
@@ -474,7 +474,7 @@ function calculateHoaRoutePricing(
 function calculateApartmentPricing(
   profile: CommercialPricingProfileValues,
   input: CommercialApartmentPricingInput,
-): CommercialPricingCalculation {
+): CommercialCorePricingCalculation {
   const crewSize = normalizeCrewSize(
     input.crewSize,
   );
@@ -1036,18 +1036,26 @@ function getSiteVisitReasons(
         ) > 0,
     );
 
-  const allMeasurementsVerified =
-    measurementsWithArea.length > 0 &&
-    measurementsWithArea.every(
-      (measurement) =>
-        measurement.confidence ===
-        "field_verified",
+  const measurementVerificationRequired =
+    input.siteContext
+      .surfaceWorkExpected ||
+    measurementsWithArea.length > 0;
+  
+  const allRequiredMeasurementsVerified =
+    !measurementVerificationRequired ||
+    (
+      measurementsWithArea.length > 0 &&
+      measurementsWithArea.every(
+        (measurement) =>
+          measurement.confidence ===
+          "field_verified",
+      )
     );
-
+  
   const onsiteAssessmentCompleted =
     input.quoteAssessment.method ===
       "onsite" &&
-    allMeasurementsVerified;
+    allRequiredMeasurementsVerified;
 
   if (onsiteAssessmentCompleted) {
     return [];
@@ -1058,7 +1066,7 @@ function getSiteVisitReasons(
   if (
     input.quoteAssessment.method ===
       "onsite" &&
-    !allMeasurementsVerified
+    !allRequiredMeasurementsVerified
   ) {
     reasons.push(
       "The onsite assessment is selected, but the measurements are not marked field verified.",
@@ -1105,7 +1113,15 @@ function getSiteVisitReasons(
     );
   }
 
+  const photosNeededForRemoteQuote =
+    input.model !== "hoa_route" ||
+    input.siteContext
+      .surfaceWorkExpected ||
+    input.condition === "heavy" ||
+    input.condition === "not_sure";
+  
   if (
+    photosNeededForRemoteQuote &&
     input.siteContext.photoCount < 2
   ) {
     reasons.push(
