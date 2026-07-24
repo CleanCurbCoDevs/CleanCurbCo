@@ -150,15 +150,6 @@ export function commercialPricingProfileRowToValues(
         .surface_person_minutes_per_100_sqft ??
         {}),
     },
-
-    surfaceRatesCents: {
-      ...profile.surfaceRatesCents,
-    },
-    
-    surfacePersonMinutesPer100SquareFeet: {
-      ...profile
-        .surfacePersonMinutesPer100SquareFeet,
-    },
         
     taskMinutes: {
       ...fallback.taskMinutes,
@@ -195,6 +186,15 @@ function clonePricingProfile(
   return {
     ...profile,
 
+    surfaceRatesCents: {
+      ...profile.surfaceRatesCents,
+    },
+    
+    surfacePersonMinutesPer100SquareFeet: {
+      ...profile
+        .surfacePersonMinutesPer100SquareFeet,
+    },
+    
     taskMinutes: {
       ...profile.taskMinutes,
     },
