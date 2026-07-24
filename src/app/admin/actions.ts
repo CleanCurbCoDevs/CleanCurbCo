@@ -2336,7 +2336,7 @@ export async function saveCommercialQuoteDraftAction(
     initialCalculation
       .routeAdjustmentsCents +
     initialCalculation
-      .assessmentRecoveryCents;
+      .assessmentInternalCostCents;
 
   const estimatedContributionCents =
     finalInitialPriceCents -
