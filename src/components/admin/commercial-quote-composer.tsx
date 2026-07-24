@@ -1540,45 +1540,8 @@ export function CommercialQuoteComposer({
                 calculation={
                   activeCalculation
                 }
-                <div>
-                  <span>
-                    Measured surface
-                  </span>
-                
-                  <strong>
-                    {calculation.measuredSquareFeet}{" "}
-                    sq. ft.
-                  </strong>
-                </div>
-                
-                <div>
-                  <span>
-                    Surface market
-                  </span>
-                
-                  <strong>
-                    {formatCurrency(
-                      calculation
-                        .surfaceMarketCents,
-                    )}
-                  </strong>
-                </div>
-                
-                <div>
-                  <span>
-                    Quote recovery
-                  </span>
-                
-                  <strong>
-                    {formatCurrency(
-                      calculation
-                        .assessmentRecoveryCents,
-                    )}
-                  </strong>
-                </div>
                 finalPriceCents={
-                  activeEstimate ===
-                  "initial"
+                  activeEstimate === "initial"
                     ? finalInitialPriceCents
                     : finalRecurringPriceCents ??
                       recurringCalculation
