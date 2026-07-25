@@ -10,6 +10,7 @@ import {
   Save,
   TriangleAlert,
   Users,
+  FileCheck2,
 } from "lucide-react";
 
 import {
@@ -67,6 +68,7 @@ import {
 import type {
   CommercialQuoteRequestRow,
   CommercialQuoteRow,
+  CustomerFileRow,
 } from "@/types/database";
 
 type CommercialQuoteComposerProps = {
@@ -76,6 +78,10 @@ type CommercialQuoteComposerProps = {
   pricingProfileId: string | null;
   pricingProfileName: string;
   existingDraft: CommercialQuoteRow | null;
+  latestCustomerCopy:
+  CustomerFileRow | null;
+  latestCustomerCopyMatchesSavedQuote:
+    boolean;
 };
 
 type EstimateKind =
@@ -138,6 +144,8 @@ export function CommercialQuoteComposer({
   pricingProfileId,
   pricingProfileName,
   existingDraft,
+  latestCustomerCopy,
+  latestCustomerCopyMatchesSavedQuote,
 }: CommercialQuoteComposerProps) {
   const startingModel =
     existingDraft?.pricing_model ??
@@ -395,8 +403,8 @@ export function CommercialQuoteComposer({
     );
   
   const quotePdfUrl =
-    existingDraft
-      ? `/admin/commercial-quotes/${request.id}/quote/pdf`
+    latestCustomerCopy
+      ? `/admin/customer-files/${latestCustomerCopy.id}`
       : null;
   
   const activeInput =
@@ -1905,9 +1913,9 @@ export function CommercialQuoteComposer({
         </section>
 
         <footer className="commercial-builder-savebar">
-          <div>
+          <div className="commercial-builder-save-summary">
             <span>
-              Draft total
+              Current quote
             </span>
         
             <strong>
@@ -1933,24 +1941,55 @@ export function CommercialQuoteComposer({
                 : ""}
             </strong>
         
-            <small>
-              PDF buttons use the last saved
-              draft. Save again after making
-              changes. Nothing is emailed yet.
-            </small>
+            {latestCustomerCopy ? (
+              <small
+                className={
+                  latestCustomerCopyMatchesSavedQuote
+                    ? "commercial-builder-copy-current"
+                    : "commercial-builder-copy-stale"
+                }
+              >
+                {latestCustomerCopyMatchesSavedQuote
+                  ? "The stored customer copy matches the last saved quote."
+                  : "The stored customer copy does not match the last saved quote. Regenerate it before sending."}
+              </small>
+            ) : (
+              <small>
+                No customer copy has been
+                generated yet.
+              </small>
+            )}
           </div>
         
           <div className="commercial-builder-save-actions">
             <ActionSubmitButton
               className="button button-primary"
-              pendingLabel="Saving Draft..."
+              name="quoteAction"
+              value="save"
+              pendingLabel="Saving..."
             >
               <Save
                 size={19}
                 aria-hidden="true"
               />
         
-              Save Quote Draft
+              Save Draft
+            </ActionSubmitButton>
+        
+            <ActionSubmitButton
+              className="button commercial-builder-generate-button"
+              name="quoteAction"
+              value="generate_customer_copy"
+              pendingLabel="Building Exact Copy..."
+            >
+              <FileCheck2
+                size={19}
+                aria-hidden="true"
+              />
+        
+              {latestCustomerCopy
+                ? "Regenerate Customer Copy"
+                : "Generate Customer Copy"}
             </ActionSubmitButton>
         
             {quotePdfUrl ? (
@@ -1966,7 +2005,7 @@ export function CommercialQuoteComposer({
                     aria-hidden="true"
                   />
         
-                  Preview PDF
+                  Preview Exact Copy
                 </a>
         
                 <a
@@ -1978,15 +2017,10 @@ export function CommercialQuoteComposer({
                     aria-hidden="true"
                   />
         
-                  Download PDF
+                  Download Exact Copy
                 </a>
               </>
-            ) : (
-              <span className="commercial-builder-pdf-disabled">
-                Save this draft once to enable
-                PDF preview and download.
-              </span>
-            )}
+            ) : null}
           </div>
         </footer>
       </FeedbackForm>
