@@ -82,6 +82,7 @@ export default async function CommercialQuoteBuilderPage({
     pricingProfileResult,
     draftResult,
     customerFilesResult,
+    customerDeliveriesResult,
   ] = await Promise.all([
     admin
       .from(
@@ -106,7 +107,13 @@ export default async function CommercialQuoteBuilderPage({
         "request_id",
         requestId,
       )
-      .eq("status", "draft")
+      .in(
+        "status",
+        [
+          "draft",
+          "sent",
+        ],
+      )
       .order(
         "version_number",
         {
@@ -119,6 +126,22 @@ export default async function CommercialQuoteBuilderPage({
     admin
       .from(
         "customer_files",
+      )
+      .select("*")
+      .eq(
+        "commercial_request_id",
+        requestId,
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        },
+      ),
+
+    admin
+      .from(
+        "customer_deliveries",
       )
       .select("*")
       .eq(
@@ -212,7 +235,11 @@ export default async function CommercialQuoteBuilderPage({
   const customerFiles =
     customerFilesResult.data ??
     [];
-
+  
+  const customerDeliveries =
+    customerDeliveriesResult.data ??
+    [];
+  
   const latestCustomerCopy =
     customerFiles
       .filter(
@@ -340,11 +367,16 @@ export default async function CommercialQuoteBuilderPage({
             />
             
             <ContextTile
-              label="Draft status"
+              label="Quote status"
               value={
                 existingDraft
-                  ? `Draft v${existingDraft.version_number}`
-                  : "No draft yet"
+                  ? `${
+                      existingDraft.status ===
+                      "sent"
+                        ? "Sent"
+                        : "Draft"
+                    } v${existingDraft.version_number}`
+                  : "No quote yet"
               }
             />
           </div>
@@ -376,6 +408,18 @@ export default async function CommercialQuoteBuilderPage({
         
         <CustomerFileArchivePanel
           files={customerFiles}
+          deliveries={
+            customerDeliveries
+          }
+          requestId={
+            request.id
+          }
+          recipientName={
+            request.contact_name
+          }
+          recipientEmail={
+            request.email
+          }
           latestQuoteFileId={
             latestCustomerCopy?.id ??
             null
