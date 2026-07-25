@@ -846,6 +846,135 @@ export type CommercialQuoteLineItemRow = {
   metadata: Record<string, unknown>;
 };
 
+export type CustomerFileKind =
+  | "document"
+  | "photo"
+  | "other";
+
+export type CustomerFileStatus =
+  | "generated"
+  | "ready"
+  | "sent"
+  | "received"
+  | "superseded"
+  | "void";
+
+export type CustomerDeliveryChannel =
+  | "email"
+  | "docusign"
+  | "portal"
+  | "manual";
+
+export type CustomerDeliveryStatus =
+  | "queued"
+  | "sent"
+  | "delivered"
+  | "failed"
+  | "bounced";
+
+export type CustomerFileRow = {
+  id: string;
+  created_at: string;
+
+  customer_id: string | null;
+  booking_id: string | null;
+  service_visit_id: string | null;
+
+  commercial_request_id:
+    string | null;
+
+  commercial_quote_id:
+    string | null;
+
+  file_kind: CustomerFileKind;
+  document_type: string;
+
+  display_name: string;
+  original_filename: string;
+
+  storage_bucket: string;
+  storage_path: string;
+
+  mime_type: string;
+  size_bytes: number;
+  sha256: string;
+
+  version_number: number;
+  status: CustomerFileStatus;
+
+  is_customer_visible: boolean;
+  is_immutable: boolean;
+
+  source_snapshot_hash:
+    string | null;
+
+  source_snapshot:
+    Record<string, unknown>;
+
+  generated_by_user_id:
+    string | null;
+
+  finalized_at: string | null;
+  sent_at: string | null;
+  received_at: string | null;
+  superseded_at: string | null;
+  voided_at: string | null;
+
+  metadata:
+    Record<string, unknown>;
+};
+
+export type CustomerDeliveryRow = {
+  id: string;
+  created_at: string;
+
+  customer_id: string | null;
+  booking_id: string | null;
+  service_visit_id: string | null;
+
+  commercial_request_id:
+    string | null;
+
+  commercial_quote_id:
+    string | null;
+
+  channel:
+    CustomerDeliveryChannel;
+
+  status:
+    CustomerDeliveryStatus;
+
+  recipient_name: string | null;
+  recipient_email: string;
+
+  subject: string | null;
+  message_text: string | null;
+
+  provider: string | null;
+  provider_message_id: string | null;
+
+  sent_at: string | null;
+  delivered_at: string | null;
+  failed_at: string | null;
+  error_message: string | null;
+
+  created_by_user_id:
+    string | null;
+
+  metadata:
+    Record<string, unknown>;
+};
+
+export type CustomerDeliveryFileRow = {
+  id: string;
+  created_at: string;
+
+  delivery_id: string;
+  customer_file_id: string;
+
+  sort_order: number;
+};
+
 export type ContactMessageRow = {
   id: string;
   created_at: string;
@@ -1166,7 +1295,65 @@ export type Database = {
       
         Relationships: [];
       };
-  
+
+            customer_files: {
+        Row: CustomerFileRow;
+
+        Insert:
+          Partial<CustomerFileRow> &
+          Pick<
+            CustomerFileRow,
+            | "document_type"
+            | "display_name"
+            | "original_filename"
+            | "storage_bucket"
+            | "storage_path"
+            | "mime_type"
+            | "size_bytes"
+            | "sha256"
+          >;
+
+        Update:
+          Partial<CustomerFileRow>;
+
+        Relationships: [];
+      };
+
+      customer_deliveries: {
+        Row: CustomerDeliveryRow;
+
+        Insert:
+          Partial<CustomerDeliveryRow> &
+          Pick<
+            CustomerDeliveryRow,
+            | "channel"
+            | "recipient_email"
+          >;
+
+        Update:
+          Partial<CustomerDeliveryRow>;
+
+        Relationships: [];
+      };
+
+      customer_delivery_files: {
+        Row:
+          CustomerDeliveryFileRow;
+
+        Insert:
+          Partial<CustomerDeliveryFileRow> &
+          Pick<
+            CustomerDeliveryFileRow,
+            | "delivery_id"
+            | "customer_file_id"
+          >;
+
+        Update:
+          Partial<CustomerDeliveryFileRow>;
+
+        Relationships: [];
+      };
+
       maintenance_waitlist: {
         Row: {
           id: string;
