@@ -753,12 +753,24 @@ function addMeasuredSurfaceSeeds(
       measurement.label.trim() ||
       surfaceLabel;
 
-    const rateCents =
+    const personMinutesPer100SquareFeet =
       pricingProfile
-        .surfaceRatesCents[
+        .surfacePersonMinutesPer100SquareFeet[
         measurement.surfaceType
       ] ?? 0;
 
+    const estimatedPersonMinutes =
+      Math.max(
+        1,
+        Math.round(
+          squareFeet /
+            100 *
+            Math.max(
+              1,
+              personMinutesPer100SquareFeet,
+            ),
+        ),
+      );
     seeds.push({
       sourceKey:
         `surface-${measurement.id}`,
@@ -767,9 +779,7 @@ function addMeasuredSurfaceSeeds(
         `${measurementLabel} cleaning`,
 
       description:
-        `${formatSquareFeet(
-          squareFeet,
-        )} sq. ft. - ${
+        `${
           commercialMeasurementSourceLabels[
             measurement.source
           ]
@@ -778,7 +788,6 @@ function addMeasuredSurfaceSeeds(
             measurement.confidence
           ]
         }`,
-
       quantity:
         squareFeet,
 
@@ -786,16 +795,7 @@ function addMeasuredSurfaceSeeds(
         "sq. ft.",
 
       weight:
-        Math.max(
-          1,
-          Math.round(
-            squareFeet *
-              Math.max(
-                1,
-                rateCents,
-              ),
-          ),
-        ),
+        estimatedPersonMinutes,
 
       metadata: {
         measurementId:
@@ -811,6 +811,8 @@ function addMeasuredSurfaceSeeds(
           measurement.confidence,
 
         squareFeet,
+
+        estimatedPersonMinutes,
       },
     });
   }
