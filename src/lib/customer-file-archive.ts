@@ -10,10 +10,7 @@ import {
 } from "@/lib/commercial-quote-pdf";
 
 import {
-  COMMERCIAL_DEPOSIT_POLICY_SUMMARY,
-  COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT,
-  calculateCommercialRemainingBalanceCents,
-  calculateCommercialSchedulingDepositCents,
+  COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
 
@@ -22,6 +19,7 @@ import {
 } from "@/lib/supabase/admin";
 
 import type {
+  CommercialQuoteLineItemRow,
   CommercialQuoteRequestRow,
   CommercialQuoteRow,
   CustomerFileRow,
@@ -60,12 +58,6 @@ export function buildCommercialQuoteCustomerSnapshot(
     CommercialQuoteLineItemRow[] =
     [],
 ) {
-  const depositBasePriceCents =
-    quote.final_initial_price_cents > 0
-      ? quote.final_initial_price_cents
-      : quote.final_recurring_price_cents ??
-        0;
-
   return {
     schemaVersion: 2,
 
@@ -241,10 +233,13 @@ export function buildCommercialQuoteCustomerSnapshot(
 
     policy: {
       schedulingDepositPercent:
-        COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT,
+        quote.scheduling_deposit_percent,
 
-      depositPolicy:
-        COMMERCIAL_DEPOSIT_POLICY_SUMMARY,
+      totalPreServicePercent:
+        quote.total_pre_service_percent,
+
+      paymentAndRefundSummary:
+        COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
     },
   };
 }
