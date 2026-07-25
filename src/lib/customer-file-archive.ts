@@ -85,7 +85,7 @@ export function buildCommercialQuoteCustomerSnapshot(
       : null;
 
   return {
-    schemaVersion: 3,
+    schemaVersion: 4,
 
     customer: {
       businessName:
