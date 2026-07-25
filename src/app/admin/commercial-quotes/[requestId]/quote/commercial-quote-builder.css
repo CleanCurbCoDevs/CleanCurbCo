@@ -1277,3 +1277,140 @@
     display: none;
   }
 }
+
+/* =========================================================
+   CUSTOMER FILE EMAIL DELIVERY
+   ========================================================= */
+
+.customer-file-delivery {
+  align-items: flex-start;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  display: flex;
+  gap: 9px;
+  max-width: 680px;
+  padding: 10px 11px;
+}
+
+.customer-file-delivery > svg {
+  flex: 0 0 auto;
+  margin-top: 1px;
+}
+
+.customer-file-delivery > span {
+  display: grid;
+  gap: 2px;
+}
+
+.customer-file-delivery small {
+  color: inherit;
+  line-height: 1.4;
+  opacity: 0.82;
+}
+
+.customer-file-delivery-queued {
+  background: rgba(
+    215,
+    169,
+    40,
+    0.1
+  );
+  border-color: rgba(
+    215,
+    169,
+    40,
+    0.3
+  );
+  color: #654c00;
+}
+
+.customer-file-delivery-sent,
+.customer-file-delivery-delivered {
+  background: rgba(
+    0,
+    170,
+    40,
+    0.08
+  );
+  border-color: rgba(
+    0,
+    170,
+    40,
+    0.22
+  );
+  color: #126d21;
+}
+
+.customer-file-delivery-failed,
+.customer-file-delivery-bounced {
+  background: rgba(
+    225,
+    52,
+    47,
+    0.08
+  );
+  border-color: rgba(
+    225,
+    52,
+    47,
+    0.24
+  );
+  color: #9f211d;
+}
+
+.customer-file-send-form {
+  display: grid;
+  gap: 6px;
+  min-width: 165px;
+}
+
+.customer-file-send-form .button {
+  width: 100%;
+}
+
+.customer-file-send-form .form-status-message {
+  font-size: 0.76rem;
+  line-height: 1.35;
+  margin: 0;
+  max-width: 230px;
+}
+
+.customer-file-send-disabled {
+  align-items: center;
+  background: rgba(
+    215,
+    169,
+    40,
+    0.12
+  );
+  border: 1px solid rgba(
+    215,
+    169,
+    40,
+    0.3
+  );
+  border-radius: 10px;
+  color: #654c00;
+  display: inline-flex;
+  font-size: 0.76rem;
+  font-weight: 900;
+  min-height: 40px;
+  padding: 8px 11px;
+  text-align: center;
+}
+
+@media (max-width: 760px) {
+  .customer-file-send-form {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .customer-file-send-form .form-status-message {
+    max-width: none;
+  }
+
+  .customer-file-send-disabled {
+    flex: 1 1 100%;
+    justify-content: center;
+  }
+}
