@@ -11,6 +11,10 @@ import {
 } from "@/components/admin/commercial-quote-composer";
 
 import {
+  CustomerFileArchivePanel,
+} from "@/components/admin/customer-file-archive-panel";
+
+import {
   AdminShell,
 } from "@/components/shells/admin-shell";
 
@@ -21,6 +25,11 @@ import {
 import {
   COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT,
 } from "@/lib/commercial-quote-policy";
+
+import {
+  COMMERCIAL_QUOTE_DOCUMENT_TYPE,
+  getCommercialQuoteSourceSnapshotHash,
+} from "@/lib/customer-file-archive";
 
 import {
   getSupabaseAdmin,
@@ -76,6 +85,7 @@ export default async function CommercialQuoteBuilderPage({
     requestResult,
     pricingProfileResult,
     draftResult,
+    customerFilesResult,
   ] = await Promise.all([
     admin
       .from(
@@ -109,6 +119,22 @@ export default async function CommercialQuoteBuilderPage({
       )
       .limit(1)
       .maybeSingle(),
+    
+    admin
+      .from(
+        "customer_files",
+      )
+      .select("*")
+      .eq(
+        "commercial_request_id",
+        requestId,
+      )
+      .order(
+        "created_at",
+        {
+          ascending: false,
+        },
+      ),
   ]);
 
   const request =
@@ -160,6 +186,39 @@ export default async function CommercialQuoteBuilderPage({
   const existingDraft =
     draftResult.data ?? null;
 
+  const customerFiles =
+    customerFilesResult.data ??
+    [];
+
+  const latestCustomerCopy =
+    customerFiles
+      .filter(
+        (file) =>
+          file.document_type ===
+            COMMERCIAL_QUOTE_DOCUMENT_TYPE &&
+          file.status !== "void",
+      )
+      .sort(
+        (
+          left,
+          right,
+        ) =>
+          right.version_number -
+          left.version_number,
+      )[0] ?? null;
+
+  const latestCustomerCopyMatchesSavedQuote =
+    Boolean(
+      existingDraft &&
+        latestCustomerCopy &&
+        latestCustomerCopy
+          .source_snapshot_hash ===
+          getCommercialQuoteSourceSnapshotHash(
+            request,
+            existingDraft,
+          ),
+    );
+  
   const services =
     request.service_interests.map(
       (service) =>
@@ -282,6 +341,23 @@ export default async function CommercialQuoteBuilderPage({
           }
           existingDraft={
             existingDraft
+          }
+          latestCustomerCopy={
+            latestCustomerCopy
+          }
+          latestCustomerCopyMatchesSavedQuote={
+            latestCustomerCopyMatchesSavedQuote
+          }
+        />
+        
+        <CustomerFileArchivePanel
+          files={customerFiles}
+          latestQuoteFileId={
+            latestCustomerCopy?.id ??
+            null
+          }
+          latestQuoteMatchesSavedQuote={
+            latestCustomerCopyMatchesSavedQuote
           }
         />
       </div>
