@@ -3,28 +3,57 @@ import {
   Eye,
   FileText,
   Image as ImageIcon,
+  MailCheck,
+  Send,
   ShieldCheck,
   TriangleAlert,
 } from "lucide-react";
 
+import {
+  ActionSubmitButton,
+  FeedbackForm,
+} from "@/components/action-feedback";
+
+import {
+  sendCommercialQuoteCustomerCopyAction,
+} from "@/app/admin/customer-file-actions";
+
 import type {
+  CustomerDeliveryRow,
   CustomerFileRow,
 } from "@/types/database";
 
 type CustomerFileArchivePanelProps = {
-  files: CustomerFileRow[];
+  files:
+    CustomerFileRow[];
 
   latestQuoteFileId:
     string | null;
 
   latestQuoteMatchesSavedQuote:
     boolean;
+
+  deliveries?:
+    CustomerDeliveryRow[];
+
+  requestId?:
+    string | null;
+
+  recipientName?:
+    string | null;
+
+  recipientEmail?:
+    string | null;
 };
 
 export function CustomerFileArchivePanel({
   files,
   latestQuoteFileId,
   latestQuoteMatchesSavedQuote,
+  deliveries = [],
+  requestId = null,
+  recipientName = null,
+  recipientEmail = null,
 }: CustomerFileArchivePanelProps) {
   return (
     <section className="placeholder-panel customer-file-archive">
@@ -39,12 +68,12 @@ export function CustomerFileArchivePanel({
           </h2>
 
           <p className="muted">
-            These are archived file
-            objects—not live
-            re-renderings. Preview,
-            download, and future customer
+            Preview, download, and email
             delivery all use the same
-            stored bytes.
+            archived bytes. No live
+            regeneration. No second
+            mystery PDF wandering around
+            the internet.
           </p>
         </div>
 
@@ -73,6 +102,44 @@ export function CustomerFileArchivePanel({
                 "photo"
                   ? ImageIcon
                   : FileText;
+
+              const fileDeliveries =
+                deliveries.filter(
+                  (delivery) =>
+                    getDeliveryCustomerFileId(
+                      delivery,
+                    ) === file.id,
+                );
+
+              const latestDelivery =
+                fileDeliveries[0] ??
+                null;
+
+              const deliveryFailed =
+                latestDelivery
+                  ? [
+                      "failed",
+                      "bounced",
+                    ].includes(
+                      latestDelivery.status,
+                    )
+                  : false;
+
+              const DeliveryIcon =
+                deliveryFailed
+                  ? TriangleAlert
+                  : MailCheck;
+
+              const canSend =
+                isLatestQuote &&
+                latestQuoteMatchesSavedQuote &&
+                [
+                  "ready",
+                  "sent",
+                  "received",
+                ].includes(
+                  file.status,
+                );
 
               return (
                 <article
@@ -168,11 +235,49 @@ export function CustomerFileArchivePanel({
 
                     {file.sent_at ? (
                       <small>
-                        Sent{" "}
+                        First sent{" "}
                         {formatDateTime(
                           file.sent_at,
                         )}
                       </small>
+                    ) : null}
+
+                    {latestDelivery ? (
+                      <div
+                        className={`customer-file-delivery customer-file-delivery-${latestDelivery.status}`}
+                      >
+                        <DeliveryIcon
+                          size={18}
+                          aria-hidden="true"
+                        />
+
+                        <span>
+                          <strong>
+                            {deliveryStatusLabel(
+                              latestDelivery.status,
+                            )}
+                          </strong>
+
+                          <small>
+                            {latestDelivery
+                              .recipient_email}
+                            {" • "}
+                            {formatDateTime(
+                              latestDelivery
+                                .sent_at ??
+                                latestDelivery
+                                  .failed_at ??
+                                latestDelivery
+                                  .created_at,
+                            )}
+
+                            {fileDeliveries.length >
+                            1
+                              ? ` • ${fileDeliveries.length} delivery attempts`
+                              : ""}
+                          </small>
+                        </span>
+                      </div>
                     ) : null}
                   </div>
 
@@ -202,6 +307,56 @@ export function CustomerFileArchivePanel({
 
                       Download
                     </a>
+
+                    {canSend &&
+                    requestId &&
+                    recipientEmail ? (
+                      <FeedbackForm
+                        action={
+                          sendCommercialQuoteCustomerCopyAction
+                        }
+                        className="customer-file-send-form"
+                        confirmMessage={`Email this exact archived quote to ${
+                          recipientName ??
+                          recipientEmail
+                        } at ${recipientEmail}?`}
+                        errorMessage="The quote email could not be sent."
+                        pendingMessage="Verifying and sending the archived PDF..."
+                        successMessage="The quote email was sent."
+                      >
+                        <input
+                          type="hidden"
+                          name="commercialRequestId"
+                          value={requestId}
+                        />
+
+                        <input
+                          type="hidden"
+                          name="customerFileId"
+                          value={file.id}
+                        />
+
+                        <ActionSubmitButton
+                          className="button button-dark"
+                          pendingLabel="Sending quote..."
+                        >
+                          <Send
+                            size={17}
+                            aria-hidden="true"
+                          />
+
+                          {file.sent_at
+                            ? "Resend Quote"
+                            : "Send Quote"}
+                        </ActionSubmitButton>
+                      </FeedbackForm>
+                    ) : isLatestQuote &&
+                      !latestQuoteMatchesSavedQuote ? (
+                      <span className="customer-file-send-disabled">
+                        Regenerate before
+                        sending
+                      </span>
+                    ) : null}
                   </div>
                 </article>
               );
@@ -233,6 +388,42 @@ export function CustomerFileArchivePanel({
       )}
     </section>
   );
+}
+
+function getDeliveryCustomerFileId(
+  delivery:
+    CustomerDeliveryRow,
+) {
+  const value =
+    delivery.metadata
+      .customerFileId;
+
+  return typeof value ===
+    "string"
+    ? value
+    : null;
+}
+
+function deliveryStatusLabel(
+  status:
+    CustomerDeliveryRow["status"],
+) {
+  switch (status) {
+    case "queued":
+      return "Email queued";
+
+    case "sent":
+      return "Email sent";
+
+    case "delivered":
+      return "Email delivered";
+
+    case "failed":
+      return "Email failed";
+
+    case "bounced":
+      return "Email bounced";
+  }
 }
 
 function humanize(
