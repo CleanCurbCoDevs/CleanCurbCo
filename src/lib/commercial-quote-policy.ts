@@ -65,8 +65,11 @@ export const COMMERCIAL_FULL_TERMS_NOTICE =
 export const COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE =
   "Project support and mobilization includes standard chemicals and consumable supplies, equipment use, travel, service preparation, administrative coordination, and other operating resources necessary to complete the quoted scope.";
 
-export const COMMERCIAL_DEFAULT_PAYMENT_TERMS =
-  "After the quote is approved, Clean Curb Co. will provide the Commercial Work Agreement and applicable policies through DocuSign. After both parties sign, the customer may pay the 10% scheduling deposit, the full required pre-service amount shown in this quote, or the entire quoted price. Any additional pre-service payment is due no later than three business days before service begins. If service is scheduled to begin fewer than three business days after signing, the full required pre-service amount is due at signing. All payments are credited toward the quoted price and are not additional fees. Net 30 is available only to approved recurring commercial accounts or customers operating under separately approved procurement terms.";
+export const COMMERCIAL_PAYMENT_OPTIONS_SUMMARY =
+  "After both parties sign, the customer may pay only the 10% scheduling deposit, the full required pre-service amount shown in this quote, or the entire quoted price. All payments are credited toward the quoted price and are not additional fees. Paying early does not change how each portion is classified or refunded.";
+
+export const COMMERCIAL_PRE_SERVICE_TIMING_SUMMARY =
+  "The scheduling deposit is due after both parties sign and reserves service capacity. Any additional pre-service payment is due no later than three business days before service begins. If service is scheduled to begin fewer than three business days after signing, the full required pre-service amount is due at signing.";
 
 export const COMMERCIAL_TAX_DISPLAY_LABEL =
   "Tax";
