@@ -2051,6 +2051,14 @@ export async function saveCommercialQuoteDraftAction(
   const auditRequestId =
     createRequestId();
 
+  const quoteAction =
+    cleanString(
+      formData.get(
+        "quoteAction",
+      ),
+      40,
+    ) || "save";
+
   const commercialQuoteRequestId =
     cleanString(
       formData.get(
