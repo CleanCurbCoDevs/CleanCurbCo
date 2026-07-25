@@ -1086,3 +1086,194 @@
     flex: 1 1 145px;
   }
 }
+
+/* =========================================================
+   CUSTOMER-FACING PRICING + PAYMENT SCHEDULE
+   ========================================================= */
+
+.commercial-customer-pricing-preview,
+.commercial-payment-schedule-editor {
+  background: white;
+  border: 1px solid var(--line);
+  border-radius: 17px;
+  display: grid;
+  gap: 16px;
+  padding: 20px;
+}
+
+.commercial-customer-pricing-preview h3,
+.commercial-payment-schedule-editor h3 {
+  font-size: clamp(1.35rem, 3vw, 2rem);
+  line-height: 1;
+  margin: 4px 0 0;
+}
+
+.commercial-customer-pricing-intro {
+  color: var(--muted);
+  line-height: 1.5;
+  margin: 10px 0 0;
+  max-width: 760px;
+}
+
+.commercial-customer-pricing-table {
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.commercial-customer-pricing-title,
+.commercial-customer-pricing-row,
+.commercial-customer-pricing-total,
+.commercial-customer-pricing-grand-total {
+  align-items: center;
+  display: grid;
+  gap: 16px;
+  grid-template-columns:
+    minmax(0, 1fr)
+    auto;
+  padding: 12px 14px;
+}
+
+.commercial-customer-pricing-title {
+  background: #f0eee6;
+  border-bottom: 3px solid var(--gold);
+  font-size: 0.76rem;
+  font-weight: 950;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.commercial-customer-pricing-row {
+  border-bottom: 1px solid var(--line);
+}
+
+.commercial-customer-pricing-row > span {
+  display: grid;
+  gap: 4px;
+}
+
+.commercial-customer-pricing-row small {
+  color: var(--muted);
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.commercial-customer-pricing-total {
+  background: #faf9f5;
+  border-bottom: 1px solid var(--line);
+  font-weight: 900;
+}
+
+.commercial-customer-pricing-grand-total {
+  background: #050505;
+  color: white;
+  font-size: 1.05rem;
+  font-weight: 950;
+}
+
+.commercial-customer-pricing-footnote {
+  color: var(--muted);
+  font-size: 0.8rem;
+  line-height: 1.5;
+  margin: 0;
+}
+
+.commercial-payment-tier-controls {
+  display: grid;
+  gap: 13px;
+  grid-template-columns:
+    repeat(2, minmax(0, 1fr));
+}
+
+.commercial-payment-schedule-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns:
+    repeat(3, minmax(0, 1fr));
+}
+
+.commercial-payment-schedule-grid > div {
+  background: #faf9f5;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  display: grid;
+  gap: 7px;
+  padding: 15px;
+}
+
+.commercial-payment-schedule-grid span {
+  color: var(--muted);
+  font-size: 0.74rem;
+  font-weight: 950;
+  text-transform: uppercase;
+}
+
+.commercial-payment-schedule-grid strong {
+  font-size: clamp(1.4rem, 3vw, 2rem);
+}
+
+.commercial-payment-schedule-grid small {
+  color: var(--muted);
+  line-height: 1.4;
+}
+
+.commercial-payment-total-note {
+  align-items: center;
+  background: rgba(215, 169, 40, 0.12);
+  border: 1px solid rgba(215, 169, 40, 0.35);
+  border-radius: 14px;
+  display: flex;
+  gap: 18px;
+  justify-content: space-between;
+  padding: 14px 16px;
+}
+
+.commercial-payment-total-note span {
+  font-weight: 900;
+}
+
+.commercial-payment-total-note strong {
+  font-size: 1.15rem;
+}
+
+.commercial-payment-options-note {
+  background: rgba(138, 0, 196, 0.07);
+  border: 1px solid rgba(138, 0, 196, 0.2);
+  border-radius: 14px;
+  display: grid;
+  gap: 6px;
+  padding: 14px 16px;
+}
+
+.commercial-payment-options-note p {
+  line-height: 1.5;
+  margin: 0;
+}
+
+@media (max-width: 850px) {
+  .commercial-payment-tier-controls,
+  .commercial-payment-schedule-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .commercial-payment-total-note {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 5px;
+  }
+}
+
+@media (max-width: 600px) {
+  .commercial-customer-pricing-title,
+  .commercial-customer-pricing-row,
+  .commercial-customer-pricing-total,
+  .commercial-customer-pricing-grand-total {
+    align-items: start;
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .commercial-customer-pricing-title > span {
+    display: none;
+  }
+}
