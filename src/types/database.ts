@@ -791,6 +791,41 @@ export type CommercialQuoteRow = {
 
   recurring_frequency: string | null;
 
+  tax_cents: number;
+
+  scheduling_deposit_percent:
+    number;
+
+  total_pre_service_percent:
+    number;
+
+  additional_pre_service_percent:
+    number;
+
+  completion_balance_percent:
+    number;
+
+  scheduling_deposit_cents:
+    number;
+
+  additional_pre_service_cents:
+    number;
+
+  completion_balance_cents:
+    number;
+
+  deposit_tier_source:
+    CommercialDepositTierSource;
+
+  deposit_override_reason:
+    string | null;
+
+  additional_pre_service_due_business_days:
+    number;
+
+  full_payment_allowed:
+    boolean;
+  
   scope_summary: string;
 
   customer_notes: string | null;
@@ -845,6 +880,10 @@ export type CommercialQuoteLineItemRow = {
 
   metadata: Record<string, unknown>;
 };
+
+export type CommercialDepositTierSource =
+  | "automatic"
+  | "override";
 
 export type CustomerFileKind =
   | "document"
