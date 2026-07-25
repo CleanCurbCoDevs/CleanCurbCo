@@ -50,8 +50,15 @@ type ArchiveCommercialQuoteResult = {
 };
 
 export function buildCommercialQuoteCustomerSnapshot(
-  request: CommercialQuoteRequestRow,
-  quote: CommercialQuoteRow,
+  request:
+    CommercialQuoteRequestRow,
+
+  quote:
+    CommercialQuoteRow,
+
+  lineItems:
+    CommercialQuoteLineItemRow[] =
+    [],
 ) {
   const depositBasePriceCents =
     quote.final_initial_price_cents > 0
@@ -60,7 +67,7 @@ export function buildCommercialQuoteCustomerSnapshot(
         0;
 
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
 
     customer: {
       businessName:
@@ -116,15 +123,97 @@ export function buildCommercialQuoteCustomerSnapshot(
       recurringFrequency:
         quote.recurring_frequency,
 
-      schedulingDepositCents:
-        calculateCommercialSchedulingDepositCents(
-          depositBasePriceCents,
-        ),
+      taxCents:
+        quote.tax_cents,
 
-      remainingBalanceCents:
-        calculateCommercialRemainingBalanceCents(
-          depositBasePriceCents,
-        ),
+      paymentSchedule: {
+        schedulingDepositPercent:
+          quote
+            .scheduling_deposit_percent,
+
+        totalPreServicePercent:
+          quote
+            .total_pre_service_percent,
+
+        additionalPreServicePercent:
+          quote
+            .additional_pre_service_percent,
+
+        completionBalancePercent:
+          quote
+            .completion_balance_percent,
+
+        schedulingDepositCents:
+          quote
+            .scheduling_deposit_cents,
+
+        additionalPreServiceCents:
+          quote
+            .additional_pre_service_cents,
+
+        completionBalanceCents:
+          quote
+            .completion_balance_cents,
+
+        additionalPreServiceDueBusinessDays:
+          quote
+            .additional_pre_service_due_business_days,
+
+        fullPaymentAllowed:
+          quote
+            .full_payment_allowed,
+
+        source:
+          quote
+            .deposit_tier_source,
+
+        overrideReason:
+          quote
+            .deposit_override_reason,
+      },
+
+      customerPricingLines:
+        lineItems
+          .filter(
+            (item) =>
+              item
+                .is_customer_visible,
+          )
+          .sort(
+            (
+              left,
+              right,
+            ) =>
+              left.sort_order -
+              right.sort_order,
+          )
+          .map(
+            (item) => ({
+              itemType:
+                item.item_type,
+
+              name:
+                item.name,
+
+              description:
+                item.description,
+
+              quantity:
+                item.quantity,
+
+              unitLabel:
+                item.unit_label,
+
+              amountCents:
+                item.amount_cents,
+
+              isOptional:
+                item.is_optional,
+
+              metadata:
+                item.metadata,
+            }),
+          ),
 
       scopeSummary:
         quote.scope_summary,
@@ -161,13 +250,21 @@ export function buildCommercialQuoteCustomerSnapshot(
 }
 
 export function getCommercialQuoteSourceSnapshotHash(
-  request: CommercialQuoteRequestRow,
-  quote: CommercialQuoteRow,
+  request:
+    CommercialQuoteRequestRow,
+
+  quote:
+    CommercialQuoteRow,
+
+  lineItems:
+    CommercialQuoteLineItemRow[] =
+    [],
 ) {
   return hashJson(
     buildCommercialQuoteCustomerSnapshot(
       request,
       quote,
+      lineItems,
     ),
   );
 }
@@ -194,10 +291,46 @@ export async function archiveCommercialQuoteCustomerCopy({
   quote,
   generatedByUserId,
 }: ArchiveCommercialQuoteInput): Promise<ArchiveCommercialQuoteResult> {
+
+    const {
+    data:
+      quoteLineItems,
+
+    error:
+      quoteLineItemsError,
+  } = await admin
+    .from(
+      "commercial_quote_line_items",
+    )
+    .select("*")
+    .eq(
+      "quote_id",
+      quote.id,
+    )
+    .eq(
+      "is_customer_visible",
+      true,
+    )
+    .order(
+      "sort_order",
+      {
+        ascending:
+          true,
+      },
+    );
+
+  if (quoteLineItemsError) {
+    throw quoteLineItemsError;
+  }
+
+  const lineItems =
+    quoteLineItems ?? [];
+  
   const sourceSnapshot =
     buildCommercialQuoteCustomerSnapshot(
       request,
       quote,
+      lineItems,
     );
 
   const sourceSnapshotHash =
@@ -273,6 +406,7 @@ export async function archiveCommercialQuoteCustomerCopy({
     await createCommercialQuotePdf({
       request,
       quote,
+      lineItems,  
     });
 
   const fileBuffer =
