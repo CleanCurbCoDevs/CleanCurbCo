@@ -2746,6 +2746,9 @@ export async function saveCommercialQuoteDraftAction(
     );
   }
 
+  const savedQuoteId =
+    savedQuote.id;
+
   const customerLineItems = [
     ...initialCustomerLineItems,
     ...recurringCustomerLineItems,
@@ -2761,7 +2764,7 @@ export async function saveCommercialQuoteDraftAction(
     .delete()
     .eq(
       "quote_id",
-      savedQuote.id,
+      savedQuoteId,
     );
 
   if (lineItemDeleteError) {
@@ -2784,7 +2787,7 @@ export async function saveCommercialQuoteDraftAction(
           commercialQuoteRequestId,
 
           commercialQuoteId:
-            savedQuote.id,
+            savedQuoteId,
         },
 
         error:
@@ -2807,7 +2810,7 @@ export async function saveCommercialQuoteDraftAction(
           index,
         ): Database["public"]["Tables"]["commercial_quote_line_items"]["Insert"] => ({
           quote_id:
-            savedQuote.id,
+            savedQuoteId,
 
           sort_order:
             (
@@ -2881,8 +2884,8 @@ export async function saveCommercialQuoteDraftAction(
           metadata: {
             commercialQuoteRequestId,
 
-            commercialQuoteId:
-              savedQuote.id,
+          commercialQuoteId:
+            savedQuoteId,
 
             lineItemCount:
               lineItemPayload.length,
