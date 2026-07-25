@@ -1,11 +1,13 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+
 import {
   actionFailure,
   actionSuccess,
   type ActionResult,
 } from "@/lib/action-result";
+
 import {
   humanizeStatus,
   validCustomerRequestStatuses,
@@ -13,24 +15,29 @@ import {
   validPaymentStatuses,
   validReferralStatuses,
 } from "@/lib/booking-utils";
+
 import {
   createAccountSetupLink,
   createClaimToken,
   createPaymentSetupLink,
   hashClaimToken,
 } from "@/lib/booking-claims";
+
 import { sendCustomerRequestUpdate } from "@/lib/email/sendCustomerRequestEmail";
+
 import {
   sendAccountDeletionDecision,
   sendBookingDecision,
   sendPaymentSetupInvite,
   sendRouteDateOffer,
 } from "@/lib/email/sendOperationsEmail";
+
 import { sendPaymentLink } from "@/lib/email/sendPaymentLink";
 import { sendReferralRewardEmail } from "@/lib/email/sendReferralReward";
 import { sendReviewRequest } from "@/lib/email/sendReviewRequest";
 import { sendRouteConfirmation } from "@/lib/email/sendRouteConfirmation";
 import { getSiteUrl, isStripeConfigured } from "@/lib/env";
+
 import {
   calculateBookingEstimate,
   shouldApplyFoundingNeighborSpecial,
@@ -42,6 +49,14 @@ import {
 import {
   normalizeCommercialPricingInput,
 } from "@/lib/commercial-pricing-input";
+
+import {
+  archiveCommercialQuoteCustomerCopy,
+} from "@/lib/customer-file-archive";
+
+import {
+  resolveCommercialPaymentTerms,
+} from "@/lib/commercial-quote-policy";
 
 import {
   commercialPricingProfileRowToValues,
@@ -1369,6 +1384,13 @@ export async function updateCustomerRequestAdminAction(formData: FormData) {
   if (auth.status !== "ok") return;
 
   const auditRequestId = createRequestId();
+  const quoteAction =
+  cleanString(
+    formData.get(
+      "quoteAction",
+    ),
+    40,
+  ) || "save";
   const requestId = cleanString(formData.get("requestId"), 80);
   const status = pickEnum<CustomerRequestStatus>(
     formData.get("status"),
@@ -2115,11 +2137,14 @@ export async function saveCommercialQuoteDraftAction(
     );
 
   const paymentTerms =
-    cleanLongText(
-      formData.get("paymentTerms"),
-      2_000,
-    ) ||
-    "Payment terms will be confirmed before service is scheduled.";
+    resolveCommercialPaymentTerms(
+      cleanLongText(
+        formData.get(
+          "paymentTerms",
+        ),
+        2_000,
+      ),
+    );
 
   const internalNotes =
     cleanLongText(
@@ -2541,7 +2566,143 @@ export async function saveCommercialQuoteDraftAction(
         commercialRequest.id,
       );
   }
+  
+  let customerCopyResult:
+    Awaited<
+      ReturnType<
+        typeof archiveCommercialQuoteCustomerCopy
+      >
+    > | null =
+    null;
 
+  if (
+    quoteAction ===
+    "generate_customer_copy"
+  ) {
+    let quoteForCustomerCopy =
+      savedQuote;
+
+    if (
+      !quoteForCustomerCopy
+        .quote_number
+    ) {
+      const quoteNumber =
+        createCommercialQuoteNumber(
+          quoteForCustomerCopy,
+        );
+
+      const {
+        data: numberedQuote,
+        error: quoteNumberError,
+      } = await admin
+        .from(
+          "commercial_quotes",
+        )
+        .update({
+          quote_number:
+            quoteNumber,
+
+          updated_by_user_id:
+            auth.userId,
+        })
+        .eq(
+          "id",
+          quoteForCustomerCopy.id,
+        )
+        .select("*")
+        .single();
+
+      if (
+        quoteNumberError ||
+        !numberedQuote
+      ) {
+        logger.error(
+          "admin_commercial_quote_number_assignment_failed",
+          {
+            requestId:
+              auditRequestId,
+
+            action:
+              "commercial_quote_customer_copy_generate",
+
+            userId:
+              auth.userId,
+
+            role:
+              auth.profile.role,
+
+            metadata: {
+              commercialQuoteRequestId,
+              commercialQuoteId:
+                quoteForCustomerCopy.id,
+            },
+
+            error:
+              quoteNumberError,
+          },
+        );
+
+        return actionFailure(
+          "The draft was saved, but its permanent quote number could not be assigned.",
+        );
+      }
+
+      quoteForCustomerCopy =
+        numberedQuote;
+
+      savedQuote =
+        numberedQuote;
+    }
+
+    try {
+      customerCopyResult =
+        await archiveCommercialQuoteCustomerCopy(
+          {
+            admin,
+
+            request:
+              commercialRequest,
+
+            quote:
+              quoteForCustomerCopy,
+
+            generatedByUserId:
+              auth.userId,
+          },
+        );
+    } catch (error) {
+      logger.error(
+        "admin_commercial_quote_customer_copy_generation_failed",
+        {
+          requestId:
+            auditRequestId,
+
+          action:
+            "commercial_quote_customer_copy_generate",
+
+          userId:
+            auth.userId,
+
+          role:
+            auth.profile.role,
+
+          metadata: {
+            commercialQuoteRequestId,
+
+            commercialQuoteId:
+              quoteForCustomerCopy.id,
+          },
+
+          error,
+        },
+      );
+
+      return actionFailure(
+        "The draft was saved, but the exact customer PDF could not be generated and archived.",
+      );
+    }
+  }
+  
   await writeAdminAuditLog({
     action:
       previousDraft
@@ -2626,6 +2787,81 @@ export async function saveCommercialQuoteDraftAction(
     },
   });
 
+  if (
+    customerCopyResult &&
+    !customerCopyResult.reused
+  ) {
+    await writeAdminAuditLog({
+      action:
+        "commercial_quote_customer_copy_generated",
+
+      actor_user_id:
+        auth.userId,
+
+      actor_email:
+        actorEmail(auth),
+
+      actor_role:
+        auth.profile.role,
+
+      target_type:
+        "customer_file",
+
+      target_id:
+        customerCopyResult
+          .file.id,
+
+      customer_id:
+        null,
+
+      booking_id:
+        null,
+
+      before_summary:
+        {},
+
+      after_summary: {
+        commercialQuoteId:
+          savedQuote.id,
+
+        quoteNumber:
+          savedQuote.quote_number,
+
+        fileVersion:
+          customerCopyResult
+            .file
+            .version_number,
+
+        sha256:
+          customerCopyResult
+            .file.sha256,
+
+        sizeBytes:
+          customerCopyResult
+            .file.size_bytes,
+
+        status:
+          customerCopyResult
+            .file.status,
+      },
+
+      request_id:
+        auditRequestId,
+
+      status:
+        "success",
+
+      metadata: {
+        commercialQuoteRequestId,
+
+        storagePath:
+          customerCopyResult
+            .file
+            .storage_path,
+      },
+    });
+  }
+  
   logger.info(
     "admin_commercial_quote_draft_saved",
     {
@@ -2662,9 +2898,38 @@ export async function saveCommercialQuoteDraftAction(
     `/admin/commercial-quotes/${commercialQuoteRequestId}/quote`,
   );
 
+  if (customerCopyResult) {
+    return actionSuccess(
+      customerCopyResult.reused
+        ? "The archived customer copy already matches the last saved quote. No duplicate file was created."
+        : `Exact customer copy v${customerCopyResult.file.version_number} generated, verified, and archived.`,
+    );
+  }
+
   return actionSuccess(
     `Commercial quote draft v${savedQuote.version_number} saved.`,
   );
+}
+
+function createCommercialQuoteNumber(
+  quote: CommercialQuoteRow,
+) {
+  const year =
+    new Date().getFullYear();
+
+  const uniquePart =
+    quote.id
+      .replaceAll(
+        "-",
+        "",
+      )
+      .slice(
+        0,
+        8,
+      )
+      .toUpperCase();
+
+  return `CCC-Q-${year}-${uniquePart}`;
 }
 
 function parseCommercialJson(
