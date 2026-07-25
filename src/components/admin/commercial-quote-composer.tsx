@@ -32,8 +32,18 @@ import {
 } from "@/lib/commercial-pricing";
 
 import {
-  calculateCommercialRemainingBalanceCents,
-  calculateCommercialSchedulingDepositCents,
+  resolveCommercialPaymentTerms,
+} from "@/lib/commercial-quote-policy";
+
+import {
+  buildCommercialCustomerLineItems,
+  type CommercialCustomerLineItemDraft,
+} from "@/lib/commercial-quote-customer-breakdown";
+
+import {
+  COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
+  COMMERCIAL_TAX_CENTS,
+  calculateCommercialPaymentSchedule,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
 
@@ -344,6 +354,29 @@ export function CommercialQuoteComposer({
       getDefaultValidUntil(),
   );
 
+  const [
+    depositPercentOverride,
+    setDepositPercentOverride,
+  ] = useState(
+    existingDraft
+      ?.deposit_tier_source ===
+      "override"
+      ? String(
+          existingDraft
+            .total_pre_service_percent,
+        )
+      : "",
+  );
+
+  const [
+    depositOverrideReason,
+    setDepositOverrideReason,
+  ] = useState(
+    existingDraft
+      ?.deposit_override_reason ??
+      "",
+  );
+  
   const initialCalculation =
     useMemo(
       () =>
