@@ -510,16 +510,6 @@ export async function createCommercialQuotePdf({
       size: 12,
       leading: 15,
       font: fonts.bold,
-      gapAfter: 2,
-    },
-  );
-
-  drawParagraph(
-    "The pricing below is the fixed customer-facing price. Internal labor, measurement, route, and garbage math stay internal.",
-    {
-      size: 8.4,
-      leading: 11,
-      color: colors.muted,
       gapAfter: 13,
     },
   );
