@@ -1006,7 +1006,12 @@ function drawPaymentRow({
   }
 
   flow.setY(
-    bottomY - 4,
+    bottomY -
+      (
+        emphasized
+          ? 14
+          : 4
+      ),
   );
 }
 
