@@ -55,8 +55,15 @@ import {
 } from "@/lib/customer-file-archive";
 
 import {
+  COMMERCIAL_TAX_CENTS,
+  calculateCommercialPaymentSchedule,
+  isCommercialTotalPreServicePercent,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
+
+import {
+  buildCommercialCustomerLineItems,
+} from "@/lib/commercial-quote-customer-breakdown";
 
 import {
   commercialPricingProfileRowToValues,
@@ -2183,6 +2190,54 @@ export async function saveCommercialQuoteDraftAction(
       ? validUntilInput
       : null;
 
+  const depositPercentOverrideInput =
+    cleanString(
+      formData.get(
+        "depositPercentOverride",
+      ),
+      10,
+    );
+
+  const parsedDepositPercentOverride =
+    depositPercentOverrideInput
+      ? Number.parseInt(
+          depositPercentOverrideInput,
+          10,
+        )
+      : null;
+
+  if (
+    parsedDepositPercentOverride !== null &&
+    !isCommercialTotalPreServicePercent(
+      parsedDepositPercentOverride,
+    )
+  ) {
+    return actionFailure(
+      "Choose a valid pre-service payment percentage.",
+    );
+  }
+
+  const depositPercentOverride =
+    parsedDepositPercentOverride;
+
+  const depositOverrideReason =
+    cleanLongText(
+      formData.get(
+        "depositOverrideReason",
+      ),
+      1_000,
+    ) || null;
+
+  if (
+    depositPercentOverride !== null &&
+    !depositOverrideReason
+  ) {
+    return actionFailure(
+      "Add an internal reason for overriding the automatic payment tier.",
+    );
+  }
+
+  
   const admin =
     getSupabaseAdmin();
 
@@ -2361,6 +2416,77 @@ export async function saveCommercialQuoteDraftAction(
       latestDraft ?? null;
   }
 
+  const depositBasePriceCents =
+    finalInitialPriceCents > 0
+      ? finalInitialPriceCents
+      : finalRecurringPriceCents ??
+        0;
+
+  const paymentSchedule =
+    calculateCommercialPaymentSchedule(
+      depositBasePriceCents,
+      depositPercentOverride,
+    );
+
+  const initialCustomerLineItems =
+    buildCommercialCustomerLineItems({
+      phase:
+        "initial",
+
+      input:
+        initialInput,
+
+      calculation:
+        initialCalculation,
+
+      pricingProfile,
+
+      finalPriceCents:
+        finalInitialPriceCents,
+    });
+
+  const recurringCustomerLineItems =
+    recurringInput &&
+    recurringCalculation &&
+    finalRecurringPriceCents !== null
+      ? buildCommercialCustomerLineItems({
+          phase:
+            "recurring",
+
+          input:
+            recurringInput,
+
+          calculation:
+            recurringCalculation,
+
+          pricingProfile,
+
+          finalPriceCents:
+            finalRecurringPriceCents,
+        })
+      : [];
+
+  if (
+    finalInitialPriceCents > 0 &&
+    initialCustomerLineItems.length ===
+      0
+  ) {
+    return actionFailure(
+      "Add at least one measurable customer-facing service before saving this quote.",
+    );
+  }
+
+  if (
+    finalInitialPriceCents <= 0 &&
+    finalRecurringPriceCents &&
+    recurringCustomerLineItems.length ===
+      0
+  ) {
+    return actionFailure(
+      "Add at least one measurable customer-facing recurring service before saving this quote.",
+    );
+  }
+  
   const estimatedOtherCostsCents =
     initialCalculation
       .mobilizationCents +
@@ -2415,6 +2541,16 @@ export async function saveCommercialQuoteDraftAction(
           finalInitialPriceCents,
 
           finalRecurringPriceCents,
+
+          paymentSchedule,
+
+          customerLineItems: {
+            initial:
+              initialCustomerLineItems,
+
+            recurring:
+              recurringCustomerLineItems,
+          },
         }),
 
       estimated_person_hours:
@@ -2453,6 +2589,54 @@ export async function saveCommercialQuoteDraftAction(
       recurring_frequency:
         recurringFrequency,
 
+      tax_cents:
+        COMMERCIAL_TAX_CENTS,
+
+      scheduling_deposit_percent:
+        paymentSchedule
+          .schedulingDepositPercent,
+
+      total_pre_service_percent:
+        paymentSchedule
+          .totalPreServicePercent,
+
+      additional_pre_service_percent:
+        paymentSchedule
+          .additionalPreServicePercent,
+
+      completion_balance_percent:
+        paymentSchedule
+          .completionBalancePercent,
+
+      scheduling_deposit_cents:
+        paymentSchedule
+          .schedulingDepositCents,
+
+      additional_pre_service_cents:
+        paymentSchedule
+          .additionalPreServiceCents,
+
+      completion_balance_cents:
+        paymentSchedule
+          .completionBalanceCents,
+
+      deposit_tier_source:
+        paymentSchedule.source,
+
+      deposit_override_reason:
+        paymentSchedule.source ===
+        "override"
+          ? depositOverrideReason
+          : null,
+
+      additional_pre_service_due_business_days:
+        paymentSchedule
+          .additionalPreServiceDueBusinessDays,
+
+      full_payment_allowed:
+        paymentSchedule
+          .fullPaymentAllowed,
+      
       scope_summary:
         scopeSummary,
 
@@ -2514,6 +2698,159 @@ export async function saveCommercialQuoteDraftAction(
           auth.userId,
       };
 
+  const customerLineItems = [
+    ...initialCustomerLineItems,
+    ...recurringCustomerLineItems,
+  ];
+
+  const {
+    error:
+      lineItemDeleteError,
+  } = await admin
+    .from(
+      "commercial_quote_line_items",
+    )
+    .delete()
+    .eq(
+      "quote_id",
+      savedQuote.id,
+    );
+
+  if (lineItemDeleteError) {
+    logger.error(
+      "admin_commercial_quote_line_items_delete_failed",
+      {
+        requestId:
+          auditRequestId,
+
+        action:
+          "commercial_quote_line_items_replace",
+
+        userId:
+          auth.userId,
+
+        role:
+          auth.profile.role,
+
+        metadata: {
+          commercialQuoteRequestId,
+
+          commercialQuoteId:
+            savedQuote.id,
+        },
+
+        error:
+          lineItemDeleteError,
+      },
+    );
+
+    return actionFailure(
+      "The quote was saved, but its customer-facing pricing lines could not be replaced.",
+    );
+  }
+
+  if (
+    customerLineItems.length > 0
+  ) {
+    const lineItemPayload =
+      customerLineItems.map(
+        (
+          item,
+          index,
+        ): Database["public"]["Tables"]["commercial_quote_line_items"]["Insert"] => ({
+          quote_id:
+            savedQuote.id,
+
+          sort_order:
+            (
+              index + 1
+            ) * 10,
+
+          item_type:
+            item.itemType,
+
+          name:
+            item.name,
+
+          description:
+            item.description,
+
+          quantity:
+            item.quantity,
+
+          unit_label:
+            item.unitLabel,
+
+          unit_price_cents:
+            item.quantity > 0
+              ? Math.round(
+                  item.amountCents /
+                    item.quantity,
+                )
+              : item.amountCents,
+
+          amount_cents:
+            item.amountCents,
+
+          is_optional:
+            false,
+
+          is_customer_visible:
+            true,
+
+          metadata:
+            item.metadata,
+        }),
+      );
+
+    const {
+      error:
+        lineItemInsertError,
+    } = await admin
+      .from(
+        "commercial_quote_line_items",
+      )
+      .insert(
+        lineItemPayload,
+      );
+
+    if (lineItemInsertError) {
+      logger.error(
+        "admin_commercial_quote_line_items_insert_failed",
+        {
+          requestId:
+            auditRequestId,
+
+          action:
+            "commercial_quote_line_items_replace",
+
+          userId:
+            auth.userId,
+
+          role:
+            auth.profile.role,
+
+          metadata: {
+            commercialQuoteRequestId,
+
+            commercialQuoteId:
+              savedQuote.id,
+
+            lineItemCount:
+              lineItemPayload.length,
+          },
+
+          error:
+            lineItemInsertError,
+        },
+      );
+
+      return actionFailure(
+        "The quote was saved, but its customer-facing pricing lines could not be created.",
+      );
+    }
+  }
+    
     const result = await admin
       .from("commercial_quotes")
       .insert(insertPayload)
