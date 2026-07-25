@@ -1,6 +1,10 @@
 import {
-  createCommercialQuotePdf,
-} from "@/lib/commercial-quote-pdf";
+  NextResponse,
+} from "next/server";
+
+import {
+  COMMERCIAL_QUOTE_DOCUMENT_TYPE,
+} from "@/lib/customer-file-archive";
 
 import {
   getSupabaseAdmin,
@@ -23,7 +27,7 @@ type CommercialQuotePdfRouteContext = {
 };
 
 export async function GET(
-  httpRequest: Request,
+  request: Request,
   {
     params,
   }: CommercialQuotePdfRouteContext,
@@ -49,168 +53,61 @@ export async function GET(
     );
   }
 
-  const admin =
-    getSupabaseAdmin();
-
-  const [
-    requestResult,
-    quoteResult,
-  ] = await Promise.all([
-    admin
-      .from(
-        "commercial_quote_requests",
-      )
-      .select("*")
-      .eq("id", requestId)
-      .maybeSingle(),
-
-    admin
-      .from(
-        "commercial_quotes",
-      )
-      .select("*")
-      .eq(
-        "request_id",
-        requestId,
-      )
-      .eq(
-        "status",
-        "draft",
-      )
-      .order(
-        "version_number",
-        {
-          ascending: false,
-        },
-      )
-      .limit(1)
-      .maybeSingle(),
-  ]);
+  const {
+    data: customerFile,
+    error,
+  } = await getSupabaseAdmin()
+    .from("customer_files")
+    .select("id")
+    .eq(
+      "commercial_request_id",
+      requestId,
+    )
+    .eq(
+      "document_type",
+      COMMERCIAL_QUOTE_DOCUMENT_TYPE,
+    )
+    .neq(
+      "status",
+      "void",
+    )
+    .order(
+      "version_number",
+      {
+        ascending: false,
+      },
+    )
+    .limit(1)
+    .maybeSingle();
 
   if (
-    requestResult.error ||
-    quoteResult.error
+    error ||
+    !customerFile
   ) {
     return new Response(
-      "The commercial quote PDF could not be loaded.",
-      {
-        status: 500,
-      },
-    );
-  }
-
-  const commercialRequest =
-    requestResult.data;
-
-  const quote =
-    quoteResult.data;
-
-  if (!commercialRequest) {
-    return new Response(
-      "The commercial quote request was not found.",
+      "Generate the exact customer copy before previewing or downloading it.",
       {
         status: 404,
       },
     );
   }
-
-  if (!quote) {
-    return new Response(
-      "Save the commercial quote draft before previewing its PDF.",
-      {
-        status: 404,
-      },
-    );
-  }
-
-  const pdfBytes =
-    await createCommercialQuotePdf(
-      {
-        request:
-          commercialRequest,
-
-        quote,
-      },
-    );
 
   const url =
     new URL(
-      httpRequest.url,
+      request.url,
     );
 
-  const shouldDownload =
+  const downloadQuery =
     url.searchParams.get(
       "download",
-    ) === "1";
+    ) === "1"
+      ? "?download=1"
+      : "";
 
-  const fileName =
-    createQuoteFileName(
-      commercialRequest
-        .business_name,
-
-      quote.quote_number ??
-        `draft-v${quote.version_number}`,
-    );
-
-  return new Response(
-    Buffer.from(
-      pdfBytes,
+  return NextResponse.redirect(
+    new URL(
+      `/admin/customer-files/${customerFile.id}${downloadQuery}`,
+      request.url,
     ),
-    {
-      status: 200,
-
-      headers: {
-        "Content-Type":
-          "application/pdf",
-
-        "Content-Disposition":
-          `${
-            shouldDownload
-              ? "attachment"
-              : "inline"
-          }; filename="${fileName}"`,
-
-        "Cache-Control":
-          "private, no-store, max-age=0",
-
-        "X-Content-Type-Options":
-          "nosniff",
-      },
-    },
   );
-}
-
-function createQuoteFileName(
-  businessName: string,
-  quoteReference: string,
-) {
-  const safeBusinessName =
-    businessName
-      .toLowerCase()
-      .replace(
-        /[^a-z0-9]+/g,
-        "-",
-      )
-      .replace(
-        /^-+|-+$/g,
-        "",
-      )
-      .slice(0, 60) ||
-    "commercial-customer";
-
-  const safeReference =
-    quoteReference
-      .toLowerCase()
-      .replace(
-        /[^a-z0-9]+/g,
-        "-",
-      )
-      .replace(
-        /^-+|-+$/g,
-        "",
-      )
-      .slice(0, 40) ||
-    "quote";
-
-  return `${safeBusinessName}-${safeReference}.pdf`;
 }
