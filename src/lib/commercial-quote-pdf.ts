@@ -16,6 +16,7 @@ import {
 } from "@/lib/commercial-quote-policy";
 
 import type {
+  CommercialQuoteLineItemRow,
   CommercialQuoteRequestRow,
   CommercialQuoteRow,
 } from "@/types/database";
@@ -23,6 +24,7 @@ import type {
 type CommercialQuotePdfInput = {
   request: CommercialQuoteRequestRow;
   quote: CommercialQuoteRow;
+  lineItems?: CommercialQuoteLineItemRow[];
 };
 
 type PdfFonts = {
@@ -596,8 +598,8 @@ export async function createCommercialQuotePdf({
   );
 
   drawCallout(
-    "Scheduling deposit policy",
-    COMMERCIAL_DEPOSIT_POLICY_SUMMARY,
+    "Payment and refund summary",
+    COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
     {
       fillColor:
         colors.cream,
