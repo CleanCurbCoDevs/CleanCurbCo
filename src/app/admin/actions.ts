@@ -2698,6 +2698,54 @@ export async function saveCommercialQuoteDraftAction(
           auth.userId,
       };
 
+    const result = await admin
+      .from("commercial_quotes")
+      .insert(insertPayload)
+      .select("*")
+      .single();
+
+    savedQuote =
+      result.data ?? null;
+
+    saveError =
+      result.error;
+  }
+
+  if (
+    saveError ||
+    !savedQuote
+  ) {
+    logger.error(
+      "admin_commercial_quote_draft_save_failed",
+      {
+        requestId:
+          auditRequestId,
+
+        action:
+          "commercial_quote_draft_save",
+
+        userId:
+          auth.userId,
+
+        role:
+          auth.profile.role,
+
+        metadata: {
+          commercialQuoteRequestId,
+          commercialQuoteId,
+          pricingModel,
+        },
+
+        error:
+          saveError,
+      },
+    );
+
+    return actionFailure(
+      "The commercial quote draft could not be saved.",
+    );
+  }
+
   const customerLineItems = [
     ...initialCustomerLineItems,
     ...recurringCustomerLineItems,
@@ -2849,50 +2897,6 @@ export async function saveCommercialQuoteDraftAction(
         "The quote was saved, but its customer-facing pricing lines could not be created.",
       );
     }
-  }
-    
-    const result = await admin
-      .from("commercial_quotes")
-      .insert(insertPayload)
-      .select("*")
-      .single();
-
-    savedQuote =
-      result.data ?? null;
-
-    saveError =
-      result.error;
-  }
-
-  if (
-    saveError ||
-    !savedQuote
-  ) {
-    logger.error(
-      "admin_commercial_quote_draft_save_failed",
-      {
-        requestId:
-          auditRequestId,
-
-        action:
-          "commercial_quote_draft_save",
-
-        userId: auth.userId,
-        role: auth.profile.role,
-
-        metadata: {
-          commercialQuoteRequestId,
-          commercialQuoteId,
-          pricingModel,
-        },
-
-        error: saveError,
-      },
-    );
-
-    return actionFailure(
-      "The commercial quote draft could not be saved.",
-    );
   }
 
   if (
