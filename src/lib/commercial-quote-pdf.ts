@@ -9,7 +9,7 @@ import {
 } from "pdf-lib";
 
 import {
-  COMMERCIAL_DEPOSIT_POLICY_SUMMARY,
+  COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
   calculateCommercialRemainingBalanceCents,
   calculateCommercialSchedulingDepositCents,
   resolveCommercialPaymentTerms,
