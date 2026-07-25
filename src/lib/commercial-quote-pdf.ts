@@ -9,11 +9,15 @@ import {
 } from "pdf-lib";
 
 import {
+  COMMERCIAL_FULL_TERMS_NOTICE,
   COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
-  calculateCommercialRemainingBalanceCents,
-  calculateCommercialSchedulingDepositCents,
+  COMMERCIAL_SERVICE_CONCERN_SUMMARY,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
+
+import {
+  drawCommercialQuotePricingSections,
+} from "@/lib/commercial-quote-pdf-sections";
 
 import type {
   CommercialQuoteLineItemRow,
@@ -91,6 +95,7 @@ const colors = {
 export async function createCommercialQuotePdf({
   request,
   quote,
+  lineItems = [],
 }: CommercialQuotePdfInput) {
   const pdfDocument =
     await PDFDocument.create();
@@ -132,35 +137,10 @@ export async function createCommercialQuotePdf({
         )
       : null;
 
-  const depositBasePriceCents =
-    initialPriceCents > 0
-      ? initialPriceCents
-      : recurringPriceCents ?? 0;
-
-  const schedulingDepositCents =
-    calculateCommercialSchedulingDepositCents(
-      depositBasePriceCents,
-    );
-
-  const remainingBalanceCents =
-    calculateCommercialRemainingBalanceCents(
-      depositBasePriceCents,
-    );
-
   const paymentTerms =
     resolveCommercialPaymentTerms(
       quote.payment_terms,
     );
-
-  const primaryServiceLabel =
-    initialPriceCents > 0
-      ? "Initial commercial service"
-      : "First recurring billing cycle";
-
-  const primaryPriceCents =
-    initialPriceCents > 0
-      ? initialPriceCents
-      : recurringPriceCents ?? 0;
 
   pdfDocument.setTitle(
     sanitizePdfText(
@@ -516,26 +496,44 @@ export async function createCommercialQuotePdf({
     },
   );
 
-  drawPricingBlock({
-    page,
-    fonts,
-    y,
-    primaryServiceLabel,
-    primaryPriceCents,
-    initialPriceCents,
-    recurringPriceCents,
-    recurringFrequency:
-      quote.recurring_frequency,
-    schedulingDepositCents,
-    remainingBalanceCents,
-  });
+  drawCommercialQuotePricingSections({
+    quote,
+    lineItems,
 
-  y -=
-    calculatePricingBlockHeight(
-      initialPriceCents,
-      recurringPriceCents,
-    ) +
-    19;
+    flow: {
+      pageWidth:
+        PAGE_WIDTH,
+
+      pageMargin:
+        PAGE_MARGIN,
+
+      contentWidth:
+        CONTENT_WIDTH,
+
+      contentBottom:
+        CONTENT_BOTTOM,
+
+      fonts,
+      colors,
+
+      getPage:
+        () => page,
+
+      getY:
+        () => y,
+
+      setY:
+        (nextY) => {
+          y = nextY;
+        },
+
+      addContinuationPage,
+
+      drawSectionTitle,
+      drawParagraph,
+      drawBulletList,
+    },
+  });
 
   drawSectionTitle(
     "Scope of work",
@@ -609,15 +607,48 @@ export async function createCommercialQuotePdf({
     },
   );
 
+  drawCallout(
+    "Service concerns and corrections",
+    COMMERCIAL_SERVICE_CONCERN_SUMMARY,
+    {
+      fillColor:
+        colors.cream,
+
+      borderColor:
+        colors.gold,
+    },
+  );
+
+  drawSectionTitle(
+    "Complete terms",
+  );
+
+  drawParagraph(
+    COMMERCIAL_FULL_TERMS_NOTICE,
+    {
+      size:
+        8.2,
+
+      leading:
+        10.8,
+
+      color:
+        colors.muted,
+    },
+  );
+  
   drawSectionTitle(
     "What happens next",
   );
 
   drawParagraph(
-    "This quote is a proposal and does not authorize or schedule work. If the customer chooses to proceed, Clean Curb Co. will send the work agreement and applicable policies through DocuSign. Work is scheduled only after both parties sign and the required 10% scheduling deposit is received.",
+    "This quote is a proposal and does not authorize or schedule work. If the customer chooses to proceed, Clean Curb Co. will provide the Commercial Work Agreement, this accepted quote, the applicable Commercial Service Policies, and any required addenda through DocuSign. Service capacity is reserved after both parties sign and the 10% scheduling deposit is received.",
     {
-      size: 8.5,
-      leading: 11,
+      size:
+        8.5,
+
+      leading:
+        11,
     },
   );
 
@@ -999,412 +1030,6 @@ function drawCustomerInformationCards(
     );
 
     rowY -= 19;
-  }
-}
-
-function calculatePricingBlockHeight(
-  initialPriceCents: number,
-  recurringPriceCents:
-    number | null,
-) {
-  const hasSeparateRecurring =
-    initialPriceCents > 0 &&
-    recurringPriceCents !== null &&
-    recurringPriceCents > 0;
-
-  return (
-    25 +
-    52 +
-    63 +
-    (
-      hasSeparateRecurring
-        ? 58
-        : 0
-    )
-  );
-}
-
-function drawPricingBlock({
-  page,
-  fonts,
-  y,
-  primaryServiceLabel,
-  primaryPriceCents,
-  initialPriceCents,
-  recurringPriceCents,
-  recurringFrequency,
-  schedulingDepositCents,
-  remainingBalanceCents,
-}: {
-  page: PDFPage;
-  fonts: PdfFonts;
-  y: number;
-  primaryServiceLabel: string;
-  primaryPriceCents: number;
-  initialPriceCents: number;
-  recurringPriceCents:
-    number | null;
-  recurringFrequency:
-    string | null;
-  schedulingDepositCents: number;
-  remainingBalanceCents: number;
-}) {
-  const headerHeight =
-    25;
-
-  const serviceRowHeight =
-    52;
-
-  const depositRowHeight =
-    63;
-
-  const hasSeparateRecurring =
-    initialPriceCents > 0 &&
-    recurringPriceCents !== null &&
-    recurringPriceCents > 0;
-
-  const recurringHeight =
-    hasSeparateRecurring
-      ? 58
-      : 0;
-
-  const totalHeight =
-    headerHeight +
-    serviceRowHeight +
-    depositRowHeight +
-    recurringHeight;
-
-  const bottomY =
-    y -
-    totalHeight;
-
-  page.drawRectangle({
-    x: PAGE_MARGIN,
-    y: bottomY,
-    width: CONTENT_WIDTH,
-    height: totalHeight,
-    color: colors.white,
-    borderColor: colors.line,
-    borderWidth: 1,
-  });
-
-  page.drawRectangle({
-    x: PAGE_MARGIN,
-    y:
-      y -
-      headerHeight,
-    width: CONTENT_WIDTH,
-    height: headerHeight,
-    color: colors.cream,
-  });
-
-  page.drawRectangle({
-    x: PAGE_MARGIN,
-    y:
-      y -
-      headerHeight -
-      2,
-    width: CONTENT_WIDTH,
-    height: 2,
-    color: colors.gold,
-  });
-
-  page.drawText(
-    "CUSTOMER-FACING SERVICE",
-    {
-      x: PAGE_MARGIN + 12,
-      y: y - 17,
-      size: 7.3,
-      font: fonts.bold,
-      color: colors.black,
-    },
-  );
-
-  page.drawText(
-    "DESCRIPTION",
-    {
-      x: PAGE_MARGIN + 206,
-      y: y - 17,
-      size: 7.3,
-      font: fonts.bold,
-      color: colors.black,
-    },
-  );
-
-  drawRightText(
-    page,
-    "AMOUNT",
-    PAGE_WIDTH -
-      PAGE_MARGIN -
-      12,
-    y - 17,
-    fonts.bold,
-    7.3,
-    colors.black,
-  );
-
-  const serviceRowTop =
-    y -
-    headerHeight;
-
-  page.drawText(
-    sanitizePdfText(
-      primaryServiceLabel,
-    ),
-    {
-      x: PAGE_MARGIN + 12,
-      y:
-        serviceRowTop -
-        28,
-      size: 9.5,
-      font: fonts.bold,
-      color: colors.black,
-    },
-  );
-
-  const description =
-    initialPriceCents > 0
-      ? "One-time service under the customer-approved written scope."
-      : "First recurring service cycle under the customer-approved written scope.";
-
-  const descriptionLines =
-    wrapPdfText(
-      description,
-      fonts.regular,
-      8,
-      205,
-    ).slice(0, 2);
-
-  let descriptionY =
-    serviceRowTop - 24;
-
-  for (
-    const line of descriptionLines
-  ) {
-    page.drawText(
-      line,
-      {
-        x:
-          PAGE_MARGIN +
-          206,
-
-        y: descriptionY,
-
-        size: 8,
-        font: fonts.regular,
-        color: colors.muted,
-      },
-    );
-
-    descriptionY -= 9;
-  }
-
-  drawRightText(
-    page,
-    formatCurrencyCents(
-      primaryPriceCents,
-    ),
-    PAGE_WIDTH -
-      PAGE_MARGIN -
-      12,
-    serviceRowTop - 29,
-    fonts.bold,
-    14,
-    colors.black,
-  );
-
-  const depositTop =
-    serviceRowTop -
-    serviceRowHeight;
-
-  page.drawRectangle({
-    x: PAGE_MARGIN,
-    y:
-      depositTop -
-      depositRowHeight,
-    width: CONTENT_WIDTH,
-    height: depositRowHeight,
-    color: colors.cream,
-  });
-
-  const columnWidth =
-    CONTENT_WIDTH / 3;
-
-  const depositColumns = [
-    {
-      label:
-        "Accepted price",
-
-      value:
-        formatCurrencyCents(
-          primaryPriceCents,
-        ),
-    },
-
-    {
-      label:
-        "10% scheduling deposit",
-
-      value:
-        formatCurrencyCents(
-          schedulingDepositCents,
-        ),
-    },
-
-    {
-      label:
-        "Remaining after deposit",
-
-      value:
-        formatCurrencyCents(
-          remainingBalanceCents,
-        ),
-    },
-  ];
-
-  depositColumns.forEach(
-    (
-      column,
-      index,
-    ) => {
-      const columnX =
-        PAGE_MARGIN +
-        columnWidth *
-          index;
-
-      if (index > 0) {
-        page.drawLine({
-          start: {
-            x: columnX,
-            y:
-              depositTop -
-              depositRowHeight +
-              11,
-          },
-
-          end: {
-            x: columnX,
-            y:
-              depositTop -
-              11,
-          },
-
-          thickness: 0.6,
-          color: colors.line,
-        });
-      }
-
-      page.drawText(
-        column.label.toUpperCase(),
-        {
-          x:
-            columnX +
-            11,
-
-          y:
-            depositTop -
-            23,
-
-          size: 6.7,
-          font: fonts.bold,
-          color: colors.muted,
-        },
-      );
-
-      page.drawText(
-        column.value,
-        {
-          x:
-            columnX +
-            11,
-
-          y:
-            depositTop -
-            46,
-
-          size: 13,
-          font: fonts.bold,
-          color: colors.black,
-        },
-      );
-    },
-  );
-
-  if (
-    hasSeparateRecurring &&
-    recurringPriceCents !== null
-  ) {
-    const recurringTop =
-      depositTop -
-      depositRowHeight;
-
-    page.drawRectangle({
-      x: PAGE_MARGIN,
-      y:
-        recurringTop -
-        recurringHeight,
-      width: CONTENT_WIDTH,
-      height: recurringHeight,
-      color: colors.white,
-      borderColor: colors.purple,
-      borderWidth: 1.5,
-    });
-
-    page.drawRectangle({
-      x: PAGE_MARGIN,
-      y:
-        recurringTop -
-        recurringHeight,
-      width: 5,
-      height: recurringHeight,
-      color: colors.purple,
-    });
-
-    page.drawText(
-      "OPTIONAL RECURRING MAINTENANCE",
-      {
-        x: PAGE_MARGIN + 17,
-        y:
-          recurringTop -
-          19,
-
-        size: 7.1,
-        font: fonts.bold,
-        color: colors.purple,
-      },
-    );
-
-    page.drawText(
-      sanitizePdfText(
-        `${humanizeFrequency(
-          recurringFrequency,
-        )} service to keep the property from returning to full trash-fire status.`,
-      ),
-      {
-        x: PAGE_MARGIN + 17,
-        y:
-          recurringTop -
-          39,
-
-        size: 8.3,
-        font: fonts.bold,
-        color: colors.black,
-      },
-    );
-
-    drawRightText(
-      page,
-      `${formatCurrencyCents(
-        recurringPriceCents,
-      )} / visit`,
-      PAGE_WIDTH -
-        PAGE_MARGIN -
-        14,
-      recurringTop - 39,
-      fonts.bold,
-      14,
-      colors.black,
-    );
   }
 }
 
