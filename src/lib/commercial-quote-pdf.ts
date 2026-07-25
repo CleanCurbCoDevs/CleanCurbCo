@@ -749,16 +749,6 @@ function drawFirstPageHeader(
     10.5,
     colors.goldSoft,
   );
-
-  drawRightText(
-    page,
-    "DRAFT PREVIEW - NOT YET SENT",
-    PAGE_WIDTH - PAGE_MARGIN,
-    PAGE_HEIGHT - 112,
-    fonts.bold,
-    6.5,
-    colors.white,
-  );
 }
 
 function drawContinuationHeader(
