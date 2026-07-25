@@ -37,6 +37,7 @@ import {
 } from "@/lib/commercial-quote-customer-breakdown";
 
 import {
+  COMMERCIAL_PAYMENT_OPTIONS_SUMMARY,
   COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
   COMMERCIAL_TAX_CENTS,
   calculateCommercialPaymentSchedule,
@@ -2565,14 +2566,9 @@ function PaymentScheduleEditor({
         </strong>
 
         <p>
-          After signing, the customer
-          may pay only the 10% scheduling
-          deposit, the entire required
-          pre-service amount, or the full
-          quoted price immediately.
-          Paying early does not change
-          how each portion is classified
-          or refunded.
+          {
+            COMMERCIAL_PAYMENT_OPTIONS_SUMMARY
+          }
         </p>
       </div>
     </div>
