@@ -10,7 +10,16 @@ import {
 } from "@/lib/commercial-quote-pdf";
 
 import {
+  buildCommercialCustomerProjectBasisFromQuote,
+} from "@/lib/commercial-quote-customer-breakdown";
+
+import {
+  COMMERCIAL_FULL_TERMS_NOTICE,
   COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
+  COMMERCIAL_PAYMENT_OPTIONS_SUMMARY,
+  COMMERCIAL_PRE_SERVICE_TIMING_SUMMARY,
+  COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
+  COMMERCIAL_SERVICE_CONCERN_SUMMARY,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
 
@@ -58,8 +67,25 @@ export function buildCommercialQuoteCustomerSnapshot(
     CommercialQuoteLineItemRow[] =
     [],
 ) {
+  const initialProjectBasis =
+    quote.final_initial_price_cents > 0
+      ? buildCommercialCustomerProjectBasisFromQuote(
+          quote,
+          "initial",
+        )
+      : null;
+
+  const recurringProjectBasis =
+    quote.final_recurring_price_cents !==
+    null
+      ? buildCommercialCustomerProjectBasisFromQuote(
+          quote,
+          "recurring",
+        )
+      : null;
+
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
 
     customer: {
       businessName:
@@ -206,7 +232,14 @@ export function buildCommercialQuoteCustomerSnapshot(
                 item.metadata,
             }),
           ),
+      customerProjectBasis: {
+        initial:
+          initialProjectBasis,
 
+        recurring:
+          recurringProjectBasis,
+      },
+      
       scopeSummary:
         quote.scope_summary,
 
@@ -230,7 +263,7 @@ export function buildCommercialQuoteCustomerSnapshot(
       validUntil:
         quote.valid_until,
     },
-
+    
     policy: {
       schedulingDepositPercent:
         quote.scheduling_deposit_percent,
@@ -240,6 +273,21 @@ export function buildCommercialQuoteCustomerSnapshot(
 
       paymentAndRefundSummary:
         COMMERCIAL_PAYMENT_AND_REFUND_SUMMARY,
+
+      paymentOptionsSummary:
+        COMMERCIAL_PAYMENT_OPTIONS_SUMMARY,
+
+      preServiceTimingSummary:
+        COMMERCIAL_PRE_SERVICE_TIMING_SUMMARY,
+
+      serviceConcernSummary:
+        COMMERCIAL_SERVICE_CONCERN_SUMMARY,
+
+      projectSupportFootnote:
+        COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
+
+      fullTermsNotice:
+        COMMERCIAL_FULL_TERMS_NOTICE,
     },
   };
 }
