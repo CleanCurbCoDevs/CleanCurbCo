@@ -32,10 +32,6 @@ import {
 } from "@/lib/commercial-pricing";
 
 import {
-  resolveCommercialPaymentTerms,
-} from "@/lib/commercial-quote-policy";
-
-import {
   buildCommercialCustomerLineItems,
   type CommercialCustomerLineItemDraft,
 } from "@/lib/commercial-quote-customer-breakdown";
@@ -44,6 +40,8 @@ import {
   COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
   COMMERCIAL_TAX_CENTS,
   calculateCommercialPaymentSchedule,
+  calculateCommercialRemainingBalanceCents,
+  calculateCommercialSchedulingDepositCents,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
 
