@@ -40,8 +40,6 @@ import {
   COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE,
   COMMERCIAL_TAX_CENTS,
   calculateCommercialPaymentSchedule,
-  calculateCommercialRemainingBalanceCents,
-  calculateCommercialSchedulingDepositCents,
   resolveCommercialPaymentTerms,
 } from "@/lib/commercial-quote-policy";
 
@@ -422,15 +420,89 @@ export function CommercialQuoteComposer({
       ? finalInitialPriceCents
       : finalRecurringPriceCents ??
         0;
-  
-  const schedulingDepositCents =
-    calculateCommercialSchedulingDepositCents(
+
+  const depositPercentOverrideValue =
+    depositPercentOverride === "10"
+      ? 10
+      : depositPercentOverride === "30"
+        ? 30
+        : depositPercentOverride === "40"
+          ? 40
+          : depositPercentOverride === "50"
+            ? 50
+            : null;
+
+  const automaticPaymentSchedule =
+    calculateCommercialPaymentSchedule(
       depositBasePriceCents,
     );
-  
-  const remainingBalanceCents =
-    calculateCommercialRemainingBalanceCents(
+
+  const paymentSchedule =
+    calculateCommercialPaymentSchedule(
       depositBasePriceCents,
+      depositPercentOverrideValue,
+    );
+
+  const initialCustomerLineItems =
+    useMemo(
+      () =>
+        buildCommercialCustomerLineItems({
+          phase:
+            "initial",
+
+          input:
+            initialInput,
+
+          calculation:
+            initialCalculation,
+
+          pricingProfile,
+
+          finalPriceCents:
+            finalInitialPriceCents,
+        }),
+      [
+        initialInput,
+        initialCalculation,
+        pricingProfile,
+        finalInitialPriceCents,
+      ],
+    );
+
+  const recurringCustomerLineItems =
+    useMemo(
+      () => {
+        if (
+          !includeRecurring ||
+          finalRecurringPriceCents ===
+            null
+        ) {
+          return [];
+        }
+
+        return buildCommercialCustomerLineItems({
+          phase:
+            "recurring",
+
+          input:
+            recurringInput,
+
+          calculation:
+            recurringCalculation,
+
+          pricingProfile,
+
+          finalPriceCents:
+            finalRecurringPriceCents,
+        });
+      },
+      [
+        includeRecurring,
+        recurringInput,
+        recurringCalculation,
+        pricingProfile,
+        finalRecurringPriceCents,
+      ],
     );
   
   const quotePdfUrl =
@@ -664,6 +736,18 @@ export function CommercialQuoteComposer({
           }
         />
 
+        <input
+          type="hidden"
+          name="depositPercentOverride"
+          value={depositPercentOverride}
+        />
+
+        <input
+          type="hidden"
+          name="depositOverrideReason"
+          value={depositOverrideReason}
+        />
+        
         <section className="commercial-builder-section">
           <div className="commercial-builder-section-heading">
             <div>
@@ -1346,7 +1430,7 @@ export function CommercialQuoteComposer({
               />
               
               <p className="commercial-builder-subheading">
-                Labor and operating assumptions
+                Crew, site, and operating assumptions
               </p>
 
               <div className="commercial-builder-input-grid">
@@ -1729,7 +1813,85 @@ export function CommercialQuoteComposer({
               />
             ) : null}
           </div>
-          
+
+          <div className="commercial-customer-pricing-preview">
+            <div>
+              <p className="section-kicker">
+                Customer-Facing Breakdown
+              </p>
+
+              <h3>
+                What the customer will
+                actually see.
+              </h3>
+
+              <p className="commercial-customer-pricing-intro">
+                These service lines add
+                up to the exact quoted
+                price without exposing
+                Clean Curb Co.&apos;s
+                private labor, margin,
+                or overhead formulas.
+              </p>
+            </div>
+
+            {finalInitialPriceCents >
+            0 ? (
+              <CustomerPricingTable
+                title="Initial reset"
+                lineItems={
+                  initialCustomerLineItems
+                }
+                subtotalCents={
+                  finalInitialPriceCents
+                }
+              />
+            ) : null}
+
+            {includeRecurring &&
+            finalRecurringPriceCents !==
+              null ? (
+              <CustomerPricingTable
+                title="Recurring maintenance per visit"
+                lineItems={
+                  recurringCustomerLineItems
+                }
+                subtotalCents={
+                  finalRecurringPriceCents
+                }
+              />
+            ) : null}
+
+            <p className="commercial-customer-pricing-footnote">
+              *
+              {
+                COMMERCIAL_PROJECT_SUPPORT_FOOTNOTE
+              }
+            </p>
+          </div>
+
+          <PaymentScheduleEditor
+            paymentSchedule={
+              paymentSchedule
+            }
+            automaticTotalPreServicePercent={
+              automaticPaymentSchedule
+                .totalPreServicePercent
+            }
+            overrideValue={
+              depositPercentOverride
+            }
+            overrideReason={
+              depositOverrideReason
+            }
+            onOverrideChange={
+              setDepositPercentOverride
+            }
+            onOverrideReasonChange={
+              setDepositOverrideReason
+            }
+          />
+
           {includeRecurring ? (
             <label className="commercial-builder-field commercial-builder-frequency">
               <span>
@@ -1963,11 +2125,18 @@ export function CommercialQuoteComposer({
                   )}`
                 : ""}
         
-              {schedulingDepositCents > 0
-                ? ` • Deposit: ${formatCurrency(
-                    schedulingDepositCents,
-                  )} • Remaining: ${formatCurrency(
-                    remainingBalanceCents,
+              {paymentSchedule
+                .schedulingDepositCents >
+              0
+                ? ` • Reserve: ${formatCurrency(
+                    paymentSchedule
+                      .schedulingDepositCents,
+                  )} • Before service: ${formatCurrency(
+                    paymentSchedule
+                      .totalPreServiceCents,
+                  )} • Completion: ${formatCurrency(
+                    paymentSchedule
+                      .completionBalanceCents,
                   )}`
                 : ""}
             </strong>
@@ -2056,6 +2225,357 @@ export function CommercialQuoteComposer({
         </footer>
       </FeedbackForm>
     </section>
+  );
+}
+
+function CustomerPricingTable({
+  title,
+  lineItems,
+  subtotalCents,
+}: {
+  title: string;
+
+  lineItems:
+    CommercialCustomerLineItemDraft[];
+
+  subtotalCents: number;
+}) {
+  return (
+    <div className="commercial-customer-pricing-table">
+      <div className="commercial-customer-pricing-title">
+        <strong>
+          {title}
+        </strong>
+
+        <span>
+          Amount
+        </span>
+      </div>
+
+      {lineItems.map(
+        (
+          item,
+          index,
+        ) => (
+          <div
+            className="commercial-customer-pricing-row"
+            key={`${item.phase}-${String(
+              item.metadata
+                .sourceKey ??
+                index,
+            )}`}
+          >
+            <span>
+              <strong>
+                {item.name}
+              </strong>
+
+              <small>
+                {item.quantity.toLocaleString(
+                  "en-US",
+                  {
+                    maximumFractionDigits:
+                      2,
+                  },
+                )}{" "}
+                {item.unitLabel ??
+                  ""}
+
+                {item.description
+                  ? ` • ${item.description}`
+                  : ""}
+              </small>
+            </span>
+
+            <strong>
+              {formatCurrency(
+                item.amountCents,
+              )}
+            </strong>
+          </div>
+        ),
+      )}
+
+      <div className="commercial-customer-pricing-total">
+        <span>
+          Subtotal
+        </span>
+
+        <strong>
+          {formatCurrency(
+            subtotalCents,
+          )}
+        </strong>
+      </div>
+
+      <div className="commercial-customer-pricing-total">
+        <span>
+          Tax
+        </span>
+
+        <strong>
+          {formatCurrency(
+            COMMERCIAL_TAX_CENTS,
+          )}
+        </strong>
+      </div>
+
+      <div className="commercial-customer-pricing-grand-total">
+        <span>
+          Total
+        </span>
+
+        <strong>
+          {formatCurrency(
+            subtotalCents +
+              COMMERCIAL_TAX_CENTS,
+          )}
+        </strong>
+      </div>
+    </div>
+  );
+}
+
+function PaymentScheduleEditor({
+  paymentSchedule,
+  automaticTotalPreServicePercent,
+  overrideValue,
+  overrideReason,
+  onOverrideChange,
+  onOverrideReasonChange,
+}: {
+  paymentSchedule:
+    ReturnType<
+      typeof calculateCommercialPaymentSchedule
+    >;
+
+  automaticTotalPreServicePercent:
+    number;
+
+  overrideValue:
+    string;
+
+  overrideReason:
+    string;
+
+  onOverrideChange:
+    (value: string) => void;
+
+  onOverrideReasonChange:
+    (value: string) => void;
+}) {
+  return (
+    <div className="commercial-payment-schedule-editor">
+      <div className="commercial-builder-section-heading">
+        <div>
+          <p className="section-kicker">
+            Payment Schedule
+          </p>
+
+          <h3>
+            Every dollar, before the
+            customer sees it.
+          </h3>
+        </div>
+
+        <span className="status-badge">
+          {
+            paymentSchedule
+              .totalPreServicePercent
+          }
+          % before service
+        </span>
+      </div>
+
+      <div className="commercial-payment-tier-controls">
+        <label className="commercial-builder-field">
+          <span>
+            Pre-service payment tier
+          </span>
+
+          <select
+            value={overrideValue}
+            onChange={(event) => {
+              onOverrideChange(
+                event.target.value,
+              );
+
+              if (
+                event.target.value ===
+                ""
+              ) {
+                onOverrideReasonChange(
+                  "",
+                );
+              }
+            }}
+          >
+            <option value="">
+              Automatic —{" "}
+              {
+                automaticTotalPreServicePercent
+              }
+              % for this price
+            </option>
+
+            <option value="10">
+              Override to 10%
+            </option>
+
+            <option value="30">
+              Override to 30%
+            </option>
+
+            <option value="40">
+              Override to 40%
+            </option>
+
+            <option value="50">
+              Override to 50%
+            </option>
+          </select>
+
+          <small>
+            The automatic tier is based
+            on the initial service price,
+            or the first recurring cycle
+            when no initial service is
+            quoted.
+          </small>
+        </label>
+
+        {overrideValue ? (
+          <label className="commercial-builder-field">
+            <span>
+              Internal override reason
+            </span>
+
+            <input
+              required
+              value={overrideReason}
+              placeholder="Why this project differs from the automatic tier..."
+              onChange={(event) =>
+                onOverrideReasonChange(
+                  event.target.value,
+                )
+              }
+            />
+
+            <small>
+              Saved internally and never
+              displayed on the customer
+              quote.
+            </small>
+          </label>
+        ) : null}
+      </div>
+
+      <div className="commercial-payment-schedule-grid">
+        <div>
+          <span>
+            Scheduling deposit — 10%
+          </span>
+
+          <strong>
+            {formatCurrency(
+              paymentSchedule
+                .schedulingDepositCents,
+            )}
+          </strong>
+
+          <small>
+            Due after both parties sign
+            to reserve service. Generally
+            nonrefundable for a
+            customer-caused cancellation.
+          </small>
+        </div>
+
+        <div>
+          <span>
+            Additional pre-service —{" "}
+            {
+              paymentSchedule
+                .additionalPreServicePercent
+            }
+            %
+          </span>
+
+          <strong>
+            {formatCurrency(
+              paymentSchedule
+                .additionalPreServiceCents,
+            )}
+          </strong>
+
+          <small>
+            Due no later than three
+            business days before service.
+            Refundable until service
+            begins.
+          </small>
+        </div>
+
+        <div>
+          <span>
+            Completion balance —{" "}
+            {
+              paymentSchedule
+                .completionBalancePercent
+            }
+            %
+          </span>
+
+          <strong>
+            {formatCurrency(
+              paymentSchedule
+                .completionBalanceCents,
+            )}
+          </strong>
+
+          <small>
+            Due when the accepted scope
+            is completed.
+          </small>
+        </div>
+      </div>
+
+      <div className="commercial-payment-total-note">
+        <span>
+          Total required before service
+        </span>
+
+        <strong>
+          {formatCurrency(
+            paymentSchedule
+              .totalPreServiceCents,
+          )}{" "}
+          (
+          {
+            paymentSchedule
+              .totalPreServicePercent
+          }
+          %)
+        </strong>
+      </div>
+
+      <div className="commercial-payment-options-note">
+        <strong>
+          Customer payment options
+        </strong>
+
+        <p>
+          After signing, the customer
+          may pay only the 10% scheduling
+          deposit, the entire required
+          pre-service amount, or the full
+          quoted price immediately.
+          Paying early does not change
+          how each portion is classified
+          or refunded.
+        </p>
+      </div>
+    </div>
   );
 }
 
