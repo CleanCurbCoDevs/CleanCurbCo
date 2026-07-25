@@ -23,10 +23,6 @@ import {
 } from "@/lib/commercial-pricing-profile";
 
 import {
-  COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT,
-} from "@/lib/commercial-quote-policy";
-
-import {
   COMMERCIAL_QUOTE_DOCUMENT_TYPE,
   getCommercialQuoteSourceSnapshotHash,
 } from "@/lib/customer-file-archive";
