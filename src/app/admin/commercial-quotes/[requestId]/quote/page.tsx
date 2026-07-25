@@ -186,6 +186,33 @@ export default async function CommercialQuoteBuilderPage({
   const existingDraft =
     draftResult.data ?? null;
 
+  const quoteLineItems =
+    existingDraft
+      ? (
+          await admin
+            .from(
+              "commercial_quote_line_items",
+            )
+            .select("*")
+            .eq(
+              "quote_id",
+              existingDraft.id,
+            )
+            .eq(
+              "is_customer_visible",
+              true,
+            )
+            .order(
+              "sort_order",
+              {
+                ascending:
+                  true,
+              },
+            )
+        ).data ?? []
+      : [];
+
+  
   const customerFiles =
     customerFilesResult.data ??
     [];
@@ -216,7 +243,8 @@ export default async function CommercialQuoteBuilderPage({
           getCommercialQuoteSourceSnapshotHash(
             request,
             existingDraft,
-          ),
+            quoteLineItems,
+          )
     );
   
   const services =
@@ -311,8 +339,8 @@ export default async function CommercialQuoteBuilderPage({
             />
 
             <ContextTile
-              label="Scheduling deposit"
-              value={`${COMMERCIAL_SCHEDULING_DEPOSIT_PERCENT}% after agreement signing`}
+              label="Payment structure"
+              value="10% to reserve service; 10%-50% total before service based on project price"
             />
             
             <ContextTile
