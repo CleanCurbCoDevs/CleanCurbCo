@@ -6,6 +6,11 @@ import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
+type SendEmailAttachment = {
+  filename: string;
+  content: string;
+};
+
 type SendEmailInput = {
   to: string | string[];
   subject: string;
@@ -16,6 +21,7 @@ type SendEmailInput = {
   relatedBookingId?: string | null;
   relatedVisitId?: string | null;
   idempotencyKey?: string;
+  attachments?: SendEmailAttachment[];
 };
 
 let resendClient: Resend | null = null;
@@ -79,6 +85,7 @@ function isCriticalEmailTemplate(templateKey: string) {
     [
       "booking_confirmation",
       "commercial_quote_confirmation",
+      "commercial_quote_delivery",
       "customer_request_received",
       "account_deletion_requested",
       "payment_setup_invite",
@@ -174,6 +181,7 @@ export async function sendTransactionalEmail(input: SendEmailInput) {
         html: input.html,
         text: input.text,
         replyTo: configuredReplyTo,
+        attachments: input.attachments,
       },
       input.idempotencyKey
         ? {
