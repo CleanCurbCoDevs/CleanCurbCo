@@ -22,7 +22,9 @@ import type {
   BookingRow,
   CareerApplicationRow,
   CommercialQuoteRequestRow,
+  CommercialQuoteRow,
   ContactMessageRow,
+  CustomerFileRow,
   CustomerRequestRow,
   ProfileRow,
   ReferralRow,
@@ -1272,6 +1274,246 @@ export function commercialQuoteConfirmationTemplate(
         "No service has been scheduled and no contract or accepted price has been created by submitting this request.",
       ].join("\n\n"),
     ),
+  };
+}
+
+function formatCommercialQuoteCurrency(
+  cents: number,
+  currency: string,
+) {
+  return new Intl.NumberFormat(
+    "en-US",
+    {
+      style: "currency",
+      currency:
+        currency.toUpperCase(),
+    },
+  ).format(
+    Math.max(
+      0,
+      cents,
+    ) / 100,
+  );
+}
+
+function humanizeCommercialQuoteFrequency(
+  value: string | null,
+) {
+  if (!value) {
+    return "recurring visit";
+  }
+
+  return value
+    .replaceAll(
+      "_",
+      " ",
+    )
+    .replace(
+      /\b\w/g,
+      (character) =>
+        character.toUpperCase(),
+    );
+}
+
+export function commercialQuoteDeliveryTemplate(
+  request:
+    CommercialQuoteRequestRow,
+
+  quote:
+    CommercialQuoteRow,
+
+  file:
+    CustomerFileRow,
+): EmailTemplate {
+  const quoteLabel =
+    quote.quote_number ??
+    `Quote v${quote.version_number}`;
+
+  const initialPriceLine =
+    quote.final_initial_price_cents >
+    0
+      ? `
+        <li>
+          <strong>Initial service:</strong>
+          ${escapeHtml(
+            formatCommercialQuoteCurrency(
+              quote.final_initial_price_cents,
+              quote.currency,
+            ),
+          )}
+        </li>
+      `
+      : "";
+
+  const recurringPriceLine =
+    quote.final_recurring_price_cents !==
+      null &&
+    quote.final_recurring_price_cents >
+      0
+      ? `
+        <li>
+          <strong>Recurring maintenance:</strong>
+          ${escapeHtml(
+            formatCommercialQuoteCurrency(
+              quote.final_recurring_price_cents,
+              quote.currency,
+            ),
+          )}
+          per
+          ${escapeHtml(
+            humanizeCommercialQuoteFrequency(
+              quote.recurring_frequency,
+            ).toLowerCase(),
+          )}
+        </li>
+      `
+      : "";
+
+  const validThrough =
+    quote.valid_until
+      ? formatEmailDate(
+          quote.valid_until,
+        )
+      : "See attached quote";
+
+  const body = `
+    <p>
+      Hi ${escapeHtml(
+        request.contact_name,
+      )},
+    </p>
+
+    <p>
+      We finished the homework. Your commercial quote for
+      <strong>${escapeHtml(
+        request.business_name,
+      )}</strong>
+      is attached to this email.
+    </p>
+
+    <div style="background:#f8f4e8;border:1px solid #dedbd0;border-radius:12px;padding:16px">
+      <ul style="line-height:1.8;margin:0;padding-left:20px">
+        <li>
+          <strong>Quote:</strong>
+          ${escapeHtml(quoteLabel)}
+        </li>
+
+        ${initialPriceLine}
+        ${recurringPriceLine}
+
+        <li>
+          <strong>Scheduling deposit:</strong>
+          ${escapeHtml(
+            formatCommercialQuoteCurrency(
+              quote.scheduling_deposit_cents,
+              quote.currency,
+            ),
+          )}
+          after both parties sign
+        </li>
+
+        <li>
+          <strong>Valid through:</strong>
+          ${escapeHtml(validThrough)}
+        </li>
+
+        <li>
+          <strong>Attached file:</strong>
+          ${escapeHtml(
+            file.original_filename,
+          )}
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      The attached quote includes the proposed scope,
+      customer-facing pricing, payment schedule, assumptions,
+      exclusions, and the important policy summary.
+    </p>
+
+    <p style="background:#f4fff5;border:1px solid #b6efbd;border-radius:12px;padding:14px">
+      <strong>Ready to move forward?</strong>
+      Reply to this email and tell us you would like to
+      proceed. We will then send the complete Commercial Work
+      Agreement, accepted quote, applicable policies, and any
+      required addenda through DocuSign.
+    </p>
+
+    <p>
+      Reviewing this quote does not schedule service or make
+      a deposit due. Service capacity is reserved only after
+      both parties sign and the 10% scheduling deposit is
+      received.
+    </p>
+
+    <p>
+      Thanks for trusting a local, veteran-owned small
+      business with the part nobody wants to stand near.
+    </p>
+  `;
+
+  const textLines = [
+    `Hi ${request.contact_name},`,
+
+    `Your Clean Curb Co. commercial quote for ${request.business_name} is attached.`,
+
+    `Quote: ${quoteLabel}`,
+
+    quote.final_initial_price_cents >
+    0
+      ? `Initial service: ${formatCommercialQuoteCurrency(
+          quote.final_initial_price_cents,
+          quote.currency,
+        )}`
+      : "",
+
+    quote.final_recurring_price_cents !==
+      null &&
+    quote.final_recurring_price_cents >
+      0
+      ? `Recurring maintenance: ${formatCommercialQuoteCurrency(
+          quote.final_recurring_price_cents,
+          quote.currency,
+        )} per ${humanizeCommercialQuoteFrequency(
+          quote.recurring_frequency,
+        ).toLowerCase()}`
+      : "",
+
+    `Scheduling deposit after both parties sign: ${formatCommercialQuoteCurrency(
+      quote.scheduling_deposit_cents,
+      quote.currency,
+    )}`,
+
+    `Valid through: ${validThrough}`,
+
+    `Attached file: ${file.original_filename}`,
+
+    "To move forward, reply to this email and tell us you would like to proceed. We will send the complete agreement and applicable policies through DocuSign.",
+
+    "Reviewing the quote does not schedule service or make a deposit due.",
+  ].filter(Boolean);
+
+  return {
+    subject:
+      `Your Clean Curb Co. commercial quote for ${request.business_name}`,
+
+    html:
+      shell(
+        "Your commercial quote is ready",
+        body,
+        {
+          preview:
+            `Quote ${quoteLabel} for ${request.business_name} is attached.`,
+        },
+      ),
+
+    text:
+      customerText(
+        textLines.join(
+          "\n\n",
+        ),
+      ),
   };
 }
 
