@@ -5,7 +5,7 @@ export const brand = {
   tagline: "Fresh Starts at the Curb.",
   legalNote: "Clean Curb Co. is operated by Stonebranch Capital LLC.",
   area:
-    "Summerville, Goose Creek, Moncks Corner, and surrounding Charleston-area communities",
+    "Goose Creek, Summerville, Moncks Corner, Cane Bay, and surrounding Lowcountry communities",
   phone: "+1 (843) 888-4124",
   phoneHref: "tel:+18438884124",
   email: "contact@cleancurbco.com",
@@ -175,14 +175,14 @@ export const binTypes = [
 ];
 
 export const serviceAreas = [
+  "Goose Creek",
   "Summerville",
+  "Moncks Corner",
   "Cane Bay",
   "Nexton",
   "Carnes Crossroads",
   "Summers Corner",
-  "Goose Creek",
-  "Moncks Corner",
-  "Nearby Charleston-area communities within our service radius",
+  "Nearby Lowcountry communities within our service radius",
 ];
 
 export const futureServices = [
