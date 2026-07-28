@@ -40,14 +40,16 @@ export default async function PortalBillingPage() {
         null,
     });
   
-  const paymentSetupBooking =
+  const paymentSetupBookingId =
     context.bookings.find(
       (booking) =>
+        Boolean(stripeCustomerId) &&
         booking.stripe_customer_id ===
-        stripeCustomerId,
-    ) ??
-    context.bookings[0] ??
+          stripeCustomerId,
+    )?.id ??
+    context.bookings[0]?.id ??
     null;
+  
   const records = context.payments.length
     ? context.payments.map((payment) => {
         const booking = context.bookings.find((item) => item.id === payment.booking_id);
@@ -77,12 +79,11 @@ export default async function PortalBillingPage() {
     </p>
 
     {paymentSetupBooking ? (
-      <PaymentSetupButton
-        bookingId={paymentSetupBooking.id}
-        returnPath="/portal/billing"
-        label="Update Payment Method"
-        className="button button-outline"
-      />
+    <PaymentSetupButton
+      bookingId={paymentSetupBookingId}
+      returnPath="/portal/billing"
+      label="Add Payment Method"
+    />
     ) : null}
   </div>
 ) : paymentMethodState.status === "missing" ? (
@@ -162,7 +163,7 @@ export default async function PortalBillingPage() {
                   <span className={`status-badge status-${status}`}>
                     {paymentStatusLabel(status)}
                   </span>
-                  {link ? (
+                  {status === "paid" ? null : link ? (
                     <a className="button button-outline" href={link}>
                       Pay Now
                     </a>
