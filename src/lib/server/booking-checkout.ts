@@ -1,11 +1,15 @@
 import "server-only";
+import Stripe from "stripe";
 
 import {
   getSiteUrl,
   getStripeEnv,
   isStripeConfigured,
 } from "@/lib/env";
-import { getFoundingNeighborSpecialStatus } from "@/lib/pricing";
+import {
+  calculateBasePrice,
+  getFoundingNeighborSpecialStatus,
+} from "@/lib/pricing";
 import { logger } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -21,6 +25,26 @@ export type BookingCheckoutResult = {
   checkoutUrl: string | null;
   error: string | null;
 };
+
+type RecurringFrequency = Exclude<
+  BookingRow["frequency"],
+  "one_time"
+>;
+
+const recurringIntervalMonths: Record<
+  RecurringFrequency,
+  number
+> = {
+  monthly: 1,
+  every_other_month: 2,
+  quarterly: 3,
+};
+
+function isRecurringFrequency(
+  frequency: BookingRow["frequency"],
+): frequency is RecurringFrequency {
+  return frequency !== "one_time";
+}
 
 function stringifyMetadata(
   metadata: Record<string, unknown>,
@@ -78,6 +102,26 @@ export async function createBookingCheckout({
     };
   }
 
+  const isRecurring = isRecurringFrequency(
+    booking.frequency,
+  );
+  
+  const amountCents = Math.round(amount * 100);
+  
+  const recurringServiceAmount = isRecurring
+    ? calculateBasePrice(
+        booking.bin_count,
+        booking.frequency,
+      )
+    : amount;
+  
+  const recurringServiceAmountCents = Math.round(
+    recurringServiceAmount * 100,
+  );
+  
+  const firstVisitDifferenceCents =
+    amountCents - recurringServiceAmountCents;
+  
   const paymentMetadata = {
     source: "booking_form",
     booking_id: booking.id,
@@ -87,6 +131,13 @@ export async function createBookingCheckout({
     add_ons: booking.add_ons,
     payment_type: "booking",
     service_amount: amount,
+    checkout_mode: isRecurring
+    ? "subscription"
+    : "payment",
+    first_visit_total_amount: amount,
+    recurring_service_amount: isRecurring
+      ? recurringServiceAmount
+      : 0,    
     tip_amount: 0,
     total_amount: amount,
   };
@@ -222,27 +273,105 @@ if (!stripeCustomerId) {
       token: claimToken,
     }).toString();
     
-    const session = await stripe.checkout.sessions.create({
-      mode: "payment",
-      customer: stripeCustomerId,
-      client_reference_id: booking.id,
-      payment_method_types: ["card"],
-      allow_promotion_codes: true,
-      line_items: [
+let firstInvoiceCouponId: string | null = null;
+
+if (
+  isRecurring &&
+  firstVisitDifferenceCents < 0
+) {
+  const coupon = await stripe.coupons.create(
+    {
+      amount_off: Math.abs(
+        firstVisitDifferenceCents,
+      ),
+      currency,
+      duration: "once",
+      max_redemptions: 1,
+      name: "First-visit discount",
+      metadata: stripeMetadata,
+    },
+    {
+      idempotencyKey:
+        `booking-${booking.id}-first-invoice-discount`,
+    },
+  );
+
+  firstInvoiceCouponId = coupon.id;
+}
+
+const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
+  isRecurring
+    ? [
         {
           quantity: 1,
           price_data: {
             currency,
-            unit_amount: Math.round(amount * 100),
+            unit_amount:
+              recurringServiceAmountCents,
+            recurring: {
+              interval: "month",
+              interval_count:
+                recurringIntervalMonths[
+                  booking.frequency
+                ],
+            },
             product_data: {
-              name: "Clean Curb Co. bin cleaning",
+              name:
+                "Clean Curb Co. recurring bin cleaning",
               description:
-                `First service visit at ${booking.street_address}`,
+                `Recurring service at ${booking.street_address}`,
               metadata: stripeMetadata,
             },
           },
         },
-      ],
+      ]
+    : [
+        {
+          quantity: 1,
+          price_data: {
+            currency,
+            unit_amount: amountCents,
+            product_data: {
+              name:
+                "Clean Curb Co. bin cleaning",
+              description:
+                `Service visit at ${booking.street_address}`,
+              metadata: stripeMetadata,
+            },
+          },
+        },
+      ];
+
+if (
+  isRecurring &&
+  firstVisitDifferenceCents > 0
+) {
+  lineItems.push({
+    quantity: 1,
+    price_data: {
+      currency,
+      unit_amount:
+        firstVisitDifferenceCents,
+      product_data: {
+        name:
+          "First-visit add-ons and adjustments",
+        description:
+          "Selected add-ons or first-visit work. This amount does not repeat.",
+        metadata: stripeMetadata,
+      },
+    },
+  });
+}
+
+const sessionParams: Stripe.Checkout.SessionCreateParams =
+  {
+    mode: isRecurring
+      ? "subscription"
+      : "payment",
+    customer: stripeCustomerId,
+    client_reference_id: booking.id,
+    payment_method_types: ["card"],
+    line_items: lineItems,
     success_url:
       `${siteUrl}/billing/success` +
       `?payment=success` +
@@ -252,11 +381,39 @@ if (!stripeCustomerId) {
       `${siteUrl}/billing/success` +
       `?payment=cancelled` +
       `&${accountQuery}`,
-      metadata: stripeMetadata,
-      payment_intent_data: {
-        metadata: stripeMetadata,
+    metadata: stripeMetadata,
+  };
+
+if (isRecurring) {
+  sessionParams.subscription_data = {
+    metadata: stripeMetadata,
+  };
+
+  if (firstInvoiceCouponId) {
+    sessionParams.discounts = [
+      {
+        coupon: firstInvoiceCouponId,
       },
-    });
+    ];
+  } else {
+    sessionParams.allow_promotion_codes =
+      true;
+  }
+} else {
+  sessionParams.allow_promotion_codes = true;
+  sessionParams.payment_intent_data = {
+    metadata: stripeMetadata,
+  };
+}
+
+const session =
+  await stripe.checkout.sessions.create(
+    sessionParams,
+    {
+      idempotencyKey:
+        `booking-checkout-${booking.id}`,
+    },
+  );
 
     const checkoutUrl = session.url ?? null;
 
@@ -282,7 +439,17 @@ if (!stripeCustomerId) {
           metadata: {
             ...paymentMetadata,
             payment_id: payment.id,
-            stripe_mode: "payment",
+            stripe_mode: isRecurring
+              ? "subscription"
+              : "payment",
+            recurring_service_amount:
+              isRecurring
+                ? recurringServiceAmount
+                : null,
+            first_visit_difference:
+              isRecurring
+                ? firstVisitDifferenceCents / 100
+                : null,
             checkout_started_at: new Date().toISOString(),
           },
         })
