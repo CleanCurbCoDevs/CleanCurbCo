@@ -188,12 +188,6 @@ async function updatePaymentState(input: {
     paymentUpdateError,
   );
 
-  if (!profile) {
-    throw new Error(
-      `Stripe payment-setup profile update returned no profile for ${previousProfile.id}.`,
-    );
-  }
-  
   if (!payment) {
     throw new Error(
       `Stripe payment update returned no row for payment ${existingPayment.id}.`,
@@ -559,6 +553,12 @@ async function updateProfilePaymentSetupState(
     profileUpdateError,
   );
 
+  if (!profile) {
+    throw new Error(
+      `Stripe payment-setup profile update returned no profile for ${previousProfile.id}.`,
+    );
+  }
+    
   await recordPaymentEvent({
     eventType:
       `stripe_profile_payment_setup_${input.status}`,
