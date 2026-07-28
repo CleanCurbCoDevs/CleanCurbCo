@@ -2,9 +2,9 @@ import { AddOnsSection, PricingSection } from "@/components/sections/home-sectio
 import { publicPageMetadata } from "@/lib/seo";
 
 export const metadata = publicPageMetadata({
-  title: "Pricing",
+  title: "Garbage Bin Cleaning Prices",
   description:
-    "Clean Curb Co. garbage bin cleaning pricing for Cane Bay and nearby Summerville communities.",
+    "Straightforward one-time and recurring garbage bin cleaning prices for Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby communities.",
   path: "/pricing",
 });
 
