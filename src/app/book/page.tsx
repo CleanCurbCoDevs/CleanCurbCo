@@ -10,7 +10,7 @@ import type { ServiceFrequency } from "@/types/booking";
 export const metadata = publicPageMetadata({
   title: "Book Garbage Bin Cleaning",
   description:
-    "Request garbage bin cleaning for Cane Bay and nearby Summerville communities.",
+    "Book garbage bin cleaning, sanitizing, and deodorizing throughout Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby communities.",
   path: "/book",
 });
 
