@@ -131,7 +131,7 @@ export default async function PortalBillingPage() {
       />
     ) : null}
   </div>
-)} : null}
+)}
         {records.length ? (
           <div className="data-table">
             {records.map(({ payment, booking }) => {
