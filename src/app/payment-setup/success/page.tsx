@@ -50,7 +50,7 @@ export default async function PaymentSetupSuccessPage({
             </Link>
             {status !== "success" && bookingId ? (
               <PaymentSetupButton
-                bookingId={bookingId}
+                bookingId={bookingId || null}
                 token={token}
                 returnPath={returnPath}
                 className="button button-outline"
