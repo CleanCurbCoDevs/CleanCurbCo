@@ -5,6 +5,10 @@ import { PortalShell } from "@/components/shells/portal-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getPortalContext } from "@/lib/portal-data";
 import { getFoundingNeighborSpecialStatus } from "@/lib/pricing";
+import {
+  getStripePaymentMethodState,
+  type SavedCardSummary,
+} from "@/lib/server/stripe-payment-method";
 
 export const metadata: Metadata = {
   title: "Portal Billing",
@@ -12,39 +16,122 @@ export const metadata: Metadata = {
 
 export default async function PortalBillingPage() {
   const context = await getPortalContext("/portal/billing");
+  const stripeCustomerId =
+    context.auth.status === "ok"
+      ? context.auth.profile.stripe_customer_id ??
+        context.bookings.find(
+          (booking) =>
+            Boolean(booking.stripe_customer_id),
+        )?.stripe_customer_id ??
+        null
+      : null;
+  
+  const recurringBooking = context.bookings.find(
+    (booking) =>
+      booking.frequency !== "one_time" &&
+      Boolean(booking.stripe_subscription_id),
+  );
+  
+  const paymentMethodState =
+    await getStripePaymentMethodState({
+      stripeCustomerId,
+      stripeSubscriptionId:
+        recurringBooking?.stripe_subscription_id ??
+        null,
+    });
+  
+  const paymentSetupBooking =
+    context.bookings.find(
+      (booking) =>
+        booking.stripe_customer_id ===
+        stripeCustomerId,
+    ) ??
+    context.bookings[0] ??
+    null;
   const records = context.payments.length
     ? context.payments.map((payment) => {
         const booking = context.bookings.find((item) => item.id === payment.booking_id);
         return { payment, booking };
       })
     : context.bookings.map((booking) => ({ payment: null, booking }));
-  const profilePaymentMethodOnFile =
-    context.auth.status === "ok" && context.auth.profile.payment_method_on_file;
-  const paymentSetupBooking = context.bookings.find(
-    (booking) =>
-      !profilePaymentMethodOnFile &&
-      !booking.payment_method_on_file &&
-      booking.payment_setup_status !== "completed",
-  );
 
   return (
     <PortalShell title="Billing and payments" auth={context.auth}>
       <section className="placeholder-panel">
         <p className="section-kicker">Billing</p>
         <h1>Payment history and links.</h1>
-        {paymentSetupBooking ? (
-          <div className="confirmation-panel">
-            <strong>Payment information not yet added.</strong>
-            <p>
-              Add a secure payment method through Stripe so your account is
-              ready once your route date is confirmed.
-            </p>
-            <PaymentSetupButton
-              bookingId={paymentSetupBooking.id}
-              returnPath="/portal/billing"
-            />
-          </div>
-        ) : null}
+{paymentMethodState.status === "saved" ? (
+  <div className="confirmation-panel">
+    <strong>Payment method on file.</strong>
+
+    <p>
+      {formatCardDescription(
+        paymentMethodState.card,
+      )}
+    </p>
+
+    <p className="muted">
+      Stripe securely stores your payment
+      information. Clean Curb Co. cannot view
+      your full card number or security code.
+    </p>
+
+    {paymentSetupBooking ? (
+      <PaymentSetupButton
+        bookingId={paymentSetupBooking.id}
+        returnPath="/portal/billing"
+        label="Update Payment Method"
+        className="button button-outline"
+      />
+    ) : null}
+  </div>
+) : paymentMethodState.status === "missing" ? (
+  <div className="confirmation-panel">
+    <strong>No payment method saved.</strong>
+
+    <p>
+      Add a secure payment method through
+      Stripe so future recurring payments are
+      ready before your next service.
+    </p>
+
+    {paymentSetupBooking ? (
+      <PaymentSetupButton
+        bookingId={paymentSetupBooking.id}
+        returnPath="/portal/billing"
+        label="Add Payment Method"
+      />
+    ) : (
+      <p>
+        No booking is currently available for
+        payment setup. Please contact us for
+        help.
+      </p>
+    )}
+  </div>
+) : (
+  <div className="confirmation-panel">
+    <strong>
+      Payment method status is temporarily
+      unavailable.
+    </strong>
+
+    <p>
+      Stripe could not confirm your saved
+      payment method right now. Please refresh
+      the page or try again shortly.
+    </p>
+
+    {paymentSetupBooking ? (
+      <PaymentSetupButton
+        bookingId={paymentSetupBooking.id}
+        returnPath="/portal/billing"
+        label="Manage Payment Method"
+        className="button button-outline"
+      />
+    ) : null}
+  </div>
+)} : null}
         {records.length ? (
           <div className="data-table">
             {records.map(({ payment, booking }) => {
@@ -103,6 +190,24 @@ export default async function PortalBillingPage() {
       </section>
     </PortalShell>
   );
+}
+
+function formatCardDescription(
+  card: SavedCardSummary,
+) {
+  const brand =
+    card.brand.charAt(0).toUpperCase() +
+    card.brand.slice(1);
+
+  const expirationMonth = String(
+    card.expMonth,
+  ).padStart(2, "0");
+
+  const expirationYear = String(
+    card.expYear,
+  ).slice(-2);
+
+  return `${brand} ending in ${card.last4} · Expires ${expirationMonth}/${expirationYear}`;
 }
 
 function paymentStatusLabel(status: string) {
