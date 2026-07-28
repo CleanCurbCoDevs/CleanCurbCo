@@ -48,7 +48,7 @@ export default async function PaymentSetupSuccessPage({
             <Link className="button button-dark" href={returnPath}>
               Continue
             </Link>
-            {status !== "success" && bookingId ? (
+            {status !== "success" ? (
               <PaymentSetupButton
                 bookingId={bookingId || null}
                 token={token}
