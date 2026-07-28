@@ -4,7 +4,11 @@ import type { BookingRow } from "@/types/database";
 
 export function sendBookingConfirmation(
   booking: BookingRow,
-  options: { accountSetupUrl?: string | null; paymentSetupUrl?: string | null } = {},
+  options: {
+    accountSetupUrl?: string | null;
+    paymentSetupUrl?: string | null;
+    checkoutUrl?: string | null;
+  } = {},
 ) {
   const template = bookingConfirmationTemplate(booking, options);
 
