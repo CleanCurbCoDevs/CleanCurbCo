@@ -383,14 +383,269 @@ async function updatePaymentState(input: {
   }
 }
 
+async function updateProfilePaymentSetupState(
+  input: {
+    session: Stripe.Checkout.Session;
+    requestId: string;
+    status:
+      | "completed"
+      | "cancelled"
+      | "failed";
+  },
+) {
+  const admin = getSupabaseAdmin();
+
+  const profileId =
+    input.session.metadata?.customer_id ??
+    input.session.metadata?.profile_id ??
+    null;
+
+  if (!profileId) {
+    throw new Error(
+      `Stripe setup session ${input.session.id} did not include a profile ID.`,
+    );
+  }
+
+  const {
+    data: previousProfile,
+    error: profileLookupError,
+  } = await admin
+    .from("profiles")
+    .select("*")
+    .eq("id", profileId)
+    .maybeSingle();
+
+  throwIfDatabaseReadFailed(
+    "Stripe payment-setup profile lookup failed",
+    profileLookupError,
+  );
+
+  if (!previousProfile) {
+    throw new Error(
+      `Stripe setup session ${input.session.id} could not find profile ${profileId}.`,
+    );
+  }
+
+  const stripeCustomerId = getStringId(
+    input.session.customer,
+  );
+
+  const completed =
+    input.status === "completed";
+
+  const stripe = getStripe();
+
+  const setupIntentId = getStringId(
+    input.session.setup_intent,
+  );
+
+  let defaultPaymentMethodId:
+    | string
+    | null = null;
+
+  let updatedSubscriptionIds:
+    string[] = [];
+
+  if (completed) {
+    if (!stripeCustomerId) {
+      throw new Error(
+        `Completed payment setup for profile ${profileId} did not include a Stripe customer.`,
+      );
+    }
+
+    if (!setupIntentId) {
+      throw new Error(
+        `Completed payment setup for profile ${profileId} did not include a SetupIntent.`,
+      );
+    }
+
+    const setupIntent =
+      await stripe.setupIntents.retrieve(
+        setupIntentId,
+      );
+
+    defaultPaymentMethodId =
+      getStringId(
+        setupIntent.payment_method,
+      );
+
+    if (!defaultPaymentMethodId) {
+      throw new Error(
+        `SetupIntent ${setupIntentId} completed without a PaymentMethod.`,
+      );
+    }
+
+    await stripe.customers.update(
+      stripeCustomerId,
+      {
+        invoice_settings: {
+          default_payment_method:
+            defaultPaymentMethodId,
+        },
+      },
+    );
+
+    const subscriptions =
+      await stripe.subscriptions.list({
+        customer: stripeCustomerId,
+        status: "all",
+        limit: 100,
+      });
+
+    const updateableSubscriptions =
+      subscriptions.data.filter(
+        (subscription) =>
+          subscription.status !==
+            "canceled" &&
+          subscription.status !==
+            "incomplete_expired",
+      );
+
+    await Promise.all(
+      updateableSubscriptions.map(
+        (subscription) =>
+          stripe.subscriptions.update(
+            subscription.id,
+            {
+              default_payment_method:
+                defaultPaymentMethodId!,
+            },
+          ),
+      ),
+    );
+
+    updatedSubscriptionIds =
+      updateableSubscriptions.map(
+        (subscription) =>
+          subscription.id,
+      );
+  }
+
+  const now = new Date().toISOString();
+
+  const profileUpdate:
+    Partial<ProfileRow> = {
+      stripe_customer_id:
+        stripeCustomerId ??
+        previousProfile.stripe_customer_id,
+  };
+
+  if (completed) {
+    profileUpdate.payment_method_on_file =
+      true;
+
+    profileUpdate.payment_setup_completed_at =
+      now;
+  }
+
+  const {
+    data: profile,
+    error: profileUpdateError,
+  } = await admin
+    .from("profiles")
+    .update(profileUpdate)
+    .eq("id", previousProfile.id)
+    .select("*")
+    .single();
+
+  throwIfDatabaseWriteFailed(
+    "Stripe payment-setup profile update failed",
+    profileUpdateError,
+  );
+
+  await recordPaymentEvent({
+    eventType:
+      `stripe_profile_payment_setup_${input.status}`,
+    message:
+      `Stripe profile payment setup ${input.status}.`,
+    metadata: {
+      profileId: profile.id,
+      checkoutSessionId:
+        input.session.id,
+      setupIntentId,
+      defaultPaymentMethodId,
+      updatedSubscriptionIds,
+      purpose:
+        input.session.metadata?.purpose ??
+        "payment_setup",
+    },
+  });
+
+  await Promise.allSettled([
+    writeAdminAuditLog({
+      action:
+        `profile_payment_setup_${input.status}`,
+      actor_user_id: null,
+      actor_email: null,
+      actor_role: "stripe",
+      target_type: "profile",
+      target_id: profile.id,
+      customer_id: profile.id,
+      booking_id: null,
+      before_summary: {
+        paymentMethodOnFile:
+          previousProfile.payment_method_on_file,
+        stripeCustomerId:
+          previousProfile.stripe_customer_id,
+      },
+      after_summary: {
+        paymentMethodOnFile:
+          completed
+            ? true
+            : previousProfile.payment_method_on_file,
+        stripeCustomerId,
+        stripeSetupSessionId:
+          input.session.id,
+        defaultPaymentMethodId,
+        updatedSubscriptionIds,
+      },
+      request_id: input.requestId,
+      status: "success",
+      metadata: {
+        stripeEvent:
+          "checkout.session.completed",
+        purpose:
+          input.session.metadata?.purpose ??
+          "payment_setup",
+      },
+    }),
+
+    createAdminNotification({
+      type: completed
+        ? "payment_setup_completed"
+        : "payment_setup_failed",
+      title: completed
+        ? "Payment setup completed"
+        : "Payment setup not completed",
+      message: completed
+        ? `${profile.first_name ?? "A customer"} added payment information through the customer portal.`
+        : `${profile.first_name ?? "A customer"} did not complete payment setup.`,
+      href: "/admin",
+      customer_id: profile.id,
+      severity: completed
+        ? "info"
+        : "warning",
+    }),
+  ]);
+}
+
 async function updatePaymentSetupState(input: {
   session: Stripe.Checkout.Session;
   requestId: string;
   status: "completed" | "cancelled" | "failed";
 }) {
   const admin = getSupabaseAdmin();
-  const bookingId = input.session.metadata?.booking_id ?? null;
-  if (!bookingId) return;
+  const bookingId =
+    input.session.metadata?.booking_id ??
+    null;
+  
+  if (!bookingId) {
+    await updateProfilePaymentSetupState(
+      input,
+    );
+  
+    return;
+  }
 
   const { data: previousBooking } = await admin
     .from("bookings")
