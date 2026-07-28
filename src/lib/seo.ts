@@ -44,43 +44,91 @@ export function publicPageMetadata({
 }
 
 export function localBusinessStructuredData(siteUrl: string) {
+  const businessId = `${siteUrl}/#business`;
+  const websiteId = `${siteUrl}/#website`;
+
+  const serviceAreas = [
+    "Goose Creek, South Carolina",
+    "Summerville, South Carolina",
+    "Moncks Corner, South Carolina",
+    "Cane Bay, South Carolina",
+    "Nexton, South Carolina",
+    "Carnes Crossroads, South Carolina",
+    "Berkeley County, South Carolina",
+    "Charleston County, South Carolina",
+  ];
+
+  const services = [
+    "Garbage bin cleaning",
+    "Trash can cleaning",
+    "Recycling bin cleaning",
+    "Bin sanitizing",
+    "Bin deodorizing",
+    "Trash pad cleaning",
+    "One-time bin cleaning",
+    "Recurring bin cleaning",
+  ];
+
   return {
     "@context": "https://schema.org",
-    "@type": "LocalBusiness",
-    name: "Clean Curb Co.",
-    legalName: "Stonebranch Capital LLC",
-    url: siteUrl,
-    email: brand.email,
-    image: `${siteUrl}/opengraph-image.png`,
-    description:
-      "Residential garbage bin cleaning, sanitizing, and deodorizing for Cane Bay and nearby Summerville, South Carolina communities.",
-    areaServed: [
+    "@graph": [
       {
-        "@type": "Place",
-        name: "Cane Bay, South Carolina",
-      },
-      {
-        "@type": "Place",
-        name: "Summerville, South Carolina",
-      },
-    ],
-    makesOffer: [
-      {
-        "@type": "Offer",
-        itemOffered: {
-          "@type": "Service",
-          name: "Residential trash bin cleaning",
-          serviceType: "Garbage bin cleaning and sanitizing",
-          areaServed: "Cane Bay and Summerville, SC",
+        "@type": "WebSite",
+        "@id": websiteId,
+        url: siteUrl,
+        name: "Clean Curb Co.",
+        alternateName: "Clean Curb Co",
+        publisher: {
+          "@id": businessId,
         },
       },
       {
-        "@type": "Offer",
-        itemOffered: {
-          "@type": "Service",
-          name: "Curbside bin deodorizing",
-          serviceType: "Trash can deodorizing",
-          areaServed: "Cane Bay and Summerville, SC",
+        "@type": "LocalBusiness",
+        "@id": businessId,
+        name: "Clean Curb Co.",
+        legalName: "Stonebranch Capital LLC",
+        url: siteUrl,
+        telephone: brand.phone,
+        email: brand.email,
+        logo: `${siteUrl}/clean-curb-logo.png`,
+        image: [
+          `${siteUrl}/opengraph-image.png`,
+          `${siteUrl}/images/proof/bin-cleaning-action-driveway.jpeg`,
+          `${siteUrl}/images/proof/bin-inside-after-detail.jpeg`,
+        ],
+        description:
+          "Clean Curb Co. provides curbside garbage, trash, and recycling bin cleaning, sanitizing, and deodorizing throughout Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby Lowcountry communities. Local, veteran-owned service with one-time and recurring cleaning options.",
+        priceRange: "$",
+        slogan: "Fresh Starts at the Curb.",
+        areaServed: serviceAreas.map((name) => ({
+          "@type": "Place",
+          name,
+        })),
+        sameAs: [
+          "https://www.facebook.com/profile.php?id=61591401340864",
+        ],
+        potentialAction: {
+          "@type": "ReserveAction",
+          name: "Book garbage bin cleaning",
+          target: `${siteUrl}/book`,
+        },
+        hasOfferCatalog: {
+          "@type": "OfferCatalog",
+          name: "Garbage bin cleaning services",
+          itemListElement: services.map((name) => ({
+            "@type": "Offer",
+            itemOffered: {
+              "@type": "Service",
+              name,
+              provider: {
+                "@id": businessId,
+              },
+              areaServed: serviceAreas.map((area) => ({
+                "@type": "Place",
+                name: area,
+              })),
+            },
+          })),
         },
       },
     ],
