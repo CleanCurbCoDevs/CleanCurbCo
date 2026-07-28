@@ -411,14 +411,148 @@ export function routeConfirmationTemplate(
   booking: BookingRow,
   routeDay: string,
 ): EmailTemplate {
+  const serviceDateLabel =
+    formatEmailDate(routeDay);
+
+  const isRecurring =
+    booking.frequency !== "one_time";
+
+  const paymentConfirmation =
+    booking.payment_status === "paid"
+      ? `
+        <p>
+          <strong>Payment:</strong>
+          We have your payment recorded. You are all set.
+        </p>
+      `
+      : "";
+
+  const recurringConfirmation =
+    isRecurring
+      ? `
+        <p>
+          This confirms your upcoming visit. Your recurring
+          service remains set for
+          <strong>${escapeHtml(
+            formatFrequency(
+              booking.frequency,
+            ),
+          )}</strong>.
+        </p>
+      `
+      : "";
+
+  const body = `
+    <p>
+      Hey ${escapeHtml(
+        booking.first_name,
+      )},
+    </p>
+
+    <p>
+      You’re officially on the route. Your Clean Curb Co.
+      bin cleaning is scheduled for:
+    </p>
+
+    <div style="margin:20px 0;padding:18px;background:#f4fff5;border:1px solid #9bea9f;border-radius:12px;text-align:center">
+      <p style="margin:0 0 4px;font-size:13px;font-weight:800;letter-spacing:.08em;text-transform:uppercase">
+        Cleaning date
+      </p>
+
+      <p style="margin:0;font-size:22px;font-weight:800">
+        ${escapeHtml(serviceDateLabel)}
+      </p>
+    </div>
+
+    <div style="margin:20px 0;padding:16px;background:#fff8df;border:1px solid #e5c95f;border-radius:12px">
+      <p style="margin:0 0 10px">
+        <strong>A few things before we arrive:</strong>
+      </p>
+
+      <ul style="margin:0;padding-left:20px;line-height:1.7">
+        <li>
+          Please make sure the bins are empty and somewhere
+          we can easily reach them.
+        </li>
+
+        <li>
+          Keep access to the water spigot clear.
+        </li>
+
+        <li>
+          You do not need to wait around for us. We’ll handle
+          the gross part.
+        </li>
+      </ul>
+    </div>
+
+    <p>
+      Route timing can move around during the day depending
+      on traffic, weather, and how badly the bins before yours
+      have behaved. If the service date itself changes, we’ll
+      contact you.
+    </p>
+
+    ${paymentConfirmation}
+    ${recurringConfirmation}
+
+    ${bookingSummaryHtml(booking)}
+
+    <p>
+      Questions or access changes? Reply to this email and
+      let us know.
+    </p>
+
+    <p>
+      Stay fresh,<br />
+      <strong>The Clean Curb Co. Team</strong>
+    </p>
+  `;
+
   return {
-    subject: "Your Clean Curb Co. route day is confirmed",
+    subject:
+      "Your Clean Curb Co. cleaning is scheduled",
     html: shell(
-      "Route day confirmed",
-      `<p>Your route day is confirmed for <strong>${escapeHtml(routeDay)}</strong>.</p>${bookingSummaryHtml(booking)}`,
+      "You’re on the route",
+      body,
+      {
+        preview:
+          `Your bin cleaning is scheduled for ${serviceDateLabel}.`,
+      },
     ),
     text: customerText(
-      `Your Clean Curb Co. route day is confirmed for ${routeDay}.`,
+      [
+        `Hey ${booking.first_name},`,
+        "",
+        "You’re officially on the route.",
+        `Your Clean Curb Co. bin cleaning is scheduled for ${serviceDateLabel}.`,
+        "",
+        "Before we arrive:",
+        "- Please make sure the bins are empty and accessible.",
+        "- Keep access to the water spigot clear.",
+        "- You do not need to wait around for us.",
+        "",
+        "Route timing can move around during the day. If the service date changes, we’ll contact you.",
+        "",
+        booking.payment_status === "paid"
+          ? "Payment: We have your payment recorded. You are all set."
+          : "",
+        isRecurring
+          ? `Recurring service: ${formatFrequency(
+              booking.frequency,
+            )}.`
+          : "",
+        "",
+        `Service address: ${booking.street_address}, ${booking.city}, ${booking.state} ${booking.zip_code}`,
+        `Bins: ${booking.bin_count}`,
+        "",
+        "Questions or access changes? Reply to this email and let us know.",
+        "",
+        "Stay fresh,",
+        "The Clean Curb Co. Team",
+      ]
+        .filter(Boolean)
+        .join("\n"),
     ),
   };
 }
