@@ -167,7 +167,7 @@ export function CommercialFooter() {
             <li>
               <span className="commercial-footer-location">
                 <MapPin size={15} aria-hidden="true" />
-                Summerville-area routes
+                Summerville and nearby Lowcountry routes
               </span>
             </li>
 
