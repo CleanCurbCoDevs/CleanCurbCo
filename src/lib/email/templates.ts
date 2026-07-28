@@ -269,6 +269,120 @@ export function routeConfirmationTemplate(
   };
 }
 
+export function recurringServiceReminderTemplate(
+  booking: BookingRow,
+  serviceDate: string,
+  options: {
+    portalUrl: string;
+    billingUrl: string;
+    paymentMethodMissing: boolean;
+  },
+): EmailTemplate {
+  const serviceDateLabel =
+    formatEmailDate(serviceDate);
+
+  const paymentSection =
+    options.paymentMethodMissing
+      ? `
+        <div style="margin:20px 0;padding:16px;background:#fff8df;border:1px solid #e5c95f;border-radius:12px">
+          <p style="margin:0 0 10px">
+            <strong>One quick billing thing:</strong>
+            Stripe does not currently show a saved payment
+            method for your recurring service.
+          </p>
+
+          <p style="margin:0 0 14px">
+            No panic—this email did not charge you.
+            Please add a card through your customer portal
+            before the next automatic payment.
+          </p>
+
+          ${emailButton(
+            options.billingUrl,
+            "Add Payment Method",
+          )}
+        </div>
+      `
+      : "";
+
+  const body = `
+    <p>
+      Hey ${escapeHtml(booking.first_name)},
+    </p>
+
+    <p>
+      Your next Clean Curb Co. visit is scheduled for
+      <strong>${escapeHtml(serviceDateLabel)}</strong>.
+    </p>
+
+    <p>
+      Please make sure your bins are empty and somewhere
+      we can reach them. If anything about your normal
+      trash pickup or access has changed, let us know
+      through the portal.
+    </p>
+
+    ${paymentSection}
+
+    <p>
+      ${emailButton(
+        options.portalUrl,
+        "View My Service",
+      )}
+    </p>
+
+    <p>
+      We’ll send final route details closer to service.
+    </p>
+
+    <p>
+      Stay fresh,<br />
+      <strong>The Clean Curb Co. Team</strong>
+    </p>
+  `;
+
+  const paymentText =
+    options.paymentMethodMissing
+      ? [
+          "",
+          "One quick billing thing: Stripe does not currently show a saved payment method for your recurring service.",
+          "This email did not charge you.",
+          `Add a payment method here: ${options.billingUrl}`,
+        ].join("\n")
+      : "";
+
+  return {
+    subject:
+      "Your next Clean Curb Co. visit is coming up",
+    html: shell(
+      "Your next visit is coming up",
+      body,
+      {
+        preview:
+          `Your next Clean Curb Co. visit is scheduled for ${serviceDateLabel}.`,
+      },
+    ),
+    text: customerText(
+      [
+        `Hey ${booking.first_name},`,
+        "",
+        `Your next Clean Curb Co. visit is scheduled for ${serviceDateLabel}.`,
+        "",
+        "Please make sure your bins are empty and somewhere we can reach them.",
+        paymentText,
+        "",
+        `View your service: ${options.portalUrl}`,
+        "",
+        "We’ll send final route details closer to service.",
+        "",
+        "Stay fresh,",
+        "The Clean Curb Co. Team",
+      ].join("\n"),
+    ),
+  };
+}
+
+
 export function reviewRequestTemplate(booking: BookingRow): EmailTemplate {
   return {
     subject: "How did we do?",
