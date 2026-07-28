@@ -855,10 +855,12 @@ if (checkoutResult.checkoutUrl) {
   }
 
   const emailJobs = [
-    sendBookingConfirmation(booking, {
-      accountSetupUrl: setupLink,
-      paymentSetupUrl: null,
-    }),
+  sendBookingConfirmation(booking, {
+    accountSetupUrl: setupLink,
+    paymentSetupUrl: null,
+    checkoutUrl:
+      checkoutResult.checkoutUrl,
+  }),
     sendAdminBookingNotification(booking),
     createAdminNotification({
       type: "new_booking_request",
