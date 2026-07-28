@@ -48,8 +48,8 @@ export function SiteFooter() {
           <div className="footer-brand">
             <BrandLogo />
             <p className="muted">
-              Locally owned, veteran-owned curbside cleaning and outdoor grime cleanup
-              for Summerville-area communities.
+              Local, veteran-owned garbage bin cleaning and outdoor grime cleanup
+              serving Goose Creek and nearby Lowcountry communities.
             </p>
           </div>
           {footerGroups.map((group) => (
