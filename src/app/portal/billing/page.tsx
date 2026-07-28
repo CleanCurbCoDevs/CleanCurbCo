@@ -62,77 +62,67 @@ export default async function PortalBillingPage() {
       <section className="placeholder-panel">
         <p className="section-kicker">Billing</p>
         <h1>Payment history and links.</h1>
-{paymentMethodState.status === "saved" ? (
-  <div className="confirmation-panel">
-    <strong>Payment method on file.</strong>
-
-    <p>
-      {formatCardDescription(
-        paymentMethodState.card,
-      )}
-    </p>
-
-    <p className="muted">
-      Stripe securely stores your payment
-      information. Clean Curb Co. cannot view
-      your full card number or security code.
-    </p>
-
-    {paymentSetupBooking ? (
-    <PaymentSetupButton
-      bookingId={paymentSetupBookingId}
-      returnPath="/portal/billing"
-      label="Add Payment Method"
-    />
-    ) : null}
-  </div>
-) : paymentMethodState.status === "missing" ? (
-  <div className="confirmation-panel">
-    <strong>No payment method saved.</strong>
-
-    <p>
-      Add a secure payment method through
-      Stripe so future recurring payments are
-      ready before your next service.
-    </p>
-
-    {paymentSetupBooking ? (
-      <PaymentSetupButton
-        bookingId={paymentSetupBooking.id}
-        returnPath="/portal/billing"
-        label="Add Payment Method"
-      />
+        
+    {paymentMethodState.status === "saved" ? (
+      <div className="confirmation-panel">
+        <strong>Payment method on file.</strong>
+    
+        <p>
+          {formatCardDescription(
+            paymentMethodState.card,
+          )}
+        </p>
+    
+        <p className="muted">
+          Stripe securely stores your payment
+          information. Clean Curb Co. cannot view
+          your full card number or security code.
+        </p>
+    
+        <PaymentSetupButton
+          bookingId={paymentSetupBookingId}
+          returnPath="/portal/billing"
+          label="Update Payment Method"
+          className="button button-outline"
+        />
+      </div>
+    ) : paymentMethodState.status === "missing" ? (
+      <div className="confirmation-panel">
+        <strong>No payment method saved.</strong>
+    
+        <p>
+          Add a secure payment method through
+          Stripe so future recurring payments are
+          ready before your next service.
+        </p>
+    
+        <PaymentSetupButton
+          bookingId={paymentSetupBookingId}
+          returnPath="/portal/billing"
+          label="Add Payment Method"
+        />
+      </div>
     ) : (
-      <p>
-        No booking is currently available for
-        payment setup. Please contact us for
-        help.
-      </p>
+      <div className="confirmation-panel">
+        <strong>
+          Payment method status is temporarily
+          unavailable.
+        </strong>
+    
+        <p>
+          Stripe could not confirm your saved
+          payment method right now. Please refresh
+          the page or try again shortly.
+        </p>
+    
+        <PaymentSetupButton
+          bookingId={paymentSetupBookingId}
+          returnPath="/portal/billing"
+          label="Manage Payment Method"
+          className="button button-outline"
+        />
+      </div>
     )}
-  </div>
-) : (
-  <div className="confirmation-panel">
-    <strong>
-      Payment method status is temporarily
-      unavailable.
-    </strong>
-
-    <p>
-      Stripe could not confirm your saved
-      payment method right now. Please refresh
-      the page or try again shortly.
-    </p>
-
-    {paymentSetupBooking ? (
-      <PaymentSetupButton
-        bookingId={paymentSetupBooking.id}
-        returnPath="/portal/billing"
-        label="Manage Payment Method"
-        className="button button-outline"
-      />
-    ) : null}
-  </div>
-)}
         {records.length ? (
           <div className="data-table">
             {records.map(({ payment, booking }) => {
