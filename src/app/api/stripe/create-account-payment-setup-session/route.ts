@@ -17,6 +17,20 @@ type AccountPaymentSetupPayload = {
   returnPath?: unknown;
 };
 
+function isMissingStripeResource(
+  error: unknown,
+) {
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "code" in error &&
+    String(
+      (error as { code?: unknown }).code ??
+        "",
+    ) === "resource_missing"
+  );
+}
+
 export async function POST(request: Request) {
   const requestId = createRequestId(
     request.headers,
@@ -98,6 +112,82 @@ export async function POST(request: Request) {
     .join(" ")
     .trim();
 
+if (stripeCustomerId) {
+  try {
+    const existingCustomer =
+      await stripe.customers.retrieve(
+        stripeCustomerId,
+      );
+
+    if (existingCustomer.deleted) {
+      logger.warn(
+        "stripe_account_customer_deleted",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_account_payment_setup_create",
+          userId: auth.userId,
+          customerId: auth.userId,
+          metadata: {
+            staleStripeCustomerId:
+              stripeCustomerId,
+          },
+        },
+      );
+
+      stripeCustomerId = null;
+    }
+  } catch (error) {
+    if (isMissingStripeResource(error)) {
+      logger.warn(
+        "stripe_account_customer_missing",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_account_payment_setup_create",
+          userId: auth.userId,
+          customerId: auth.userId,
+          metadata: {
+            staleStripeCustomerId:
+              stripeCustomerId,
+          },
+        },
+      );
+
+      stripeCustomerId = null;
+    } else {
+      logger.error(
+        "stripe_account_customer_lookup_failed",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_account_payment_setup_create",
+          userId: auth.userId,
+          customerId: auth.userId,
+          error,
+          metadata: {
+            stripeCustomerId,
+          },
+        },
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "Stripe could not verify your billing account.",
+          requestId,
+        },
+        {
+          status: 502,
+        },
+      );
+    }
+  }
+}
+  
   if (!stripeCustomerId) {
     try {
       const customer =
