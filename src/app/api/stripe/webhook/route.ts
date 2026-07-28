@@ -21,6 +21,7 @@ function getStringId(
     | Stripe.PaymentIntent
     | Stripe.SetupIntent
     | Stripe.Subscription
+    | Stripe.PaymentMethod
     | Stripe.Customer
     | Stripe.DeletedCustomer
     | null,
@@ -401,6 +402,61 @@ async function updatePaymentSetupState(input: {
 
   const stripeCustomerId = getStringId(input.session.customer);
   const completed = input.status === "completed";
+  const stripe = getStripe();
+const setupIntentId = getStringId(
+  input.session.setup_intent,
+);
+
+let defaultPaymentMethodId: string | null = null;
+
+if (completed) {
+  if (!stripeCustomerId) {
+    throw new Error(
+      `Completed payment setup for booking ${previousBooking.id} did not include a Stripe customer.`,
+    );
+  }
+
+  if (!setupIntentId) {
+    throw new Error(
+      `Completed payment setup for booking ${previousBooking.id} did not include a SetupIntent.`,
+    );
+  }
+
+  const setupIntent =
+    await stripe.setupIntents.retrieve(
+      setupIntentId,
+    );
+
+  defaultPaymentMethodId = getStringId(
+    setupIntent.payment_method,
+  );
+
+  if (!defaultPaymentMethodId) {
+    throw new Error(
+      `SetupIntent ${setupIntentId} completed without a PaymentMethod.`,
+    );
+  }
+
+  await stripe.customers.update(
+    stripeCustomerId,
+    {
+      invoice_settings: {
+        default_payment_method:
+          defaultPaymentMethodId,
+      },
+    },
+  );
+
+  if (previousBooking.stripe_subscription_id) {
+    await stripe.subscriptions.update(
+      previousBooking.stripe_subscription_id,
+      {
+        default_payment_method:
+          defaultPaymentMethodId,
+      },
+    );
+  }
+}
   const { data: booking } = await admin
     .from("bookings")
     .update({
@@ -436,8 +492,13 @@ async function updatePaymentSetupState(input: {
     message: `Stripe payment setup ${input.status}.`,
     metadata: {
       checkoutSessionId: input.session.id,
-      setupIntentId: getStringId(input.session.setup_intent),
-      purpose: input.session.metadata?.purpose ?? "payment_setup",
+      setupIntentId,
+      defaultPaymentMethodId,
+      subscriptionId:
+        previousBooking.stripe_subscription_id,
+      purpose:
+        input.session.metadata?.purpose ??
+        "payment_setup",
     },
   });
 
@@ -459,6 +520,9 @@ async function updatePaymentSetupState(input: {
         paymentSetupStatus: input.status,
         paymentMethodOnFile: completed,
         stripeSetupSessionId: input.session.id,
+        defaultPaymentMethodId,
+        stripeSubscriptionId:
+          previousBooking.stripe_subscription_id,
       },
       request_id: input.requestId,
       status: "success",
