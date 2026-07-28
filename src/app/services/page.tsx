@@ -7,9 +7,9 @@ import { SectionHeader } from "@/components/section-header";
 import { publicPageMetadata } from "@/lib/seo";
 
 export const metadata = publicPageMetadata({
-  title: "Services",
+  title: "Garbage Bin Cleaning Services",
   description:
-    "Residential garbage bin cleaning, sanitizing, deodorizing, and curbside service throughout Summerville, Cane Bay, Goose Creek, Moncks Corner, and nearby communities.",
+    "Garbage, trash, and recycling bin cleaning, sanitizing, and deodorizing throughout Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby Lowcountry communities.",
   path: "/services",
 });
 
@@ -49,8 +49,8 @@ export default function ServicesPage() {
           <p className="section-kicker">Services</p>
           <h1>Residential garbage bin cleaning, done right.</h1>
           <p>
-            Cleaner, fresher trash and recycling bins throughout the
-            Summerville area. Simple route-day service, clear updates,
+            Cleaner, fresher trash and recycling bins throughout Goose Creek and
+            nearby Lowcountry communities. Simple route-day service, clear updates,
             and proof when the job is done.
           </p>
         </div>
