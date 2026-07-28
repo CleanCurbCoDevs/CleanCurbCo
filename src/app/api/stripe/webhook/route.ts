@@ -187,6 +187,12 @@ async function updatePaymentState(input: {
     "Stripe payment-state update failed",
     paymentUpdateError,
   );
+
+  if (!profile) {
+    throw new Error(
+      `Stripe payment-setup profile update returned no profile for ${previousProfile.id}.`,
+    );
+  }
   
   if (!payment) {
     throw new Error(
