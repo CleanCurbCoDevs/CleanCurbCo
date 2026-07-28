@@ -128,8 +128,8 @@ export function ProofSection() {
           title="Real bins. Real fresh starts."
           centered
         >
-          A quick look at the kind of curbside cleanup we are bringing to
-          Summerville-area neighborhoods.
+        Real curbside cleanup from Goose Creek and the surrounding Lowcountry.
+        The bins brought the mess. We handled the rest.
         </SectionHeader>
         <div className="proof-gallery" aria-label="Clean Curb Co. service photos">
           <ProofPhotoCard photo={proofPhotos[0]} priority />
@@ -424,7 +424,7 @@ export function WhyChooseUsSection() {
     {
       icon: MapPin,
       title: "Local",
-      description: "Built for Summerville-area neighborhoods and nearby communities.",
+      description: "Built around local routes across Goose Creek and nearby Lowcountry communities. Less windshield time, more bins handled.",
     },
     {
       icon: Flag,
