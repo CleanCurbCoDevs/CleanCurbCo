@@ -4,7 +4,7 @@ import { useState, useTransition } from "react";
 import { useActionFeedback } from "@/components/action-feedback";
 
 type PaymentSetupButtonProps = {
-  bookingId: string;
+  bookingId?: string | null;
   token?: string | null;
   returnPath: string;
   label?: string;
@@ -25,11 +25,17 @@ export function PaymentSetupButton({
   function createSetupSession() {
     setError("");
     startTransition(async () => {
-      const response = await fetch("/api/stripe/create-payment-setup-session", {
+      const endpoint = bookingId
+        ? "/api/stripe/create-payment-setup-session"
+        : "/api/stripe/create-account-payment-setup-session";
+      
+      const response = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify({
-          bookingId,
+          bookingId: bookingId ?? undefined,
           token,
           returnPath,
         }),
