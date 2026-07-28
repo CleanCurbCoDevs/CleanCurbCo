@@ -1,8 +1,6 @@
 import {
   addOns,
   brand,
-  bookingSuccessLaunchMessage,
-  launchRouteHeadline,
 } from "@/lib/site";
 import {
   commercialDesiredFrequencyLabels,
@@ -16,7 +14,6 @@ import {
 } from "@/types/commercial";
 import { formatFrequency } from "@/lib/pricing";
 import { policyWindowLabels, requestTypeLabels } from "@/lib/service-policy";
-import { america250Promotion } from "@/lib/promotions";
 import type {
   AccountDeletionRequestRow,
   BookingRow,
@@ -166,7 +163,14 @@ export function bookingSummaryHtml(booking: BookingRow) {
       <li><strong>Bins:</strong> ${booking.bin_count}</li>
       <li><strong>Frequency:</strong> ${escapeHtml(formatFrequency(booking.frequency))}</li>
       <li><strong>Add-ons:</strong> ${escapeHtml(addOnLabels(booking.add_ons))}</li>
-      <li><strong>Estimated price:</strong> $${booking.estimated_price}</li>
+      <li><strong>Booking total:</strong> ${escapeHtml(
+          new Intl.NumberFormat("en-US", {
+            style: "currency",
+            currency: "USD",
+          }).format(
+            Number(booking.estimated_price),
+          ),
+        )}</li>
       <li><strong>Notes:</strong> ${escapeHtml(booking.customer_notes ?? "None")}</li>
     </ul>
   `;
@@ -174,50 +178,200 @@ export function bookingSummaryHtml(booking: BookingRow) {
 
 export function bookingConfirmationTemplate(
   booking: BookingRow,
-  options: { accountSetupUrl?: string | null; paymentSetupUrl?: string | null } = {},
+  options: {
+    accountSetupUrl?: string | null;
+    paymentSetupUrl?: string | null;
+    checkoutUrl?: string | null;
+  } = {},
 ): EmailTemplate {
-  const america250Claimed = booking.internal_notes?.includes(
-      america250Promotion.code,
+  const bookingTotal =
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+    }).format(
+      Number(booking.estimated_price),
     );
 
-    const body = `
-      <p>Thanks for booking with Clean Curb Co. We received your request and will confirm your service date and final price by email or text.</p>
-      <p><strong>${escapeHtml(launchRouteHeadline)}</strong> ${escapeHtml(bookingSuccessLaunchMessage)}</p>
-      ${
-        america250Claimed
-          ? `<p style="background:#f4fff5;border:1px solid #b6efbd;border-radius:12px;padding:14px"><strong>America 250 Deal:</strong> Your request was submitted during the America 250 promotion window. We will confirm eligibility, final discount, route day, and pricing before charging.</p>`
-          : ""
-      }
+  const usesStripe =
+    booking.payment_preference === "stripe";
+
+  const isRecurring =
+    booking.frequency !== "one_time";
+
+  const paymentSection = usesStripe
+    ? options.checkoutUrl
+      ? `
+        <div style="margin:20px 0;padding:16px;background:#f4fff5;border:1px solid #9bea9f;border-radius:12px">
+          <p style="margin:0 0 12px">
+            <strong>Still need to finish checkout?</strong>
+            Complete your secure Stripe checkout below.
+          </p>
+
+          <p style="margin:0 0 14px">
+            If you already completed checkout, you are all set.
+            Stripe sends a separate receipt confirming the payment.
+          </p>
+
+          ${emailButton(
+            options.checkoutUrl,
+            "Complete Secure Checkout",
+          )}
+        </div>
+      `
+      : `
+        <p>
+          <strong>Payment:</strong>
+          Stripe checkout was selected, but no payment has been
+          confirmed by this email. If checkout did not open, reply
+          and we will send you a fresh secure link.
+        </p>
+      `
+    : `
+      <p>
+        <strong>Payment:</strong>
+        You selected payment outside Stripe. No card was charged
+        through the website.
+      </p>
+    `;
+
+  const recurringSection = isRecurring
+    ? `
+      <p>
+        <strong>Recurring service:</strong>
+        You selected ${escapeHtml(
+          formatFrequency(
+            booking.frequency,
+          ),
+        )}. Stripe will display the recurring billing terms
+        before checkout is confirmed.
+      </p>
+    `
+    : "";
+
+  const body = `
+    <p>
+      Hey ${escapeHtml(
+        booking.first_name,
+      )},
+    </p>
+
+    <p>
+      Thanks for booking Clean Curb Co. We have your service
+      details, and your booking total is
+      <strong>${escapeHtml(
+        bookingTotal,
+      )}</strong>.
+    </p>
+
+    <p>
+      <strong>What happens next:</strong>
+      We will place your stop on the best route around your
+      regular trash pickup and send your confirmed service date
+      by email or text.
+    </p>
+
+    ${paymentSection}
+    ${recurringSection}
+
     ${
       options.accountSetupUrl
-        ? `<p>${emailButton(options.accountSetupUrl, "Create account")}</p>`
+        ? `
+          <p>
+            Create your customer account to view your booking,
+            billing information, route updates, and service photos.
+          </p>
+
+          <p>
+            ${emailButton(
+              options.accountSetupUrl,
+              "Create My Account",
+            )}
+          </p>
+        `
         : ""
     }
+
     ${
       options.paymentSetupUrl
-        ? `<p>${emailButton(options.paymentSetupUrl, "Add payment info")}</p>
-           <p>You can securely add payment information now if you'd like. Your payment details are handled securely through Stripe. Clean Curb Co. does not store your full card number or CVC. You will not be charged until your service/payment terms are confirmed.</p>`
+        ? `
+          <p>
+            ${emailButton(
+              options.paymentSetupUrl,
+              "Add Payment Method",
+            )}
+          </p>
+        `
         : ""
     }
+
     ${bookingSummaryHtml(booking)}
-    <p>Trash day should not stink all week. We are on it.</p>
+
+    <p>
+      Trash day should not stink all week. We are on it.
+    </p>
+
+    <p>
+      Stay fresh,<br />
+      <strong>The Clean Curb Co. Team</strong>
+    </p>
   `;
 
+  const paymentText = usesStripe
+    ? options.checkoutUrl
+      ? [
+          "Payment: Complete secure Stripe checkout using the link below.",
+          "If you already completed checkout, you are all set. Stripe sends a separate payment receipt.",
+          `Complete checkout: ${options.checkoutUrl}`,
+        ].join("\n")
+      : "Payment: Stripe checkout was selected, but this email does not confirm that payment was completed."
+    : "Payment: You selected payment outside Stripe. No card was charged through the website.";
+
+  const recurringText = isRecurring
+    ? `Recurring service selected: ${formatFrequency(
+        booking.frequency,
+      )}. Stripe will display the recurring terms before confirmation.`
+    : "";
+
   return {
-    subject: "We received your Clean Curb Co. booking request",
-    html: shell("Booking request received", body),
+    subject:
+      "Thanks for booking Clean Curb Co.",
+    html: shell(
+      "We’ve got your booking",
+      body,
+      {
+        preview:
+          "Your Clean Curb Co. booking is in. We’ll confirm your route date next.",
+      },
+    ),
     text: customerText(
       [
-        `We received your Clean Curb Co. booking request for ${booking.street_address}.`,
-        `${launchRouteHeadline} ${bookingSuccessLaunchMessage}`,
-        `Estimated price: $${booking.estimated_price}.`,
-        options.accountSetupUrl ? `Create account: ${options.accountSetupUrl}` : "",
-        options.paymentSetupUrl
-          ? `Add payment info securely through Stripe: ${options.paymentSetupUrl}. Clean Curb Co. does not store your full card number or CVC. You will not be charged until service/payment terms are confirmed.`
+        `Hey ${booking.first_name},`,
+        "",
+        "Thanks for booking Clean Curb Co.",
+        `Booking total: ${bookingTotal}`,
+        "",
+        "We will place your stop on the best route around your regular trash pickup and send your confirmed service date by email or text.",
+        "",
+        paymentText,
+        recurringText,
+        "",
+        options.accountSetupUrl
+          ? `Create your account: ${options.accountSetupUrl}`
           : "",
+        "",
+        `Service address: ${booking.street_address}, ${booking.city}, ${booking.state} ${booking.zip_code}`,
+        `Bins: ${booking.bin_count}`,
+        `Frequency: ${formatFrequency(
+          booking.frequency,
+        )}`,
+        "",
+        "Trash day should not stink all week. We are on it.",
+        "",
+        "Stay fresh,",
+        "The Clean Curb Co. Team",
       ]
         .filter(Boolean)
-        .join(" "),
+        .join("\n"),
     ),
   };
 }
