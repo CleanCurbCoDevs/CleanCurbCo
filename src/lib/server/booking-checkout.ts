@@ -312,7 +312,7 @@ const lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] =
               interval: "month",
               interval_count:
                 recurringIntervalMonths[
-                  booking.frequency
+                  booking.frequency as RecurringFrequency
                 ],
             },
             product_data: {
