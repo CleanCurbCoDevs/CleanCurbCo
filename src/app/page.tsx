@@ -18,9 +18,9 @@ import {
 } from "@/components/sections/home-sections";
 
 export const metadata = publicPageMetadata({
-  title: "Curbside Cleaning & Garbage Bin Cleaning in Summerville, SC",
+  title: "Garbage Bin Cleaning in Goose Creek, SC",
   description:
-    "Curbside cleaning, garbage bin cleaning, sanitizing, deodorizing, and outdoor grime cleanup for Summerville, Cane Bay, Goose Creek, Moncks Corner, and nearby communities.",
+    "Local garbage bin cleaning, sanitizing, and deodorizing serving Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby Lowcountry communities.",
   path: "/",
 });
 
@@ -41,10 +41,10 @@ export default function Home() {
 
         <div className="container hero-content">
           <h1>Your bins have seen some things.</h1>
-        
+                  
           <p className="hero-subtitle">
-            We clean, sanitize, and deodorize trash and recycling bins
-            right at the curb—so you don’t have to.
+            We clean, sanitize, and deodorize trash and recycling bins throughout
+            Goose Creek and nearby Lowcountry communities—right at the curb.
           </p>
         
           <p className="trust-line">
