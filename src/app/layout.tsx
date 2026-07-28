@@ -31,24 +31,28 @@ export const metadata: Metadata = {
   manifest: "/manifest.webmanifest",
   title: {
     default:
-      "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
+      "Clean Curb Co. | Garbage Bin Cleaning in Goose Creek, SC",
     template: "%s | Clean Curb Co.",
   },
   description:
-    "Professional garbage bin cleaning, sanitizing, and deodorizing for Cane Bay and nearby Summerville communities. Locally owned, veteran-owned, eco-conscious service.",
+    "Local garbage bin cleaning, sanitizing, and deodorizing serving Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby Lowcountry communities.",
   keywords: [
-    "Garbage bin cleaning Cane Bay",
-    "Trash can cleaning Summerville SC",
-    "Bin cleaning Cane Bay",
-    "Residential bin cleaning",
-    "Trash bin sanitizing",
+    "Garbage bin cleaning Goose Creek SC",
+    "Trash can cleaning Goose Creek",
+    "Bin cleaning Summerville SC",
+    "Garbage bin cleaning Moncks Corner SC",
+    "Bin cleaning Cane Bay SC",
+    "Garbage bin sanitizing",
+    "Recycling bin cleaning",
+    "Trash can deodorizing",
     "Curbside bin cleaning",
+    "Residential garbage bin cleaning",
   ],
   openGraph: {
     title:
-      "Clean Curb Co. | Garbage Bin Cleaning in Cane Bay, SC",
+      "Clean Curb Co. | Garbage Bin Cleaning in Goose Creek, SC",
     description:
-      "Fresh Starts at the Curb. Garbage bin cleaning for Cane Bay and nearby Summerville communities.",
+      "Garbage bin cleaning, sanitizing, and deodorizing throughout Goose Creek and nearby Lowcountry communities.",
     url: "/",
     siteName: "Clean Curb Co.",
     images: [
@@ -65,9 +69,9 @@ export const metadata: Metadata = {
   twitter: {
     card: "summary_large_image",
     title:
-      "Clean Curb Co. | Fresh Starts at the Curb.",
+      "Clean Curb Co. | Garbage Bin Cleaning in Goose Creek, SC",
     description:
-      "Professional garbage bin cleaning for Cane Bay and nearby Summerville communities.",
+      "Local garbage bin cleaning serving Goose Creek, Summerville, Moncks Corner, Cane Bay, and nearby communities.",
     images: ["/twitter-image.png"],
   },
   appleWebApp: {
