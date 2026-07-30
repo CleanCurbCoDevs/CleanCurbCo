@@ -306,7 +306,7 @@ export function PricingSection() {
             <strong>
               Recurring plans include up to 2 bins.
             </strong>{" "}
-            Extra recurring bins are typically $8–$10 each.
+            Extra recurring bins are $10 each, per visit.
           </p>
 
           <p>
