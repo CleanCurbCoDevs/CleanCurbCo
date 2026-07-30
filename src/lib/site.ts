@@ -53,9 +53,8 @@ export const navItems = [
 ];
 
 export const oneTimeRows = [
-  { label: "1 bin", price: "$25" },
-  { label: "2 bins", price: "$35" },
-  { label: "3 bins", price: "$45" },
+  { label: "Starting price", price: "$55" },
+  { label: "Includes", price: "Up to 2 bins" },
   { label: "Each additional bin", price: "+$10" },
 ];
 
@@ -101,7 +100,7 @@ export const recurringPlans: Array<{
     name: "Seasonal Fresh Start",
     label: "Quarterly",
     frequency: "Every 3 months",
-    price: "$35",
+    price: "$40",
     suffix: "/visit",
     highlights: [
       "Good seasonal reset",
