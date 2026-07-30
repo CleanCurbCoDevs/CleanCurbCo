@@ -42,7 +42,8 @@ export default async function BookPage({ searchParams }: BookPageProps) {
 
           <p>
             Trash cans get gross. We clean, sanitize, and deodorize
-            them right at the curb—starting at $25.
+            them right at the curb—recurring service from $25 and
+            one-time cleaning from $55.
           </p>
 
           <div className="hero-actions">
