@@ -261,7 +261,6 @@ export async function submitServiceChecklistAction(formData: FormData) {
     });
 
     revalidateChecklistPaths(bundle.visit.id, bundle.booking.customer_id);
-    redirectWithStatus(returnTo, "submitted");
   } catch (error) {
     logger.error("checklist_pdf_generation_or_upload_failed", {
       requestId,
@@ -276,8 +275,11 @@ export async function submitServiceChecklistAction(formData: FormData) {
         checklistId: bundle.checklist.id,
       },
     });
+
     redirectWithStatus(returnTo, "pdf_failed");
   }
+
+  redirectWithStatus(returnTo, "submitted");
 }
 
 export async function addChecklistCorrectionAction(formData: FormData) {
