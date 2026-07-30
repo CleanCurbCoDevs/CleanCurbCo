@@ -48,7 +48,7 @@ export default function Home() {
           </p>
         
           <p className="trust-line">
-            Starting at $25 • Local and veteran-owned
+            Recurring from $25 • One-time from $55 • Local and veteran-owned
           </p>
         
           <div className="hero-actions">
