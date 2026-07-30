@@ -138,13 +138,16 @@ export function ServiceChecklistPanel({
         <ChecklistSections groupedItems={groupedItems} isSubmitted={isSubmitted} />
 
         <label className="field">
-          <span>Overall service notes</span>
+          <span>Customer-facing service notes</span>
           <textarea
             name="overallNotes"
             defaultValue={bundle.checklist.overall_notes ?? ""}
             disabled={isSubmitted}
-            placeholder="Final service notes, customer-visible limitations, access issues, or follow-up needs."
+            placeholder="Optional summary, limitation, access issue, or follow-up detail for the customer."
           />
+          <small className="muted">
+            Comments entered here are included in the final customer service report.
+          </small>
         </label>
 
         {isSubmitted ? (
@@ -171,7 +174,7 @@ export function ServiceChecklistPanel({
             <input name="finalizeAck" type="checkbox" />
             <span>
               I understand final submission locks this checklist and generates
-              the customer/internal PDF service record.
+              the customer-facing PDF service record.
             </span>
           </label>
         ) : null}
@@ -236,7 +239,8 @@ export function ServiceChecklistPanel({
               {isSubmitted ? "Checklist complete" : "Tap it. Clean it. Move on."}
             </h2>
             <p>
-              Mark each item done, note an issue, or choose N/A.
+              Mark each item done, note an issue, or choose N/A. Optional comments
+              are included on the customer&apos;s final service report.
             </p>
           </div>
   
@@ -354,13 +358,16 @@ export function ServiceChecklistPanel({
                         </label>
   
                         <label className="field-checklist-issue-note">
-                          <span>What happened?</span>
+                          <span>Optional customer-facing comment</span>
                           <textarea
                             defaultValue={item.notes ?? ""}
                             disabled={isSubmitted}
                             name={`notes-${item.id}`}
-                            placeholder="Briefly describe the issue or limitation."
+                            placeholder="Add a short comment, condition, limitation, or detail the customer should see."
                           />
+                          <small className="muted">
+                            Comments entered here are included in the final customer service report.
+                          </small>
                         </label>
                       </fieldset>
                     </article>
@@ -371,16 +378,19 @@ export function ServiceChecklistPanel({
           })}
   
           <details className="field-checklist-overall-notes">
-            <summary>Add an overall service note</summary>
-  
+            <summary>Add customer-facing service notes</summary>
+          
             <label>
-              Notes
+              Customer-facing service notes
               <textarea
                 defaultValue={bundle.checklist.overall_notes ?? ""}
                 disabled={isSubmitted}
                 name="overallNotes"
-                placeholder="Optional notes for the customer or admin."
+                placeholder="Optional summary, limitation, access issue, or follow-up detail for the customer."
               />
+              <small className="muted">
+                Comments entered here are included in the final customer service report.
+              </small>
             </label>
           </details>
   
@@ -452,13 +462,16 @@ function ChecklistSections({
                     </div>
                   </fieldset>
                   <label className="field compact-field">
-                    <span>Item notes</span>
+                    <span>Customer-facing item comment</span>
                     <textarea
                       disabled={isSubmitted}
                       name={`notes-${item.id}`}
                       defaultValue={item.notes ?? ""}
-                      placeholder="Optional note for this item"
+                      placeholder="Optional comment that will appear on the customer’s service report."
                     />
+                    <small className="muted">
+                      Comments entered here are included in the final customer service report.
+                    </small>
                   </label>
                 </article>
               ))}
