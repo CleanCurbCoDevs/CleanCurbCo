@@ -70,7 +70,10 @@ const EMAIL_TEST_OPTIONS = [
   { value: "admin_booking_notification", label: "Internal · New booking alert" },
   { value: "account_setup", label: "Customer · Account setup" },
   { value: "route_confirmation", label: "Customer · Route confirmation" },
-  { value: "facebook_review_request", label: "Customer · Facebook review request" },
+  {
+    value: "review_request",
+    label: "Customer · Google + Facebook review request",
+  },
   { value: "payment_link", label: "Customer · Payment link" },
   { value: "payment_received_new", label: "Customer · Payment received, new account" },
   { value: "payment_received_existing", label: "Customer · Payment received, existing account" },
@@ -390,7 +393,7 @@ function buildTestTemplate(
         career,
         `${siteUrl}/admin/careers`,
       );
-    case "facebook_review_request":
+    case "review_request":
       return null;
   }
 
@@ -442,7 +445,7 @@ export default async function AdminSettingsPage() {
       return actionFailure("Choose a valid email template.");
     }
 
-    if (rawTemplateKey === "facebook_review_request") {
+    if (rawTemplateKey === "review_request") {
       const result = await sendFieldReviewRequestEmail(
         sampleBooking(recipient),
         {},
@@ -450,7 +453,7 @@ export default async function AdminSettingsPage() {
 
       if (result.status === "sent") {
         return actionSuccess(
-          `Facebook review request sent to ${recipient}.`,
+          `Review request sent to ${recipient}.`,
         );
       }
 
@@ -459,7 +462,7 @@ export default async function AdminSettingsPage() {
       }
 
       return actionFailure(
-        `The Facebook review request failed: ${getErrorMessage(result.error)}`,
+        `The review request failed: ${getErrorMessage(result.error)}`,
       );
     }
 
@@ -567,7 +570,7 @@ export default async function AdminSettingsPage() {
                 Email template
                 <select
                   name="templateKey"
-                  defaultValue="facebook_review_request"
+                  defaultValue="review_request"
                   required
                 >
                   {EMAIL_TEST_OPTIONS.map((option) => (
