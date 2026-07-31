@@ -15,6 +15,9 @@ import { sendTransactionalEmail } from "@/lib/email/resend";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import type { BookingRow } from "@/types/database";
 
+const GOOGLE_REVIEWS_URL =
+  "https://g.page/r/CVKlcLrCBRUREBM/review";
+
 const FACEBOOK_REVIEWS_URL =
   "https://www.facebook.com/profile.php?id=61591401340864&sk=reviews";
 
@@ -114,36 +117,44 @@ function facebookReviewRequestTemplate(
 
               <p>
                 Clean Curb Co. is still the new kid on the route, so
-                an honest Facebook recommendation helps more than
-                you might think. It lets nearby neighbors know we are
-                real people doing real work—and not just three
-                raccoons operating a pressure washer.
+                an honest review helps more than you might think. It
+                lets nearby neighbors know we are real people doing
+                real work—and not just three raccoons operating a
+                pressure washer.
               </p>
-
+              
               <div style="margin:28px 0;text-align:center">
                 <a
-                  href="${escapeHtml(FACEBOOK_REVIEWS_URL)}"
+                  href="${escapeHtml(GOOGLE_REVIEWS_URL)}"
                   style="display:inline-block;background:#00ff38;color:#050505;padding:15px 22px;border-radius:10px;font-size:16px;font-weight:800;text-decoration:none"
+                >
+                  Leave a Google Review
+                </a>
+              </div>
+              
+              <div style="margin:18px 0 28px;text-align:center">
+                <a
+                  href="${escapeHtml(FACEBOOK_REVIEWS_URL)}"
+                  style="display:inline-block;background:#6d28d9;color:#ffffff;padding:13px 20px;border-radius:10px;font-size:15px;font-weight:800;text-decoration:none"
                 >
                   Recommend Us on Facebook
                 </a>
               </div>
-
+              
               <div
                 style="margin:24px 0;background:#f4efff;border:1px solid #c9b8f4;border-left:6px solid #6d28d9;border-radius:12px;padding:16px"
               >
                 <p
                   style="margin:0 0 6px;color:#3f1d78;font-weight:800"
                 >
-                  More of a Google or Yelp person?
+                  Pick whichever one you actually use.
                 </p>
-
+              
                 <p style="margin:0;color:#514760;font-size:14px">
-                  We're getting those profiles squared away too.
-                  They are still finishing their official verification
-                  rinse, so Facebook is the best place to review us
-                  right now. Once everything is live, you'll be able
-                  to find Clean Curb Co. on Google and Yelp too.
+                  Google reviews currently help us the most, but a
+                  Facebook recommendation is genuinely appreciated
+                  too. No need to leave both unless you are feeling
+                  unusually enthusiastic about clean garbage cans.
                 </p>
               </div>
 
@@ -173,8 +184,8 @@ function facebookReviewRequestTemplate(
 
               <p style="margin:0 0 10px">
                 Local, veteran-owned garbage bin cleaning serving
-                Summerville and surrounding Charleston-area
-                communities.
+                Summerville, Goose Creek, Moncks Corner, Cane Bay,
+                and nearby Lowcountry communities.
               </p>
 
               <p style="margin:0 0 8px">
@@ -210,12 +221,15 @@ function facebookReviewRequestTemplate(
     "",
     "Your bins have had a little time to enjoy their fresh start. We hope they are looking cleaner, smelling better, and feeling considerably less suspicious.",
     "",
-    "Clean Curb Co. is still the new kid on the route, so an honest Facebook recommendation helps more than you might think. It lets nearby neighbors know we are real people doing real work—and not just three raccoons operating a pressure washer.",
+    "Clean Curb Co. is still the new kid on the route, so an honest review helps more than you might think. It lets nearby neighbors know we are real people doing real work—and not just three raccoons operating a pressure washer.",
+    "",
+    "Leave a Google review:",
+    GOOGLE_REVIEWS_URL,
     "",
     "Recommend us on Facebook:",
     FACEBOOK_REVIEWS_URL,
     "",
-    "More of a Google or Yelp person? We're getting those profiles squared away too. They are still finishing their official verification rinse, so Facebook is the best place to review us right now. Once everything is live, you'll be able to find Clean Curb Co. on Google and Yelp too.",
+    "Google reviews currently help us the most, but a Facebook recommendation is genuinely appreciated too. No need to leave both unless you are feeling unusually enthusiastic about clean garbage cans.",
     "",
     "Every review, referral, and person willing to trust us with the gross stuff genuinely matters. Thanks for supporting a local, veteran-owned small business.",
     "",
