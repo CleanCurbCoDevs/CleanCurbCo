@@ -127,8 +127,12 @@ export default async function PortalBillingPage() {
           <div className="data-table">
             {records.map(({ payment, booking }) => {
               const amount = payment?.amount ?? booking?.estimated_price ?? 0;
-              const status = payment?.status ?? booking?.payment_status ?? "pending";
-              const link = payment?.checkout_url ?? booking?.payment_link ?? "";
+              const status =
+                booking?.payment_status === "paid"
+                  ? "paid"
+                  : payment?.status ??
+                    booking?.payment_status ??
+                    "pending";
               const foundingSpecial = booking
                 ? getFoundingNeighborSpecialStatus({
                     binCount: booking.bin_count,
@@ -153,24 +157,24 @@ export default async function PortalBillingPage() {
                   <span className={`status-badge status-${status}`}>
                     {paymentStatusLabel(status)}
                   </span>
-                  {status === "paid" ? null : link ? (
-                    <a className="button button-outline" href={link}>
-                      Pay Now
-                    </a>
-                  ) : booking ? (
-                    <PaymentLinkButton
-                      amount={booking.estimated_price}
-                      addOns={booking.add_ons}
-                      binCount={booking.bin_count}
-                      bookingId={booking.id}
-                      frequency={booking.frequency}
-                      paymentId={payment?.id}
-                      paymentType="payment_link"
-                      returnPath="/portal/billing"
-                    />
-                  ) : (
-                    <span>Payment link pending</span>
-                  )}
+                  {status === "paid" ? null : booking ? (
+                  <PaymentLinkButton
+                    amount={booking.estimated_price}
+                    addOns={booking.add_ons}
+                    binCount={booking.bin_count}
+                    bookingId={booking.id}
+                    frequency={booking.frequency}
+                    paymentType="booking"
+                    returnPath="/portal/billing"
+                    label="Pay Now"
+                    redirectOnCreate
+                    forceOneTime={
+                      booking.frequency === "one_time"
+                    }
+                  />
+                ) : (
+                  <span>Payment link pending</span>
+                )}
                 </article>
               );
             })}
