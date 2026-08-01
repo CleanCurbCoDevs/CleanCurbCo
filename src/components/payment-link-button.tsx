@@ -96,7 +96,11 @@ export function PaymentLinkButton({
         onClick={createLink}
         disabled={isPending}
       >
-        {isPending ? "Opening Stripe..." : label}
+        {isPending
+          ? redirectOnCreate
+            ? "Opening Stripe..."
+            : "Creating..."
+          : label}
       </button>
       {!redirectOnCreate && checkoutUrl ? (
         <a className="button button-outline" href={checkoutUrl} target="_blank" rel="noreferrer">
