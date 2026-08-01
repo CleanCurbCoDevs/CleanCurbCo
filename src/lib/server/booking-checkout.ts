@@ -411,7 +411,7 @@ const session =
     sessionParams,
     {
       idempotencyKey:
-        `booking-checkout-${booking.id}`,
+        `booking-checkout-${booking.id}-${payment.id}`,
     },
   );
 
