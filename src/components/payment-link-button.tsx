@@ -119,7 +119,11 @@ export function PaymentLinkButton({
           Copy Link
         </button>
       ) : null}
-      {checkoutUrl ? <p className="muted">Link copied and saved to the booking.</p> : null}
+      {!redirectOnCreate && checkoutUrl ? (
+        <p className="muted">
+          Link copied and saved to the booking.
+        </p>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
     </div>
   );
