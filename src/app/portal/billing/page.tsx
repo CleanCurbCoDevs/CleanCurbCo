@@ -50,12 +50,54 @@ export default async function PortalBillingPage() {
     context.bookings[0]?.id ??
     null;
   
-  const records = context.payments.length
-    ? context.payments.map((payment) => {
-        const booking = context.bookings.find((item) => item.id === payment.booking_id);
-        return { payment, booking };
-      })
-    : context.bookings.map((booking) => ({ payment: null, booking }));
+    const paymentsByBooking = new Map<
+      string,
+      (typeof context.payments)[number]
+    >();
+    
+    for (const payment of context.payments) {
+      if (!payment.booking_id) continue;
+    
+      const currentPayment =
+        paymentsByBooking.get(payment.booking_id);
+    
+      /*
+       * Payments arrive newest-first.
+       *
+       * Use the newest attempt for unpaid bookings, but prefer
+       * a successful payment when one exists.
+       */
+      if (
+        !currentPayment ||
+        (payment.status === "paid" &&
+          currentPayment.status !== "paid")
+      ) {
+        paymentsByBooking.set(
+          payment.booking_id,
+          payment,
+        );
+      }
+    }
+    
+    const records = [
+      ...context.bookings.map((booking) => ({
+        booking,
+        payment:
+          paymentsByBooking.get(booking.id) ??
+          null,
+      })),
+    
+      /*
+       * Preserve legitimate payments that are not associated
+       * with a booking, such as certain manual charges.
+       */
+      ...context.payments
+        .filter((payment) => !payment.booking_id)
+        .map((payment) => ({
+          payment,
+          booking: null,
+        })),
+    ];
 
   return (
     <PortalShell title="Billing and payments" auth={context.auth}>
