@@ -16,6 +16,9 @@ type PaymentLinkButtonProps = {
   addOns?: string[];
   existingCheckoutUrl?: string | null;
   returnPath: string;
+  label?: string;
+  redirectOnCreate?: boolean;
+  forceOneTime?: boolean;
 };
 
 export function PaymentLinkButton({
@@ -30,7 +33,11 @@ export function PaymentLinkButton({
   addOns,
   existingCheckoutUrl,
   returnPath,
+  label = "Create Stripe Link",
+  redirectOnCreate = false,
+  forceOneTime = true,
 }: PaymentLinkButtonProps) {
+  
   const router = useRouter();
   const feedback = useActionFeedback();
   const [isPending, startTransition] = useTransition();
@@ -54,9 +61,10 @@ export function PaymentLinkButton({
           bin_count: binCount,
           add_ons: addOns,
           returnPath,
-          forceOneTime: true,
+          forceOneTime,
         }),
       });
+      
       const data = (await response.json()) as {
         checkoutUrl?: string;
         error?: string;
@@ -68,7 +76,11 @@ export function PaymentLinkButton({
         feedback.error(message);
         return;
       }
-
+      if (redirectOnCreate) {
+        window.location.assign(data.checkoutUrl);
+        return;
+      }
+      
       setCheckoutUrl(data.checkoutUrl);
       await navigator.clipboard?.writeText(data.checkoutUrl).catch(() => undefined);
       feedback.success("Stripe payment link created and copied.");
@@ -84,14 +96,18 @@ export function PaymentLinkButton({
         onClick={createLink}
         disabled={isPending}
       >
-        {isPending ? "Creating..." : "Create Stripe Link"}
+        {isPending
+          ? redirectOnCreate
+            ? "Opening Stripe..."
+            : "Creating..."
+          : label}
       </button>
-      {checkoutUrl ? (
+      {!redirectOnCreate && checkoutUrl ? (
         <a className="button button-outline" href={checkoutUrl} target="_blank" rel="noreferrer">
           Open Link
         </a>
       ) : null}
-      {checkoutUrl ? (
+      {!redirectOnCreate && checkoutUrl ? (
         <button
           className="button button-outline"
           type="button"
@@ -103,7 +119,11 @@ export function PaymentLinkButton({
           Copy Link
         </button>
       ) : null}
-      {checkoutUrl ? <p className="muted">Link copied and saved to the booking.</p> : null}
+      {!redirectOnCreate && checkoutUrl ? (
+        <p className="muted">
+          Link copied and saved to the booking.
+        </p>
+      ) : null}
       {error ? <p className="form-error">{error}</p> : null}
     </div>
   );
