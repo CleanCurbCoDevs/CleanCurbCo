@@ -1553,7 +1553,24 @@ export type Database = {
       };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    
+    Functions: {
+      claim_booking_to_customer: {
+        Args: {
+          p_booking_id: string;
+          p_customer_id: string;
+          p_customer_email: string;
+          p_token_hash: string;
+        };
+        Returns: {
+          bookingId?: string;
+          customerId?: string;
+          serviceAddressId?: string | null;
+          alreadyLinked?: boolean;
+        };
+      };
+    };
+    
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };
