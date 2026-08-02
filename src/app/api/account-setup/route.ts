@@ -6,6 +6,7 @@ import {
   rejectLimitedRequest,
 } from "@/lib/server/request-guards";
 import { createRequestId, logger } from "@/lib/server/logger";
+import { claimBookingForCustomer } from "@/lib/server/booking-customer-link";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { cleanString, isValidEmail } from "@/lib/validation";
@@ -16,6 +17,40 @@ type AccountSetupPayload = {
   email?: unknown;
   password?: unknown;
 };
+
+async function cleanupCreatedAccount(input: {
+  userId: string;
+  requestId: string;
+  route: string;
+}) {
+  const admin = getSupabaseAdmin();
+
+  const { error: profileDeleteError } = await admin
+    .from("profiles")
+    .delete()
+    .eq("id", input.userId);
+
+  if (profileDeleteError) {
+    logger.error("account_setup_profile_cleanup_failed", {
+      requestId: input.requestId,
+      route: input.route,
+      userId: input.userId,
+      error: profileDeleteError,
+    });
+  }
+
+  const { error: userDeleteError } =
+    await admin.auth.admin.deleteUser(input.userId);
+
+  if (userDeleteError) {
+    logger.error("account_setup_user_cleanup_failed", {
+      requestId: input.requestId,
+      route: input.route,
+      userId: input.userId,
+      error: userDeleteError,
+    });
+  }
+}
 
 export async function POST(request: Request) {
   const requestId = createRequestId(request.headers);
@@ -50,6 +85,8 @@ export async function POST(request: Request) {
     );
   }
 
+  
+  
   const bookingId = cleanString(body.bookingId, 80);
   const token = cleanString(body.token, 200);
   const email = cleanString(body.email, 120).toLowerCase();
@@ -81,7 +118,7 @@ export async function POST(request: Request) {
   const tokenHash = hashClaimToken(token);
   const now = new Date().toISOString();
 
-  const { data: claim } = await admin
+   const { data: claim, error: claimError } = await admin
     .from("booking_claims")
     .select("*")
     .eq("booking_id", bookingId)
@@ -90,23 +127,65 @@ export async function POST(request: Request) {
     .gt("expires_at", now)
     .maybeSingle();
 
+  if (claimError) {
+    logger.error("account_setup_claim_lookup_failed", {
+      requestId,
+      route,
+      bookingId,
+      error: claimError,
+    });
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not verify that setup link. Please try again.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
+
   if (!claim || claim.email.toLowerCase() !== email) {
     logger.warn("account_setup_invalid_claim", {
       requestId,
       route,
       metadata: { bookingId, email },
     });
+
     return NextResponse.json(
-      { error: "That setup link is expired or no longer valid.", requestId },
+      {
+        error:
+          "That setup link is expired or no longer valid.",
+        requestId,
+      },
       { status: 400 },
     );
   }
 
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("*")
-    .eq("id", bookingId)
-    .maybeSingle();
+  const { data: booking, error: bookingError } =
+    await admin
+      .from("bookings")
+      .select("*")
+      .eq("id", bookingId)
+      .maybeSingle();
+
+  if (bookingError) {
+    logger.error("account_setup_booking_lookup_failed", {
+      requestId,
+      route,
+      bookingId,
+      error: bookingError,
+    });
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not load the booking for that setup link.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
 
   if (!booking || booking.email.toLowerCase() !== email) {
     logger.warn("account_setup_booking_not_found", {
@@ -114,8 +193,13 @@ export async function POST(request: Request) {
       route,
       metadata: { bookingId, email },
     });
+
     return NextResponse.json(
-      { error: "We could not find the booking for that setup link.", requestId },
+      {
+        error:
+          "We could not find the booking for that setup link.",
+        requestId,
+      },
       { status: 404 },
     );
   }
@@ -133,7 +217,9 @@ export async function POST(request: Request) {
     });
 
   if (createUserError || !createdUser.user) {
-    const message = createUserError?.message ?? "Account could not be created.";
+    const message =
+      createUserError?.message ??
+      "Account could not be created.";
 
     return NextResponse.json(
       {
@@ -142,67 +228,128 @@ export async function POST(request: Request) {
           : message,
         requestId,
       },
-      { status: message.toLowerCase().includes("already") ? 409 : 500 },
+      {
+        status: message.toLowerCase().includes("already")
+          ? 409
+          : 500,
+      },
     );
   }
 
   const userId = createdUser.user.id;
 
-  await admin.from("profiles").upsert(
-    {
-      id: userId,
-      role: "customer",
-      first_name: booking.first_name,
-      last_name: booking.last_name,
-      phone: booking.phone,
-      email,
-      preferred_contact_method: "email",
-      referred_by_profile_id: booking.referred_by_profile_id,
-      stripe_customer_id: booking.stripe_customer_id,
-      payment_method_on_file: booking.payment_method_on_file,
-      payment_setup_completed_at: booking.payment_setup_completed_at,
-    },
-    { onConflict: "id" },
-  );
+  const { error: profileError } = await admin
+    .from("profiles")
+    .upsert(
+      {
+        id: userId,
+        role: "customer",
+        first_name: booking.first_name,
+        last_name: booking.last_name,
+        phone: booking.phone,
+        email,
+        preferred_contact_method: "email",
+        referred_by_profile_id:
+          booking.referred_by_profile_id,
+        stripe_customer_id:
+          booking.stripe_customer_id,
+        payment_method_on_file:
+          booking.payment_method_on_file,
+        payment_setup_completed_at:
+          booking.payment_setup_completed_at,
+      },
+      { onConflict: "id" },
+    );
 
-  const { data: serviceAddress } = await admin
-    .from("service_addresses")
-    .insert({
-      customer_id: userId,
-      label: "Home",
-      street_address: booking.street_address,
-      city: booking.city,
-      state: booking.state,
-      zip_code: booking.zip_code,
-      neighborhood: booking.neighborhood,
-      notes: booking.customer_notes,
-      is_primary: true,
-    })
-    .select("id")
-    .single();
+  if (profileError) {
+    logger.error("account_setup_profile_failed", {
+      requestId,
+      route,
+      userId,
+      bookingId,
+      error: profileError,
+    });
 
-  await admin
-    .from("bookings")
-    .update({
-      customer_id: userId,
-      service_address_id: serviceAddress?.id ?? null,
-    })
-    .eq("id", booking.id);
+    await cleanupCreatedAccount({
+      userId,
+      requestId,
+      route,
+    });
 
-  if (booking.referral_code) {
-    await admin
-      .from("referrals")
-      .update({ referred_profile_id: userId })
-      .eq("referred_booking_id", booking.id);
+    return NextResponse.json(
+      {
+        error:
+          "We could not finish creating your account. Please try again.",
+        requestId,
+      },
+      { status: 500 },
+    );
   }
 
-  await admin
-    .from("booking_claims")
-    .update({ used_at: now })
-    .eq("id", claim.id);
-
+  /*
+   * Prove that the new credentials work and establish the
+   * browser session before consuming the booking claim.
+   */
   const supabase = await createServerSupabaseClient();
-  await supabase.auth.signInWithPassword({ email, password });
+
+  const { error: signInError } =
+    await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+  if (signInError) {
+    logger.error("account_setup_sign_in_failed", {
+      requestId,
+      route,
+      userId,
+      bookingId,
+      error: signInError,
+    });
+
+    await cleanupCreatedAccount({
+      userId,
+      requestId,
+      route,
+    });
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not verify the new account credentials. Please try again.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
+
+  const linkResult = await claimBookingForCustomer({
+    bookingId: booking.id,
+    claimToken: token,
+    customerId: userId,
+    customerEmail: email,
+    requestId,
+    route,
+  });
+
+  if (!linkResult.ok) {
+    await supabase.auth.signOut();
+
+    await cleanupCreatedAccount({
+      userId,
+      requestId,
+      route,
+    });
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not securely connect that booking to the new account. The setup link was not used.",
+        requestId,
+      },
+      { status: 409 },
+    );
+  }
 
   logger.info("account_setup_completed", {
     requestId,
@@ -210,7 +357,16 @@ export async function POST(request: Request) {
     userId,
     customerId: userId,
     bookingId: booking.id,
+    metadata: {
+      serviceAddressId:
+        linkResult.serviceAddressId,
+      alreadyLinked:
+        linkResult.alreadyLinked,
+    },
   });
 
-  return NextResponse.json({ redirectTo: "/portal", requestId });
+  return NextResponse.json({
+    redirectTo: "/portal",
+    requestId,
+  });
 }
