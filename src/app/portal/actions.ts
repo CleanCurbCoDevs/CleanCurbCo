@@ -34,7 +34,7 @@ import { cleanArray, cleanLongText, cleanString, pickEnum } from "@/lib/validati
 import type { ServiceFrequency } from "@/types/booking";
 import type { BookingRow, RequestType } from "@/types/database";
 
-const preferredContactMethods = ["email", "phone", "sms"] as const;
+const preferredContactMethods = ["email", "phone"] as const;
 
 export type AccountDeletionRequestState = {
   status: "idle" | "success" | "error";
@@ -61,7 +61,6 @@ export async function updatePortalAccountAction(formData: FormData) {
       phone: cleanString(formData.get("phone"), 40) || null,
       preferred_contact_method: preferredContactMethod,
       marketing_opt_in: formData.get("marketingOptIn") === "on",
-      sms_opt_in: formData.get("smsOptIn") === "on",
     })
     .eq("id", auth.userId);
 
