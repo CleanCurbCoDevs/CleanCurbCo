@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { openBookingException } from "@/lib/server/booking-exceptions";
 import { recordBookingEvent } from "@/lib/server/booking-events";
 import {
   createAccountSetupLink,
@@ -861,6 +862,35 @@ await recordBookingEvent({
         ),
       },
     });
+    await openBookingException({
+      bookingId: booking.id,
+      customerId:
+        booking.customer_id,
+      requestId,
+      route,
+      source: "booking_api",
+      exceptionType:
+        "service_address_link_failed",
+      severity: "warning",
+      title:
+        "Saved service address was not linked",
+      message:
+        "The booking is saved and linked to the customer, but its service address needs review.",
+      dedupeKey:
+        `booking:${booking.id}:service_address_link_failed`,
+      metadata: {
+        errorCode:
+          serviceAddressLinkErrorCode,
+        customerPreserved: Boolean(
+          booking.customer_id,
+        ),
+        streetAddress:
+          booking.street_address,
+        city: booking.city,
+        state: booking.state,
+        zipCode: booking.zip_code,
+      },
+    });
   }
   
   if (ga4ClientId) {
@@ -946,6 +976,32 @@ if (claimError) {
     errorCode: claimError.code ?? null,
   },
 });
+  await openBookingException({
+    bookingId: booking.id,
+    customerId:
+      booking.customer_id,
+    requestId,
+    route,
+    source: "booking_api",
+    exceptionType:
+      "booking_claim_creation_failed",
+    severity: "urgent",
+    title:
+      "Secure booking claim was not created",
+    message:
+      "The booking was saved, but its account-setup and guest-checkout claim needs repair.",
+    dedupeKey:
+      `booking:${booking.id}:booking_claim_creation_failed`,
+    metadata: {
+      errorCode:
+        claimError.code ?? null,
+      paymentPreference,
+      customerLinked: Boolean(
+        booking.customer_id,
+      ),
+    },
+  });
+  
 } else {
   claimToken = token;
 
@@ -1030,6 +1086,39 @@ if (checkoutResult.checkoutUrl) {
       paymentStatus: booking.payment_status,
     },
   });
+    /*
+     * A missing claim token already has its own root-cause
+     * exception. Only open the Stripe exception when checkout
+     * was actually eligible to be attempted.
+     */
+    if (claimToken) {
+      await openBookingException({
+        bookingId: booking.id,
+        customerId:
+          booking.customer_id,
+        requestId,
+        route,
+        source: "booking_api",
+        exceptionType:
+          "stripe_checkout_creation_failed",
+        severity: "urgent",
+        title:
+          "Stripe checkout could not be created",
+        message:
+          "The booking was saved, but its initial Stripe checkout session needs attention.",
+        dedupeKey:
+          `booking:${booking.id}:stripe_checkout_creation_failed`,
+        metadata: {
+          stage: "initial_checkout",
+          paymentPreference,
+          paymentStatus:
+            booking.payment_status,
+          checkoutError:
+            checkoutResult.error,
+        },
+      });
+    }
+  
 } else {
   await recordBookingEvent({
     bookingId: booking.id,
