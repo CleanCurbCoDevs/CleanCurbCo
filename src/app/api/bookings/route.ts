@@ -541,6 +541,16 @@ export async function POST(request: Request) {
             first_name: firstName,
             last_name: lastName,
             phone,
+            ...(smsOptIn
+              ? {
+                  sms_opt_in: true,
+                  sms_opt_in_at: smsOptInAt,
+                  sms_opt_out_at: null,
+                  sms_opt_in_source: SMS_CONSENT_SOURCE_BOOKING,
+                  sms_consent_version: SMS_CONSENT_VERSION,
+                  sms_consent_text: SMS_CONSENT_DISCLOSURE,
+                }
+              : {}),
           },
           { onConflict: "id" },
         )
