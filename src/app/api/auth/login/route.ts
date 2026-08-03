@@ -109,15 +109,55 @@ export async function POST(request: Request) {
     );
   }
 
-  const { data: profile } = await supabase
+  const {
+    data: profile,
+    error: profileError,
+  } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", data.user.id)
     .maybeSingle();
 
-  const role = (
-    profile?.role ?? "customer"
-  ) as AppRole;
+  if (profileError || !profile) {
+    logger.error(
+      "auth_login_profile_lookup_failed",
+      {
+        requestId,
+        route,
+        userId: data.user.id,
+        error: profileError,
+        metadata: {
+          profileFound: Boolean(profile),
+        },
+      },
+    );
+
+    const { error: signOutError } =
+      await supabase.auth.signOut();
+
+    if (signOutError) {
+      logger.warn(
+        "auth_login_profile_failure_sign_out_failed",
+        {
+          requestId,
+          route,
+          userId: data.user.id,
+          error: signOutError,
+        },
+      );
+    }
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not finish signing you in. Please try again.",
+        requestId,
+      },
+      { status: 500 },
+    );
+  }
+
+  const role = profile.role as AppRole;
 
   const fallbackRoute =
     defaultRouteForRole(role);
