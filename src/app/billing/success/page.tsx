@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import { GuestCheckoutRetryButton } from "@/components/guest-checkout-retry-button";
 import {
   createAccountSetupLink,
   createLoginClaimLink,
@@ -32,7 +33,8 @@ type BillingContext = {
   booking: BookingRow;
   accountSetupHref: string;
   loginHref: string;
-  retryHref: string | null;
+  claimToken: string;
+  canRetryCheckout: boolean;
   paymentConfirmed: boolean;
 };
 
@@ -85,7 +87,7 @@ export default async function BillingSuccessPage({
               {cancelled ? (
                 <>
                   <li>
-                    Resume the same secure checkout whenever
+                    Start a fresh secure checkout whenever
                     you are ready.
                   </li>
                   <li>
@@ -119,13 +121,12 @@ export default async function BillingSuccessPage({
           {context ? (
             <>
               <div className="button-row">
-                {cancelled && context.retryHref ? (
-                  <a
-                    className="button button-dark"
-                    href={context.retryHref}
-                  >
-                    Resume Secure Checkout
-                  </a>
+                {cancelled &&
+                context.canRetryCheckout ? (
+                  <GuestCheckoutRetryButton
+                    bookingId={context.booking.id}
+                    claimToken={context.claimToken}
+                  />
                 ) : (
                   <a
                     className="button button-dark"
@@ -134,8 +135,9 @@ export default async function BillingSuccessPage({
                     Create Your Personal Account
                   </a>
                 )}
-
-                {cancelled ? (
+              
+                {cancelled &&
+                context.canRetryCheckout ? (
                   <a
                     className="button button-outline"
                     href={context.accountSetupHref}
@@ -278,10 +280,13 @@ async function getBillingContext(input: {
       booking.id,
       input.token,
     ),
-    retryHref:
-      booking.payment_status === "paid"
-        ? null
-        : booking.payment_link,
+    claimToken: input.token,
+    canRetryCheckout:
+      booking.status !== "cancelled" &&
+      booking.status !== "paid" &&
+      booking.payment_status !== "paid" &&
+      booking.payment_status !==
+        "refunded",
     paymentConfirmed,
   };
 }
