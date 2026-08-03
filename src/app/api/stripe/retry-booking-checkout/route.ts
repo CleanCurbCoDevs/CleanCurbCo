@@ -6,6 +6,10 @@ import {
   isSupabaseConfigured,
 } from "@/lib/env";
 import { createBookingCheckout } from "@/lib/server/booking-checkout";
+import {
+  openBookingException,
+  resolveBookingException,
+} from "@/lib/server/booking-exceptions";
 import { recordBookingEvent } from "@/lib/server/booking-events";
 import {
   createRequestId,
@@ -313,7 +317,31 @@ export async function POST(request: Request) {
         claimId: claim.id,
       },
     });
-
+    await openBookingException({
+      bookingId: booking.id,
+      customerId:
+        booking.customer_id,
+      requestId,
+      route,
+      source: "booking_api",
+      exceptionType:
+        "stripe_checkout_creation_failed",
+      severity: "urgent",
+      title:
+        "Stripe checkout could not be created",
+      message:
+        "A customer attempted to resume payment, but a fresh Stripe checkout session could not be created.",
+      dedupeKey:
+        `booking:${booking.id}:stripe_checkout_creation_failed`,
+      metadata: {
+        stage: "guest_checkout_retry",
+        paymentStatus:
+          booking.payment_status,
+        claimId: claim.id,
+        checkoutError:
+          checkoutResult.error ?? null,
+      },
+    });
     return NextResponse.json(
       {
         error:
@@ -343,7 +371,15 @@ export async function POST(request: Request) {
       claimId: claim.id,
     },
   });
-
+  await resolveBookingException({
+    bookingId: booking.id,
+    requestId,
+    route,
+    dedupeKey:
+      `booking:${booking.id}:stripe_checkout_creation_failed`,
+    resolutionNote:
+      "A fresh guest Stripe checkout session was created successfully.",
+  });
   logger.info(
     "guest_checkout_retry_created",
     {
