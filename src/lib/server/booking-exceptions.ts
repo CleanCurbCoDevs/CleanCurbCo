@@ -22,6 +22,15 @@ type OpenBookingExceptionInput = {
   metadata?: Record<string, unknown>;
 };
 
+type ResolveBookingExceptionInput = {
+  bookingId: string;
+  dedupeKey: string;
+  resolutionNote: string;
+  resolvedByProfileId?: string | null;
+  requestId?: string | null;
+  route?: string;
+};
+
 /*
  * Exception recording must never break the customer workflow
  * that exposed the exception. Failures are logged and return
@@ -133,6 +142,119 @@ export async function openBookingException(
         occurrenceCount:
           data.occurrence_count,
         dedupeKey: data.dedupe_key,
+      },
+    },
+  );
+
+  return data;
+}
+
+/*
+ * Automatically resolves an operational exception when the
+ * system later repairs the underlying problem.
+ *
+ * The last_seen_at condition prevents an older successful
+ * request from resolving a newer concurrent failure.
+ */
+export async function resolveBookingException(
+  input: ResolveBookingExceptionInput,
+): Promise<BookingExceptionRow | null> {
+  const bookingId = input.bookingId.trim();
+  const dedupeKey = input.dedupeKey.trim();
+  const resolutionNote =
+    input.resolutionNote.trim();
+
+  if (
+    !bookingId ||
+    !dedupeKey ||
+    !resolutionNote
+  ) {
+    logger.error(
+      "booking_exception_resolution_invalid_input",
+      {
+        requestId:
+          input.requestId ?? undefined,
+        route: input.route,
+        bookingId:
+          bookingId || undefined,
+        metadata: {
+          hasDedupeKey:
+            Boolean(dedupeKey),
+          hasResolutionNote:
+            Boolean(resolutionNote),
+        },
+      },
+    );
+
+    return null;
+  }
+
+  const resolvedAt =
+    new Date().toISOString();
+
+  const { data, error } =
+    await getSupabaseAdmin()
+      .from("booking_exceptions")
+      .update({
+        status: "resolved",
+        resolved_at: resolvedAt,
+        resolved_by_profile_id:
+          input.resolvedByProfileId ?? null,
+        resolution_note:
+          resolutionNote,
+      })
+      .eq("booking_id", bookingId)
+      .eq("dedupe_key", dedupeKey)
+      .in("status", [
+        "open",
+        "acknowledged",
+      ])
+      .lte("last_seen_at", resolvedAt)
+      .select("*")
+      .maybeSingle();
+
+  if (error) {
+    logger.error(
+      "booking_exception_resolution_failed",
+      {
+        requestId:
+          input.requestId ?? undefined,
+        route: input.route,
+        bookingId,
+        error,
+        metadata: {
+          dedupeKey,
+        },
+      },
+    );
+
+    return null;
+  }
+
+  /*
+   * No matching open exception is a normal no-op. For
+   * example, checkout may succeed on its first attempt.
+   */
+  if (!data) {
+    return null;
+  }
+
+  logger.info(
+    "booking_exception_resolved",
+    {
+      requestId:
+        input.requestId ?? undefined,
+      route: input.route,
+      bookingId,
+      customerId:
+        data.customer_id ?? undefined,
+      metadata: {
+        exceptionId: data.id,
+        exceptionType:
+          data.exception_type,
+        dedupeKey: data.dedupe_key,
+        occurrenceCount:
+          data.occurrence_count,
       },
     },
   );
