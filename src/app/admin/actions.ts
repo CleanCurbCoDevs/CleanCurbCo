@@ -100,7 +100,7 @@ export type AdminEmailChangeState = {
   requestId?: string;
 };
 
-const preferredContactMethods = ["email", "phone", "sms"] as const;
+const preferredContactMethods = ["email", "phone"] as const;
 const careerApplicationStatuses: readonly CareerApplicationStatus[] = [
   "new",
   "reviewing",
@@ -1001,7 +1001,6 @@ export async function updateCustomerProfileAdminAction(formData: FormData) {
     phone: cleanString(formData.get("phone"), 40) || null,
     preferred_contact_method: preferredContactMethod,
     marketing_opt_in: formData.get("marketingOptIn") === "on",
-    sms_opt_in: formData.get("smsOptIn") === "on",
     internal_notes: cleanLongText(formData.get("internalNotes"), 3000) || null,
   };
 
@@ -1060,7 +1059,6 @@ export async function updateCustomerProfileAdminAction(formData: FormData) {
       phone: maskPhone(previousProfile?.phone),
       preferredContactMethod: previousProfile?.preferred_contact_method ?? null,
       marketingOptIn: previousProfile?.marketing_opt_in ?? null,
-      smsOptIn: previousProfile?.sms_opt_in ?? null,
     },
     after_summary: {
       firstName: profileUpdate.first_name,
@@ -1068,7 +1066,6 @@ export async function updateCustomerProfileAdminAction(formData: FormData) {
       phone: maskPhone(profileUpdate.phone),
       preferredContactMethod,
       marketingOptIn: profileUpdate.marketing_opt_in,
-      smsOptIn: profileUpdate.sms_opt_in,
     },
     request_id: requestId,
     status: "success",
