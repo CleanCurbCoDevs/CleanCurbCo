@@ -444,69 +444,271 @@ export async function POST(request: Request) {
   let existingStripeCustomerId: string | null = null;
   let existingPaymentMethodOnFile = false;
   let existingPaymentSetupCompletedAt: string | null = null;
-
+  let serviceAddressLinkFailed = false;
+  let serviceAddressLinkErrorCode: string | null = null;
+  
   try {
     const supabase = await createServerSupabaseClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-    customerId = user?.id ?? null;
 
-    if (customerId) {
-      const { data: profile } = await admin
+    /*
+     * getSession() is used only to distinguish a genuine
+     * public guest from a browser that has an account session.
+     * Any detected session is then verified with getUser().
+     */
+    const {
+      data: { session },
+      error: sessionError,
+    } = await supabase.auth.getSession();
+
+    if (sessionError) {
+      logger.error("booking_submission_session_lookup_failed", {
+        requestId,
+        route,
+        error: sessionError,
+      });
+
+      return NextResponse.json(
+        {
+          error:
+            "We could not verify your account session. Please refresh and try again.",
+          requestId,
+        },
+        { status: 503 },
+      );
+    }
+
+    if (session) {
+      const {
+        data: { user },
+        error: userError,
+      } = await supabase.auth.getUser();
+
+      if (userError || !user) {
+        logger.warn(
+          "booking_submission_authenticated_user_invalid",
+          {
+            requestId,
+            route,
+            error: userError,
+          },
+        );
+
+        return NextResponse.json(
+          {
+            error:
+              "Your sign-in could not be verified. Please log in again before booking.",
+            requestId,
+          },
+          { status: 401 },
+        );
+      }
+
+      /*
+       * Once an authenticated user is known, this ID must
+       * never be cleared because a nested operation fails.
+       */
+      customerId = user.id;
+
+      const profileEmail =
+        user.email?.trim().toLowerCase() || email;
+
+      const {
+        data: profile,
+        error: profileError,
+      } = await admin
         .from("profiles")
         .upsert(
           {
             id: customerId,
-            email,
+            email: profileEmail,
             first_name: firstName,
             last_name: lastName,
             phone,
           },
           { onConflict: "id" },
         )
-        .select("id, stripe_customer_id, payment_method_on_file, payment_setup_completed_at")
+        .select(
+          "id, stripe_customer_id, payment_method_on_file, payment_setup_completed_at",
+        )
         .single();
 
-      if (profile?.id) {
-        existingStripeCustomerId = profile.stripe_customer_id ?? null;
-        existingPaymentMethodOnFile = Boolean(profile.payment_method_on_file);
-        existingPaymentSetupCompletedAt = profile.payment_setup_completed_at ?? null;
+      if (profileError || !profile) {
+        logger.error(
+          "booking_submission_profile_sync_failed",
+          {
+            requestId,
+            route,
+            userId: customerId,
+            customerId,
+            error: profileError,
+          },
+        );
 
-        const { data: serviceAddress } = await admin
+        return NextResponse.json(
+          {
+            error:
+              "We could not connect this booking to your account. Please try again.",
+            requestId,
+          },
+          { status: 500 },
+        );
+      }
+
+      existingStripeCustomerId =
+        profile.stripe_customer_id ?? null;
+
+      existingPaymentMethodOnFile =
+        Boolean(profile.payment_method_on_file);
+
+      existingPaymentSetupCompletedAt =
+        profile.payment_setup_completed_at ?? null;
+
+      /*
+       * Reuse a matching saved address instead of creating
+       * a duplicate every time the customer books.
+       */
+      let addressQuery = admin
+        .from("service_addresses")
+        .select("id")
+        .eq("customer_id", profile.id)
+        .eq("street_address", streetAddress)
+        .eq("city", city)
+        .eq("state", state);
+
+      addressQuery = zipCode
+        ? addressQuery.eq("zip_code", zipCode)
+        : addressQuery.is("zip_code", null);
+
+      const {
+        data: existingAddress,
+        error: addressLookupError,
+      } = await addressQuery
+        .order("is_primary", { ascending: false })
+        .order("created_at", { ascending: true })
+        .limit(1)
+        .maybeSingle();
+
+      if (addressLookupError) {
+        logger.warn(
+          "booking_submission_address_lookup_failed",
+          {
+            requestId,
+            route,
+            userId: customerId,
+            customerId,
+            error: addressLookupError,
+          },
+        );
+      }
+
+      if (existingAddress?.id) {
+        serviceAddressId = existingAddress.id;
+      } else {
+        const {
+          count: savedAddressCount,
+          error: addressCountError,
+        } = await admin
+          .from("service_addresses")
+          .select("id", {
+            count: "exact",
+            head: true,
+          })
+          .eq("customer_id", profile.id);
+
+        if (addressCountError) {
+          logger.warn(
+            "booking_submission_address_count_failed",
+            {
+              requestId,
+              route,
+              userId: customerId,
+              customerId,
+              error: addressCountError,
+            },
+          );
+        }
+
+        const shouldBePrimary =
+          !addressCountError &&
+          (savedAddressCount ?? 0) === 0;
+
+        const {
+          data: serviceAddress,
+          error: serviceAddressError,
+        } = await admin
           .from("service_addresses")
           .insert({
             customer_id: profile.id,
+            label: "Home",
             street_address: streetAddress,
             city,
             state,
             zip_code: zipCode,
             neighborhood,
             collection_day: collectionDay,
-            collection_time_window: collectionTimeWindow,
-            same_day_preference: sameDayPreference,
-            latitude: serviceAreaResult.latitude ?? null,
-            longitude: serviceAreaResult.longitude ?? null,
+            collection_time_window:
+              collectionTimeWindow,
+            same_day_preference:
+              sameDayPreference,
+            latitude:
+              serviceAreaResult.latitude ?? null,
+            longitude:
+              serviceAreaResult.longitude ?? null,
             distance_from_hub_miles:
               serviceAreaResult.distanceMiles ?? null,
             notes:
-              cleanLongText(body.instructions?.notes, 1000) || null,
-            is_primary: true,
+              cleanLongText(
+                body.instructions?.notes,
+                1000,
+              ) || null,
+            is_primary: shouldBePrimary,
           })
           .select("id")
           .single();
 
-        serviceAddressId = serviceAddress?.id ?? null;
+        if (serviceAddressError || !serviceAddress) {
+          /*
+           * The customer identity remains attached. The
+           * booking can proceed without a saved-address link.
+           */
+          serviceAddressLinkFailed = true;
+          serviceAddressLinkErrorCode =
+            serviceAddressError?.code ?? null;
+
+          logger.warn(
+            "booking_submission_address_creation_failed",
+            {
+              requestId,
+              route,
+              userId: customerId,
+              customerId,
+              error: serviceAddressError,
+            },
+          );
+        } else {
+          serviceAddressId = serviceAddress.id;
+        }
       }
     }
   } catch (error) {
-    logger.warn("booking_submission_session_profile_lookup_failed", {
-      requestId,
-      route,
-      error,
-    });
-    customerId = null;
-    serviceAddressId = null;
+    logger.error(
+      "booking_submission_customer_resolution_failed",
+      {
+        requestId,
+        route,
+        customerId,
+        error,
+      },
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "We could not verify your customer account. Please refresh and try again.",
+        requestId,
+      },
+      { status: 503 },
+    );
   }
 
   if (referralCode) {
@@ -629,6 +831,30 @@ await recordBookingEvent({
   },
 });
 
+  if (serviceAddressLinkFailed) {
+    await recordBookingEvent({
+      bookingId: booking.id,
+      customerId: booking.customer_id,
+      actorProfileId: booking.customer_id,
+      requestId,
+      route,
+      source: "booking_api",
+      eventType: "SERVICE_ADDRESS_LINK_FAILED",
+      outcome: "failure",
+      message:
+        "Booking was linked to the customer, but the saved service address could not be linked.",
+      idempotencyKey:
+        `booking:${booking.id}:service_address_link_failed`,
+      metadata: {
+        errorCode:
+          serviceAddressLinkErrorCode,
+        customerPreserved: Boolean(
+          booking.customer_id,
+        ),
+      },
+    });
+  }
+  
   if (ga4ClientId) {
     await sendGa4ServerEvent({
       eventName: "booking_submitted",
