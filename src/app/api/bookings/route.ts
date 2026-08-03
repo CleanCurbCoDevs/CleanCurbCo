@@ -589,6 +589,16 @@ export async function POST(request: Request) {
         .maybeSingle();
 
       if (addressLookupError) {
+        /*
+         * Do not attempt to create a new address when we
+         * could not reliably determine whether it already
+         * exists. Preserve the customer link and continue
+         * with the booking's embedded address instead.
+         */
+        serviceAddressLinkFailed = true;
+        serviceAddressLinkErrorCode =
+          addressLookupError.code ?? null;
+
         logger.warn(
           "booking_submission_address_lookup_failed",
           {
@@ -599,9 +609,7 @@ export async function POST(request: Request) {
             error: addressLookupError,
           },
         );
-      }
-
-      if (existingAddress?.id) {
+      } else if (existingAddress?.id) {
         serviceAddressId = existingAddress.id;
       } else {
         const {
