@@ -59,11 +59,14 @@ export default async function PortalAccountPage() {
                 <span>Preferred contact method</span>
                 <select
                   name="preferredContactMethod"
-                  defaultValue={profile.preferred_contact_method ?? "email"}
+                  defaultValue={
+                    profile.preferred_contact_method === "phone"
+                      ? "phone"
+                      : "email"
+                  }
                 >
                   <option value="email">Email</option>
                   <option value="phone">Phone</option>
-                  <option value="sms">SMS placeholder</option>
                 </select>
               </label>
             </div>
@@ -76,14 +79,15 @@ export default async function PortalAccountPage() {
                 />
                 <span>Send occasional route updates and local offers.</span>
               </label>
-              <label className="choice-card">
-                <input
-                  type="checkbox"
-                  name="smsOptIn"
-                  defaultChecked={profile.sms_opt_in}
-                />
-                <span>SMS opt-in placeholder for future text automations.</span>
-              </label>
+                <div className="choice-card">
+                  <span>
+                    Text message consent:{" "}
+                    {profile.sms_opt_in ? "Opted in" : "Not opted in"}
+                  </span>
+                  <small>
+                    SMS preferences are managed through the booking consent process.
+                  </small>
+                </div>
             </div>
 
             <h2>Primary service address</h2>
