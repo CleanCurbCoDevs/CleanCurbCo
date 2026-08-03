@@ -192,16 +192,11 @@
   grid-column: 1 / -1;
 }
 
-/* Let the street address breathe */
+/* Full-width booking fields */
 
-@media (min-width: 720px) {
-  .booking-page
-    .booking-form
-    > .form-section:first-of-type
-    .form-grid
-    > .field:nth-child(5) {
-    grid-column: 1 / -1;
-  }
+.booking-page .booking-street-address,
+.booking-page .sms-consent-card {
+  grid-column: 1 / -1;
 }
 
 /* Fields */
@@ -274,6 +269,41 @@
   font-weight: 650;
   line-height: 1.45;
   margin-top: 5px;
+}
+
+.booking-page .sms-consent-card {
+  align-items: start;
+  display: grid;
+  gap: 8px;
+}
+
+.booking-page .sms-consent-control {
+  align-items: flex-start;
+  display: flex;
+  gap: 11px;
+}
+
+.booking-page .sms-consent-control > input {
+  flex: 0 0 auto;
+  margin-top: 3px;
+}
+
+.booking-page .sms-consent-control > span {
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.booking-page .sms-consent-card p {
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.45;
+  margin: 0 0 0 29px;
+}
+
+.booking-page .sms-consent-card a {
+  font-weight: 900;
+  text-decoration: underline;
 }
 
 .booking-page .choice-card:has(input:checked) {
