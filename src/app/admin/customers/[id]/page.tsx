@@ -143,11 +143,14 @@ export default async function CustomerDetailPage({
               <span>Preferred contact</span>
               <select
                 name="preferredContactMethod"
-                defaultValue={profile.preferred_contact_method ?? "email"}
+                defaultValue={
+                  profile.preferred_contact_method === "phone"
+                    ? "phone"
+                    : "email"
+                }              
               >
                 <option value="email">Email</option>
                 <option value="phone">Phone</option>
-                <option value="sms">SMS placeholder</option>
               </select>
             </label>
             <label className="field">
@@ -164,14 +167,16 @@ export default async function CustomerDetailPage({
               />
               <span>Marketing opt-in</span>
             </label>
-            <label className="choice-card">
-              <input
-                type="checkbox"
-                name="smsOptIn"
-                defaultChecked={profile.sms_opt_in}
-              />
-              <span>SMS opt-in placeholder</span>
-            </label>
+            <div className="choice-card">
+              <span>
+                SMS consent: {profile.sms_opt_in ? "Opted in" : "Not opted in"}
+              </span>
+              <small>
+                {profile.sms_opt_in_at
+                  ? `Recorded ${new Date(profile.sms_opt_in_at).toLocaleString()}`
+                  : "No verified SMS consent recorded."}
+              </small>
+            </div>
           </div>
           <h2>Primary service address</h2>
           <div className="form-grid">
