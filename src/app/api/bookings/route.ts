@@ -320,6 +320,7 @@ export async function POST(request: Request) {
     paymentDueAtService ? new Date().toISOString() : null;
 
   const smsOptIn =
+    process.env.NEXT_PUBLIC_SMS_OPT_IN_ENABLED === "true" &&
     body.communications?.smsOptIn === true;
   
   const smsOptInAt =
@@ -793,6 +794,18 @@ export async function POST(request: Request) {
       agreement_weather_access: agreements.weatherAccess,
       agreement_photos: agreements.photos,
       agreement_payment: agreements.payment,
+      
+      sms_opt_in: smsOptIn,
+      sms_opt_in_at: smsOptInAt,
+      sms_opt_in_source: smsOptIn
+        ? SMS_CONSENT_SOURCE_BOOKING
+        : null,
+      sms_consent_version: smsOptIn
+        ? SMS_CONSENT_VERSION
+        : null,
+      sms_consent_text: smsOptIn
+        ? SMS_CONSENT_DISCLOSURE
+        : null,
       
       payment_preference: paymentPreference,
       payment_due_at_service: paymentDueAtService,
