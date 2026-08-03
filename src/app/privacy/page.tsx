@@ -15,26 +15,27 @@ export default function PrivacyPage() {
           <p className="section-kicker">Privacy</p>
           <h1>Privacy Policy</h1>
           <p>
-            How Clean Curb Co. collects, uses, protects, and shares customer and
-            website information.
+            How Clean Curb Co. collects, uses, protects, and shares customer,
+            website, and messaging information.
           </p>
         </div>
       </section>
 
       <section className="section section-white">
         <div className="container legal-copy">
-          <p className="muted">Effective date: July 2, 2026</p>
+          <p className="muted">Effective date: August 3, 2026</p>
           <aside className="legal-summary-card">
             <p className="section-kicker">Plain-English Summary</p>
             <h2>What this means</h2>
             <ul>
               <li>We collect the information needed to book, route, clean, bill, and support your service.</li>
-              <li>We use your address and neighborhood to confirm service area and build efficient routes.</li>
-              <li>We may send operational emails, calls, or texts about bookings, route updates, payments, and service support.</li>
-              <li>We may take service photos for proof, quality control, and customer updates, but we do not publicly identify your address without permission.</li>
-              <li>We do not sell personal information.</li>
+              <li>Transactional SMS enrollment is optional; providing a mobile number alone is not consent to automated texts.</li>
+              <li>When you opt in, we retain a record of your consent and use your number for the service messages described at sign-up.</li>
+              <li>We do not sell personal information or share text-message opt-in data and consent with third parties.</li>
+              <li>You may reply STOP to end Clean Curb Co. SMS messages.</li>
             </ul>
           </aside>
+
           <h2>Who we are</h2>
           <p>
             Clean Curb Co. is operated by Stonebranch Capital LLC. In this
@@ -51,6 +52,13 @@ export default function PrivacyPage() {
             neighborhood, bin count, selected services, add-ons, route or
             scheduling preferences, gate or access instructions, service notes,
             customer account details, and payment-status information.
+          </p>
+          <p>
+            If you choose to receive text messages, we may also collect and
+            retain your SMS consent selection, the date and time of consent, the
+            form or account page used, the version of the consent disclosure
+            shown to you, your opt-out or re-subscription history, and related
+            messaging records.
           </p>
           <p>
             Please do not include sensitive personal information in service
@@ -79,16 +87,34 @@ export default function PrivacyPage() {
             fraud, and comply with legal, accounting, tax, safety, and business
             obligations.
           </p>
+          <p>
+            When you opt in to SMS, we use your mobile number and consent record
+            to send the transactional service messages described in the opt-in
+            disclosure, administer HELP and STOP requests, document consent,
+            troubleshoot delivery, and maintain compliance records.
+          </p>
 
           <h2>Texts, calls, emails, and service updates</h2>
           <p>
-            Clean Curb Co. may contact you by text message, phone, or email
-            about booking requests, launch timing, route-day confirmations,
-            reminders, payment links, service updates, billing notices, customer
-            support, account access, policy changes, and follow-up. Message and
-            data rates may apply for text messages. Marketing texts or emails,
-            if offered, should use a separate opt-in where required or
-            appropriate.
+            Clean Curb Co. may contact you by phone, email, or customer portal
+            message about booking requests, route timing, reminders, payment
+            links, service updates, billing notices, customer support, account
+            access, policy changes, and follow-up.
+          </p>
+          <p>
+            Automated or recurring SMS messages are sent only after you
+            affirmatively select a separate SMS-consent option or otherwise
+            provide valid consent. Providing a phone number, submitting a
+            booking, or accepting these policies alone does not enroll you in
+            the SMS program. SMS consent is optional and is not a condition of
+            purchase.
+          </p>
+          <p>
+            Message frequency varies, typically 2-6 messages per service visit.
+            Message and data rates may apply. Reply STOP to opt out or HELP for
+            help. You may also call or text 843-888-4124 or email
+            contact@cleancurbco.com. Marketing messages, if offered later, will
+            use a separate opt-in where required.
           </p>
 
           <h2>Photos and proof of service</h2>
@@ -121,9 +147,7 @@ export default function PrivacyPage() {
             preferences, and improve the customer experience. Analytics may
             include pages visited, approximate location derived from IP address,
             browser or device type, referring pages, form events, and general
-            usage patterns. We do not currently use Google Analytics, Meta
-            pixel, Nextdoor pixel, or other marketing pixels in the app code,
-            and we do not use analytics to sell personal information.
+            usage patterns. We do not use analytics to sell personal information.
           </p>
 
           <h2>Who we share information with</h2>
@@ -143,10 +167,17 @@ export default function PrivacyPage() {
             safety, property, or operations of Clean Curb Co., Stonebranch
             Capital LLC, customers, workers, or others.
           </p>
+          <p>
+            All the above categories exclude text messaging originator opt-in
+            data and consent; this information won’t be shared with any third
+            parties.
+          </p>
 
           <h2>No selling personal information</h2>
           <p>
-            We do not sell personal information. We use customer information to
+            We do not sell personal information. We do not sell, rent, transfer,
+            or share mobile opt-in information or SMS consent for third-party
+            marketing or promotional purposes. We use customer information to
             operate Clean Curb Co., communicate clearly, provide service, and
             improve our website and operations.
           </p>
@@ -155,10 +186,11 @@ export default function PrivacyPage() {
           <p>
             We keep information for as long as reasonably needed for the
             purposes described in this policy, including service records,
-            customer support, route history, warranty or dispute records,
-            accounting, tax, insurance, legal, safety, fraud prevention, and
-            business operations. When information is no longer reasonably needed,
-            we may delete, de-identify, or archive it where practical.
+            customer support, route history, SMS consent and opt-out records,
+            messaging history, warranty or dispute records, accounting, tax,
+            insurance, legal, safety, fraud prevention, and business operations.
+            When information is no longer reasonably needed, we may delete,
+            de-identify, or archive it where practical.
           </p>
 
           <h2>Your choices</h2>
@@ -170,10 +202,18 @@ export default function PrivacyPage() {
             dispute, or business-record purposes.
           </p>
           <p>
+            You may withdraw SMS consent at any time by replying STOP. After a
+            valid STOP request, we may send one final confirmation and will not
+            send additional messages through the Clean Curb Co. SMS program
+            unless you opt in again. SMS opt-out does not cancel your booking or
+            recurring service; we may communicate by email, phone, or customer
+            portal where permitted.
+          </p>
+          <p>
             You may opt out of marketing messages where offered. Transactional
-            service messages may still be sent when needed to complete or
-            support a booking, payment, route visit, customer account, or legal
-            notice.
+            messages through channels other than SMS may still be sent when
+            reasonably needed to complete or support a booking, payment, route
+            visit, customer account, or legal notice.
           </p>
 
           <h2>Children</h2>
@@ -188,8 +228,8 @@ export default function PrivacyPage() {
           <p>
             We use reasonable administrative, technical, and organizational
             safeguards designed to protect customer information. No website,
-            database, payment system, or internet transmission can be guaranteed
-            to be completely secure.
+            database, payment system, messaging service, or internet
+            transmission can be guaranteed to be completely secure.
           </p>
 
           <h2>Changes to this policy</h2>
@@ -206,8 +246,8 @@ export default function PrivacyPage() {
             <a href="mailto:privacy@cleancurbco.com">
               privacy@cleancurbco.com
             </a>{" "}
-            or to <a href={brand.emailHref}>{brand.email}</a>. You may also
-            call <a href={brand.phoneHref}>{brand.phone}</a>.
+            or to <a href={brand.emailHref}>{brand.email}</a>. You may also call
+            or text <a href={brand.phoneHref}>{brand.phone}</a>.
           </p>
 
           <p className="muted">{brand.legalNote}</p>
