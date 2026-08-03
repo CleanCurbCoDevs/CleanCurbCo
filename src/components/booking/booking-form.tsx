@@ -96,6 +96,9 @@ type FormState = {
 
 export type InitialBookingCustomer = Partial<FormState["customer"]>;
 
+const smsOptInEnabled =
+  process.env.NEXT_PUBLIC_SMS_OPT_IN_ENABLED === "true";
+
 const initialState: FormState = {
   website: "",
   referralCode: "",
@@ -512,32 +515,36 @@ export function BookingForm({
               onChange={(value) => updateCustomer("email", value)}
               required
             />
-            <div className="choice-card sms-consent-card">
-              <label className="sms-consent-control">
-                <input
-                  type="checkbox"
-                  checked={form.communications.smsOptIn}
-                  onChange={(event) =>
-                    setForm((current) => ({
-                      ...current,
-                      communications: {
-                        ...current.communications,
-                        smsOptIn: event.target.checked,
-                      },
-                    }))
-                  }
-                  aria-describedby="sms-consent-details"
-                />
             
-                <span>{SMS_CONSENT_DISCLOSURE}</span>
-              </label>
+            {smsOptInEnabled ? (
+              <div className="choice-card sms-consent-card">
+                <label className="sms-consent-control">
+                  <input
+                    type="checkbox"
+                    checked={form.communications.smsOptIn}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        communications: {
+                          ...current.communications,
+                          smsOptIn: event.target.checked,
+                        },
+                      }))
+                    }
+                    aria-describedby="sms-consent-details"
+                  />
             
-              <p id="sms-consent-details">
-                Read our{" "}
-                <Link href="/communications-policy">SMS Terms</Link>{" "}
-                and <Link href="/privacy">Privacy Policy</Link>.
-              </p>
-            </div>
+                  <span>{SMS_CONSENT_DISCLOSURE}</span>
+                </label>
+            
+                <p id="sms-consent-details">
+                  Read our{" "}
+                  <Link href="/communications-policy">SMS Terms</Link>{" "}
+                  and <Link href="/privacy">Privacy Policy</Link>.
+                </p>
+              </div>
+            ) : null}
+            
             <TextField
               className="booking-street-address"
               label="Street address"
