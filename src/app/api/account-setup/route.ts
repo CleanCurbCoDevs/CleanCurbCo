@@ -249,6 +249,12 @@ export async function POST(request: Request) {
         phone: booking.phone,
         email,
         preferred_contact_method: "email",
+        sms_opt_in: booking.sms_opt_in,
+        sms_opt_in_at: booking.sms_opt_in_at,
+        sms_opt_out_at: null,
+        sms_opt_in_source: booking.sms_opt_in_source,
+        sms_consent_version: booking.sms_consent_version,
+        sms_consent_text: booking.sms_consent_text,
         referred_by_profile_id:
           booking.referred_by_profile_id,
         stripe_customer_id:
