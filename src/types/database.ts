@@ -285,6 +285,56 @@ export type BookingEventRow = {
   metadata: Record<string, unknown>;
 };
 
+export type BookingExceptionSeverity =
+  | "info"
+  | "warning"
+  | "urgent";
+
+export type BookingExceptionStatus =
+  | "open"
+  | "acknowledged"
+  | "resolved"
+  | "dismissed";
+
+export type BookingExceptionRow = {
+  id: string;
+  created_at: string;
+  updated_at: string;
+  first_seen_at: string;
+  last_seen_at: string;
+
+  booking_id: string;
+  customer_id: string | null;
+  source_event_id: string | null;
+
+  request_id: string | null;
+  source: string;
+  exception_type: string;
+
+  severity: BookingExceptionSeverity;
+  status: BookingExceptionStatus;
+
+  title: string;
+  message: string;
+  dedupe_key: string;
+  occurrence_count: number;
+
+  assigned_to_profile_id: string | null;
+
+  acknowledged_at: string | null;
+  acknowledged_by_profile_id:
+    | string
+    | null;
+
+  resolved_at: string | null;
+  resolved_by_profile_id:
+    | string
+    | null;
+
+  resolution_note: string | null;
+  metadata: Record<string, unknown>;
+};
+
 export type ProfileRow = {
   id: string;
   created_at: string;
@@ -1182,6 +1232,23 @@ export type Database = {
         Update: Partial<BookingEventRow>;
         Relationships: [];
       };
+
+            booking_exceptions: {
+        Row: BookingExceptionRow;
+        Insert:
+          Partial<BookingExceptionRow> &
+          Pick<
+            BookingExceptionRow,
+            | "booking_id"
+            | "exception_type"
+            | "title"
+            | "message"
+            | "dedupe_key"
+          >;
+        Update:
+          Partial<BookingExceptionRow>;
+        Relationships: [];
+      };
     
       booking_claims: {
         Row: {
@@ -1562,12 +1629,33 @@ export type Database = {
           p_customer_email: string;
           p_token_hash: string;
         };
+        
         Returns: {
           bookingId?: string;
           customerId?: string;
           serviceAddressId?: string | null;
           alreadyLinked?: boolean;
         };
+      };
+      open_booking_exception: {
+        Args: {
+          p_booking_id: string;
+          p_customer_id: string | null;
+          p_source_event_id:
+            | string
+            | null;
+          p_request_id: string | null;
+          p_source: string;
+          p_exception_type: string;
+          p_severity:
+            BookingExceptionSeverity;
+          p_title: string;
+          p_message: string;
+          p_dedupe_key: string;
+          p_metadata:
+            Record<string, unknown>;
+        };
+        Returns: BookingExceptionRow;
       };
     };
     
