@@ -131,6 +131,9 @@ const initialState: FormState = {
     waterSpigotAvailable: "yes",
     notes: "",
   },
+  communications: {
+    smsOptIn: false,
+  },
   agreements: {
     waterUse: false,
     binCondition: false,
