@@ -46,6 +46,7 @@ import type {
   SchedulingPreference,
   ServiceFrequency,
 } from "@/types/booking";
+import { SMS_CONSENT_DISCLOSURE } from "@/lib/sms-consent";
 
 type CustomerPaymentPreference = Exclude<
   PaymentPreference,
@@ -86,6 +87,9 @@ type FormState = {
     binLocation: string;
     waterSpigotAvailable: "yes" | "no" | "not_sure";
     notes: string;
+  };
+  communications: {
+    smsOptIn: boolean;
   };
   agreements: BookingRequest["agreements"];
 };
@@ -363,7 +367,8 @@ export function BookingForm({
           
           <p>
             Your booking has been received. We will review your collection schedule
-            and confirm your route details by email or text when available. If you
+            and confirm your route details by{" "}
+            {form.communications.smsOptIn ? "email or text" : "email"} when available. If you
             selected card payment, your Stripe Checkout result is reflected in your
             booking and payment records.
           </p>
@@ -504,7 +509,34 @@ export function BookingForm({
               onChange={(value) => updateCustomer("email", value)}
               required
             />
+            <div className="choice-card sms-consent-card">
+              <label className="sms-consent-control">
+                <input
+                  type="checkbox"
+                  checked={form.communications.smsOptIn}
+                  onChange={(event) =>
+                    setForm((current) => ({
+                      ...current,
+                      communications: {
+                        ...current.communications,
+                        smsOptIn: event.target.checked,
+                      },
+                    }))
+                  }
+                  aria-describedby="sms-consent-details"
+                />
+            
+                <span>{SMS_CONSENT_DISCLOSURE}</span>
+              </label>
+            
+              <p id="sms-consent-details">
+                Read our{" "}
+                <Link href="/communications-policy">SMS Terms</Link>{" "}
+                and <Link href="/privacy">Privacy Policy</Link>.
+              </p>
+            </div>
             <TextField
+              className="booking-street-address"
               label="Street address"
               value={form.customer.streetAddress}
               onChange={(value) => updateCustomer("streetAddress", value)}
@@ -1394,15 +1426,19 @@ function TextField({
   onChange,
   type = "text",
   required,
+  className,
 }: {
   label: string;
   value: string;
   onChange: (value: string) => void;
   type?: string;
   required?: boolean;
+  className?: string;
 }) {
   return (
-    <label className="field">
+      <label
+        className={["field", className].filter(Boolean).join(" ")}
+      >
       <span>
         {label}
         {required ? <span className="required-mark"> *</span> : null}
