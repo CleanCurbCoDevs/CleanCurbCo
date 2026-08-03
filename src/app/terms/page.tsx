@@ -16,25 +16,26 @@ export default function TermsPage() {
           <h1>Terms of Service</h1>
           <p>
             The basic agreement for using the Clean Curb Co. website, booking
-            service, customer portal, and bin cleaning services.
+            service, customer portal, communications, and bin cleaning services.
           </p>
         </div>
       </section>
 
       <section className="section section-white">
         <div className="container legal-copy">
-          <p className="muted">Effective date: July 2, 2026</p>
+          <p className="muted">Effective date: August 3, 2026</p>
           <aside className="legal-summary-card">
             <p className="section-kicker">Plain-English Summary</p>
             <h2>The short version</h2>
             <ul>
               <li>Submitting a booking request does not guarantee service until we confirm your route, price, and service details.</li>
-              <li>During launch, you should not be charged until service/payment terms are confirmed.</li>
               <li>Bins need to be empty, accessible, and safe to clean when service is scheduled.</li>
               <li>Recurring service continues until paused or cancelled under the applicable policy.</li>
-              <li>Promos, estimates, route timing, and add-ons may require final confirmation before service.</li>
+              <li>Transactional SMS enrollment is optional and separate from booking; providing a phone number alone is not consent to receive automated texts.</li>
+              <li>Reply STOP to end Clean Curb Co. texts or HELP for assistance.</li>
             </ul>
           </aside>
+
           <h2>1. Who we are</h2>
           <p>
             Clean Curb Co. is operated by Stonebranch Capital LLC. These Terms
@@ -164,14 +165,44 @@ export default function TermsPage() {
             details should require permission or reasonable de-identification.
           </p>
 
-          <h2>13. Communications</h2>
+          <h2>13. Communications and SMS program</h2>
           <p>
-            You agree that we may contact you by text, phone, email, or customer
-            portal message about booking requests, route timing, reminders,
-            payment links, service updates, billing, support, account access,
-            policy updates, and related operational matters. Message and data
-            rates may apply. More details are provided in our Communications
-            Policy.
+            We may contact you by phone, email, or customer portal message about
+            booking requests, route timing, reminders, payment links, service
+            updates, billing, support, account access, policy updates, and
+            related operational matters.
+          </p>
+          <p>
+            SMS enrollment is optional. If you actively select the separate
+            SMS-consent checkbox and submit the form, you consent to receive
+            recurring transactional text messages from Clean Curb Co. at the
+            mobile number provided. Messages may include booking confirmations,
+            appointment reminders, scheduling and arrival updates,
+            service-completion notices, payment-related updates, and customer
+            support. Providing a mobile number or booking service by itself does
+            not enroll you in the SMS program, and consent is not a condition of
+            purchase.
+          </p>
+          <p>
+            Message frequency varies, typically 2-6 messages per service visit.
+            Message and data rates may apply. Reply STOP to opt out or HELP for
+            help. You may also call or text 843-888-4124 or email
+            contact@cleancurbco.com. Wireless carriers are not liable for delayed
+            or undelivered messages.
+          </p>
+          <p>
+            After a valid STOP request, we may send one final confirmation that
+            you have been unsubscribed. We will not continue sending messages
+            through the Clean Curb Co. SMS program unless you opt in again.
+            Opting out of SMS does not cancel a booking or recurring service and
+            does not prevent service-related communication by another method
+            where permitted.
+          </p>
+          <p>
+            We may retain records of your SMS consent, including the phone
+            number, consent selection, date and time, source, applicable
+            disclosure version, and opt-out history. Additional details are
+            provided in our Communications Policy and Privacy Policy.
           </p>
 
           <h2>14. Accounts and customer portal</h2>
@@ -204,12 +235,12 @@ export default function TermsPage() {
 
           <h2>17. Disclaimers</h2>
           <p>
-            The website and services are provided on an “as available” and “as
-            is” basis to the fullest extent permitted by law. We do not promise
-            uninterrupted website access, perfect route timing, exact arrival
-            windows, complete stain or odor removal, or that every booking
-            request can be accepted. Nothing in these Terms limits rights that
-            cannot be waived under applicable law.
+            The website and services are provided on an &quot;as available&quot;
+            and &quot;as is&quot; basis to the fullest extent permitted by law.
+            We do not promise uninterrupted website access, perfect route timing,
+            exact arrival windows, complete stain or odor removal, or that every
+            booking request can be accepted. Nothing in these Terms limits
+            rights that cannot be waived under applicable law.
           </p>
 
           <h2>18. Limitation of liability</h2>
@@ -252,20 +283,18 @@ export default function TermsPage() {
 
           <h2>22. Changes to these Terms</h2>
           <p>
-            We may update these Terms from time to time. The updated version
-            will be posted on this page with a new effective date. Continued use
-            of the website, customer portal, booking tools, or services after an
+            We may update these Terms from time to time. The updated version will
+            be posted on this page with a new effective date. Continued use of
+            the website, customer portal, booking tools, or services after an
             update means you accept the updated Terms.
           </p>
 
           <h2>23. Contact</h2>
           <p>
             Questions about these Terms can be sent to{" "}
-            <a href="mailto:legal@cleancurbco.com">
-              legal@cleancurbco.com
-            </a>{" "}
-            or to <a href={brand.emailHref}>{brand.email}</a>. You may also call{" "}
-            <a href={brand.phoneHref}>{brand.phone}</a>.
+            <a href="mailto:legal@cleancurbco.com">legal@cleancurbco.com</a>{" "}
+            or to <a href={brand.emailHref}>{brand.email}</a>. You may also call
+            or text <a href={brand.phoneHref}>{brand.phone}</a>.
           </p>
 
           <p className="muted">{brand.legalNote}</p>
