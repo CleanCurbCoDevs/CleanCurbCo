@@ -252,21 +252,31 @@ export async function POST(request: Request) {
     );
   }
 
-  if (booking.payment_status === "paid") {
+  const checkoutRetryBlocked =
+    booking.status === "cancelled" ||
+    booking.status === "paid" ||
+    booking.payment_status === "paid" ||
+    booking.payment_status === "refunded";
+
+  if (checkoutRetryBlocked) {
     logger.info(
-      "guest_checkout_retry_already_paid",
+      "guest_checkout_retry_booking_closed",
       {
         requestId,
         route,
         bookingId,
         customerId: booking.customer_id,
+        metadata: {
+          bookingStatus: booking.status,
+          paymentStatus: booking.payment_status,
+        },
       },
     );
 
     return NextResponse.json(
       {
         error:
-          "This booking is already paid. No additional checkout is needed.",
+          "This booking is no longer eligible for a new checkout session. Please contact Clean Curb Co. if you need help.",
         requestId,
       },
       { status: 409 },
