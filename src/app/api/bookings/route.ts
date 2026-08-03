@@ -99,6 +99,9 @@ type IncomingBooking = {
     waterSpigotAvailable?: unknown;
     notes?: unknown;
   };
+  communications?: {
+    smsOptIn?: unknown;
+  };
   agreements?: {
     waterUse?: unknown;
     binCondition?: unknown;
@@ -128,6 +131,7 @@ const expectedTopLevelFields = new Set([
   "payment",
   "scheduling",
   "instructions",
+  "communications",
   "agreements",
 ]);
 
