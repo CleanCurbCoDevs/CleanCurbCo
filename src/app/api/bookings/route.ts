@@ -33,6 +33,11 @@ import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { verifyTurnstileToken } from "@/lib/server/turnstile";
 import { createBookingCheckout } from "@/lib/server/booking-checkout";
 import { bookingSuccessLaunchMessage } from "@/lib/site";
+import {
+  SMS_CONSENT_DISCLOSURE,
+  SMS_CONSENT_SOURCE_BOOKING,
+  SMS_CONSENT_VERSION,
+} from "@/lib/sms-consent";
 import { america250PromoInternalNote } from "@/lib/promotions";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
@@ -313,7 +318,13 @@ export async function POST(request: Request) {
   
   const inPersonPaymentRequestedAt =
     paymentDueAtService ? new Date().toISOString() : null;
+
+  const smsOptIn =
+    body.communications?.smsOptIn === true;
   
+  const smsOptInAt =
+    smsOptIn ? new Date().toISOString() : null;
+    
   const limited = rejectLimitedRequest(request, {
     requestId,
     route,
