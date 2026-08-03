@@ -109,44 +109,76 @@ export async function POST(request: Request) {
     );
   }
 
-  let bookingClaimed = false;
-  
-  if (bookingId && claimToken) {
-    const authenticatedEmail =
-      data.user.email?.trim().toLowerCase() ?? "";
-  
-    if (!authenticatedEmail) {
-      logger.warn("login_booking_claim_missing_email", {
-        requestId,
-        route,
-        userId: data.user.id,
-        bookingId,
-      });
-    } else {
-      const linkResult =
-        await claimBookingForCustomer({
-          bookingId,
-          claimToken,
-          customerId: data.user.id,
-          customerEmail: authenticatedEmail,
-          requestId,
-          route,
-        });
-  
-      bookingClaimed = linkResult.ok;
-    }
-  }
-  
   const { data: profile } = await supabase
     .from("profiles")
     .select("role")
     .eq("id", data.user.id)
     .maybeSingle();
 
-  const role = (profile?.role ?? "customer") as AppRole;
-  const fallbackRoute = defaultRouteForRole(role);
-  const redirectTo = safeRedirectForRole(role, requestedNext, fallbackRoute);
+  const role = (
+    profile?.role ?? "customer"
+  ) as AppRole;
 
+  const fallbackRoute =
+    defaultRouteForRole(role);
+
+  const redirectTo = safeRedirectForRole(
+    role,
+    requestedNext,
+    fallbackRoute,
+  );
+
+  let bookingClaimed = false;
+
+  if (
+    bookingId &&
+    claimToken &&
+    role === "customer"
+  ) {
+    const authenticatedEmail =
+      data.user.email
+        ?.trim()
+        .toLowerCase() ?? "";
+
+    if (!authenticatedEmail) {
+      logger.warn(
+        "login_booking_claim_missing_email",
+        {
+          requestId,
+          route,
+          userId: data.user.id,
+          bookingId,
+        },
+      );
+    } else {
+      const linkResult =
+        await claimBookingForCustomer({
+          bookingId,
+          claimToken,
+          customerId: data.user.id,
+          customerEmail:
+            authenticatedEmail,
+          requestId,
+          route,
+        });
+
+      bookingClaimed = linkResult.ok;
+    }
+  } else if (
+    bookingId &&
+    claimToken
+  ) {
+    logger.warn(
+      "login_booking_claim_role_rejected",
+      {
+        requestId,
+        route,
+        userId: data.user.id,
+        role,
+        bookingId,
+      },
+    );
+  }
   logger.info("auth_login_success", {
     requestId,
     route,
@@ -159,7 +191,9 @@ export async function POST(request: Request) {
   });
 
   const finalRedirectTo =
-    bookingId && claimToken
+    bookingId &&
+    claimToken &&
+    role === "customer"
       ? bookingClaimed
         ? "/portal?bookingLink=success"
         : "/portal?bookingLink=failed"
