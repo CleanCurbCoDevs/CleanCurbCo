@@ -219,6 +219,11 @@ export type BookingRow = {
   agreement_weather_access: boolean;
   agreement_photos: boolean;
   agreement_payment: boolean;
+  sms_opt_in: boolean;
+  sms_opt_in_at: string | null;
+  sms_opt_in_source: string | null;
+  sms_consent_version: string | null;
+  sms_consent_text: string | null;
   payment_status: "not_sent" | "pending" | "paid" | "failed" | "refunded";
   payment_preference: PaymentPreference;
   payment_due_at_service: boolean;
@@ -346,6 +351,11 @@ export type ProfileRow = {
   email: string | null;
   marketing_opt_in: boolean;
   sms_opt_in: boolean;
+  sms_opt_in_at: string | null;
+  sms_opt_out_at: string | null;
+  sms_opt_in_source: string | null;
+  sms_consent_version: string | null;
+  sms_consent_text: string | null;
   preferred_contact_method: "email" | "phone" | "sms" | null;
   referral_code: string | null;
   referred_by_profile_id: string | null;
