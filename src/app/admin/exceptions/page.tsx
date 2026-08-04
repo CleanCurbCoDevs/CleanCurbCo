@@ -2,6 +2,11 @@ import type { Metadata } from "next";
 import Link from "next/link";
 
 import {
+  sendPaymentLinkAction,
+  sendPaymentSetupInviteAction,
+} from "@/app/admin/actions";
+import {
+  repairServiceAddressExceptionAction,
   updateBookingExceptionAction,
 } from "@/app/admin/exceptions/actions";
 import {
@@ -799,7 +804,7 @@ function ExceptionCard({
                       ? profileName(
                           acknowledgedBy,
                         )
-                      : "administrator"
+                      : "system"
                   }`
                 : "Not yet"
             }
@@ -816,7 +821,7 @@ function ExceptionCard({
                       ? profileName(
                           resolvedBy,
                         )
-                      : "administrator"
+                      : "system"
                   }`
                 : "Still active"
             }
@@ -897,6 +902,7 @@ function ExceptionCard({
         ) : isActive ? (
           <ActiveExceptionActions
             exception={exception}
+            booking={booking}
             assignee={assignee}
             assignableProfiles={
               assignableProfiles
@@ -917,17 +923,24 @@ function ExceptionCard({
 
 function ActiveExceptionActions({
   exception,
+  booking,
   assignee,
   assignableProfiles,
   currentAssigneeIsAssignable,
 }: {
   exception: BookingExceptionRow;
+  booking: BookingRow | null;
   assignee: ProfileRow | null;
   assignableProfiles: ProfileRow[];
   currentAssigneeIsAssignable: boolean;
 }) {
   return (
     <div className={styles.actionGrid}>
+      <AutomaticRepairPanel
+        exception={exception}
+        booking={booking}
+      />
+
       {exception.status === "open" ? (
         <section className={styles.actionPanel}>
           <h3>
@@ -1121,6 +1134,422 @@ function ActiveExceptionActions({
         </FeedbackForm>
       </section>
     </div>
+  );
+}
+
+function AutomaticRepairPanel({
+  exception,
+  booking,
+}: {
+  exception: BookingExceptionRow;
+  booking: BookingRow | null;
+}) {
+  const supportedTypes = [
+    "service_address_link_failed",
+    "booking_claim_creation_failed",
+    "stripe_checkout_creation_failed",
+  ];
+
+  if (
+    !supportedTypes.includes(
+      exception.exception_type,
+    )
+  ) {
+    return null;
+  }
+
+  if (!booking) {
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Automatic repair unavailable
+        </h3>
+
+        <p>
+          The related booking could not be
+          loaded. Review the technical details
+          before closing this exception.
+        </p>
+      </section>
+    );
+  }
+
+  if (
+    booking.status ===
+    "cancelled"
+  ) {
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Close cancelled-booking exception
+        </h3>
+
+        <p>
+          This booking is cancelled, so the
+          failed operation is no longer
+          required.
+        </p>
+
+        <FeedbackForm
+          action={
+            updateBookingExceptionAction
+          }
+          confirmMessage="Close this exception because the booking is cancelled?"
+          pendingMessage="Closing exception..."
+          successMessage="Cancelled-booking exception closed."
+        >
+          <input
+            type="hidden"
+            name="exceptionId"
+            value={exception.id}
+          />
+
+          <input
+            type="hidden"
+            name="action"
+            value="resolve"
+          />
+
+          <input
+            type="hidden"
+            name="resolutionNote"
+            value="The booking is cancelled, so this operation is no longer required."
+          />
+
+          <ActionSubmitButton
+            pendingLabel="Closing..."
+          >
+            Close cancelled-booking exception
+          </ActionSubmitButton>
+        </FeedbackForm>
+      </section>
+    );
+  }
+
+  if (
+    exception.exception_type ===
+    "service_address_link_failed"
+  ) {
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Repair saved service address
+        </h3>
+
+        <p>
+          Find an existing matching customer
+          address or create one from the
+          booking, then connect it to this
+          booking.
+        </p>
+
+        {!booking.customer_id ? (
+          <div
+            className={
+              styles.repairUnavailable
+            }
+          >
+            This booking must be connected to
+            a customer account before a saved
+            address can be created.
+          </div>
+        ) : (
+          <FeedbackForm
+            action={
+              repairServiceAddressExceptionAction
+            }
+            confirmMessage="Create or link this booking's saved service address?"
+            pendingMessage="Repairing service address..."
+            successMessage="Service address repaired."
+          >
+            <input
+              type="hidden"
+              name="exceptionId"
+              value={exception.id}
+            />
+
+            <ActionSubmitButton
+              pendingLabel="Repairing..."
+            >
+              Repair service address
+            </ActionSubmitButton>
+          </FeedbackForm>
+        )}
+      </section>
+    );
+  }
+
+  if (
+    exception.exception_type ===
+    "booking_claim_creation_failed"
+  ) {
+    const claimNoLongerNeeded =
+      Boolean(
+        booking.customer_id,
+      ) &&
+      (
+        booking.payment_preference !==
+          "stripe" ||
+        booking.payment_status ===
+          "paid"
+      );
+
+    if (claimNoLongerNeeded) {
+      return (
+        <section
+          className={[
+            styles.actionPanel,
+            styles.repairPanel,
+          ].join(" ")}
+        >
+          <h3>
+            Close unnecessary claim exception
+          </h3>
+
+          <p>
+            The booking is already linked to a
+            customer and no longer requires a
+            secure claim for checkout or
+            account setup.
+          </p>
+
+          <FeedbackForm
+            action={
+              updateBookingExceptionAction
+            }
+            confirmMessage="Close this claim exception as no longer required?"
+            pendingMessage="Closing exception..."
+            successMessage="Claim exception closed."
+          >
+            <input
+              type="hidden"
+              name="exceptionId"
+              value={exception.id}
+            />
+
+            <input
+              type="hidden"
+              name="action"
+              value="resolve"
+            />
+
+            <input
+              type="hidden"
+              name="resolutionNote"
+              value="The booking is already linked to a customer and no longer requires a secure booking claim."
+            />
+
+            <ActionSubmitButton
+              pendingLabel="Closing..."
+            >
+              Close unnecessary claim
+            </ActionSubmitButton>
+          </FeedbackForm>
+        </section>
+      );
+    }
+
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Create replacement secure claim
+        </h3>
+
+        <p>
+          Generate a fresh secure claim and
+          email the customer a usable account
+          or payment-setup link.
+        </p>
+
+        <FeedbackForm
+          action={
+            sendPaymentSetupInviteAction
+          }
+          confirmMessage="Create a new secure claim and email the replacement link to this customer?"
+          pendingMessage="Creating replacement link..."
+          successMessage="Replacement secure link sent."
+        >
+          <input
+            type="hidden"
+            name="bookingId"
+            value={booking.id}
+          />
+
+          <input
+            type="hidden"
+            name="repairClaim"
+            value="true"
+          />
+
+          <ActionSubmitButton
+            pendingLabel="Creating and sending..."
+          >
+            Create and send replacement link
+          </ActionSubmitButton>
+        </FeedbackForm>
+      </section>
+    );
+  }
+
+  if (
+    booking.payment_status ===
+    "paid"
+  ) {
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Close completed-payment exception
+        </h3>
+
+        <p>
+          This booking is already marked paid,
+          so a replacement checkout session is
+          no longer required.
+        </p>
+
+        <FeedbackForm
+          action={
+            updateBookingExceptionAction
+          }
+          confirmMessage="Close this checkout exception because payment is already complete?"
+          pendingMessage="Closing exception..."
+          successMessage="Checkout exception closed."
+        >
+          <input
+            type="hidden"
+            name="exceptionId"
+            value={exception.id}
+          />
+
+          <input
+            type="hidden"
+            name="action"
+            value="resolve"
+          />
+
+          <input
+            type="hidden"
+            name="resolutionNote"
+            value="The booking is already marked paid, so a replacement Stripe checkout session is no longer required."
+          />
+
+          <ActionSubmitButton
+            pendingLabel="Closing..."
+          >
+            Close paid-booking exception
+          </ActionSubmitButton>
+        </FeedbackForm>
+      </section>
+    );
+  }
+
+  const amountIsValid =
+    Number.isFinite(
+      Number(
+        booking.estimated_price,
+      ),
+    ) &&
+    Number(
+      booking.estimated_price,
+    ) > 0;
+
+  if (
+    !booking.confirmed_route_day ||
+    !amountIsValid
+  ) {
+    return (
+      <section
+        className={[
+          styles.actionPanel,
+          styles.repairPanel,
+        ].join(" ")}
+      >
+        <h3>
+          Payment-link repair needs booking work
+        </h3>
+
+        <p>
+          A Stripe payment link requires both
+          a confirmed route date and a valid
+          positive booking amount.
+        </p>
+
+        <div
+          className={
+            styles.repairUnavailable
+          }
+        >
+          {!booking.confirmed_route_day
+            ? "Confirm the service date in the booking first."
+            : "Correct the booking amount before creating the payment link."}
+        </div>
+      </section>
+    );
+  }
+
+  return (
+    <section
+      className={[
+        styles.actionPanel,
+        styles.repairPanel,
+      ].join(" ")}
+    >
+      <h3>
+        Repair Stripe checkout
+      </h3>
+
+      <p>
+        Create and deliver a new Stripe
+        payment link, or resend the existing
+        valid link when one is already saved.
+      </p>
+
+      <FeedbackForm
+        action={
+          sendPaymentLinkAction
+        }
+        confirmMessage="Create or resend this customer's Stripe payment link?"
+        pendingMessage="Preparing payment link..."
+        successMessage="Payment link created or resent."
+      >
+        <input
+          type="hidden"
+          name="bookingId"
+          value={booking.id}
+        />
+
+        <ActionSubmitButton
+          pendingLabel="Preparing and sending..."
+        >
+          Create or resend payment link
+        </ActionSubmitButton>
+      </FeedbackForm>
+    </section>
   );
 }
 
