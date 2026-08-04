@@ -10,6 +10,9 @@ import {
 import { recordBookingEvent } from "@/lib/server/booking-events";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import {
+  resolveBookingException,
+} from "@/lib/server/booking-exceptions";
+import {
   createRequestId,
   logger,
   maskEmail,
@@ -339,6 +342,636 @@ export async function updateBookingExceptionAction(
 
   return actionSuccess(
     details.message,
+  );
+}
+
+export async function repairServiceAddressExceptionAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireAdmin(
+    "/admin/exceptions",
+  );
+
+  if (auth.status !== "ok") {
+    return actionFailure(
+      "Admin access is required.",
+    );
+  }
+
+  const requestId =
+    createRequestId();
+
+  const exceptionId =
+    cleanString(
+      formData.get(
+        "exceptionId",
+      ),
+      80,
+    );
+
+  if (!exceptionId) {
+    return actionFailure(
+      "The exception ID is missing.",
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: current,
+    error: currentError,
+  } = await admin
+    .from("booking_exceptions")
+    .select("*")
+    .eq(
+      "id",
+      exceptionId,
+    )
+    .maybeSingle();
+
+  if (currentError) {
+    logger.error(
+      "admin_service_address_exception_lookup_failed",
+      {
+        requestId,
+        action:
+          "service_address_exception_repair",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        error:
+          currentError,
+        metadata: {
+          exceptionId,
+        },
+      },
+    );
+
+    return actionFailure(
+      "The exception could not be loaded.",
+    );
+  }
+
+  if (!current) {
+    return actionFailure(
+      "That exception no longer exists.",
+    );
+  }
+
+  if (
+    current.exception_type !==
+    "service_address_link_failed"
+  ) {
+    return actionFailure(
+      "This repair only applies to saved-address link exceptions.",
+    );
+  }
+
+  if (
+    isClosedStatus(
+      current.status,
+    )
+  ) {
+    return actionFailure(
+      "This exception is already closed.",
+    );
+  }
+
+  const {
+    data: booking,
+    error: bookingError,
+  } = await admin
+    .from("bookings")
+    .select("*")
+    .eq(
+      "id",
+      current.booking_id,
+    )
+    .maybeSingle();
+
+  if (
+    bookingError ||
+    !booking
+  ) {
+    logger.error(
+      "admin_service_address_repair_booking_lookup_failed",
+      {
+        requestId,
+        action:
+          "service_address_exception_repair",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        bookingId:
+          current.booking_id,
+        error:
+          bookingError,
+        metadata: {
+          exceptionId:
+            current.id,
+        },
+      },
+    );
+
+    return actionFailure(
+      "The related booking could not be loaded.",
+    );
+  }
+
+  if (!booking.customer_id) {
+    return actionFailure(
+      "Link this booking to a customer account before creating a saved service address.",
+    );
+  }
+
+  let serviceAddressId =
+    booking.service_address_id;
+
+  let addressCreated =
+    false;
+
+  if (!serviceAddressId) {
+    let addressQuery = admin
+      .from(
+        "service_addresses",
+      )
+      .select("id")
+      .eq(
+        "customer_id",
+        booking.customer_id,
+      )
+      .eq(
+        "street_address",
+        booking.street_address,
+      )
+      .eq(
+        "city",
+        booking.city,
+      )
+      .eq(
+        "state",
+        booking.state,
+      );
+
+    addressQuery =
+      booking.zip_code
+        ? addressQuery.eq(
+            "zip_code",
+            booking.zip_code,
+          )
+        : addressQuery.is(
+            "zip_code",
+            null,
+          );
+
+    const {
+      data: existingAddress,
+      error: addressLookupError,
+    } = await addressQuery
+      .order(
+        "is_primary",
+        {
+          ascending:
+            false,
+        },
+      )
+      .order(
+        "created_at",
+        {
+          ascending:
+            true,
+        },
+      )
+      .limit(1)
+      .maybeSingle();
+
+    if (addressLookupError) {
+      logger.error(
+        "admin_service_address_repair_lookup_failed",
+        {
+          requestId,
+          action:
+            "service_address_exception_repair",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            booking.customer_id,
+          bookingId:
+            booking.id,
+          error:
+            addressLookupError,
+          metadata: {
+            exceptionId:
+              current.id,
+          },
+        },
+      );
+
+      return actionFailure(
+        "Existing saved addresses could not be checked.",
+      );
+    }
+
+    if (existingAddress?.id) {
+      serviceAddressId =
+        existingAddress.id;
+    } else {
+      const {
+        count:
+          savedAddressCount,
+        error:
+          addressCountError,
+      } = await admin
+        .from(
+          "service_addresses",
+        )
+        .select("id", {
+          count:
+            "exact",
+          head:
+            true,
+        })
+        .eq(
+          "customer_id",
+          booking.customer_id,
+        );
+
+      if (addressCountError) {
+        logger.warn(
+          "admin_service_address_repair_count_failed",
+          {
+            requestId,
+            action:
+              "service_address_exception_repair",
+            userId:
+              auth.userId,
+            role:
+              auth.profile.role,
+            customerId:
+              booking.customer_id,
+            bookingId:
+              booking.id,
+            error:
+              addressCountError,
+          },
+        );
+      }
+
+      const {
+        data: createdAddress,
+        error:
+          addressCreateError,
+      } = await admin
+        .from(
+          "service_addresses",
+        )
+        .insert({
+          customer_id:
+            booking.customer_id,
+          label:
+            "Home",
+          street_address:
+            booking.street_address,
+          city:
+            booking.city,
+          state:
+            booking.state,
+          zip_code:
+            booking.zip_code,
+          neighborhood:
+            booking.neighborhood,
+          collection_day:
+            booking.collection_day,
+          collection_time_window:
+            booking
+              .collection_time_window,
+          same_day_preference:
+            booking
+              .same_day_preference,
+          latitude:
+            booking
+              .service_latitude,
+          longitude:
+            booking
+              .service_longitude,
+          distance_from_hub_miles:
+            booking
+              .service_distance_miles,
+          gate_code:
+            null,
+          notes:
+            booking.customer_notes,
+          is_primary:
+            !addressCountError &&
+            (savedAddressCount ??
+              0) === 0,
+        })
+        .select("id")
+        .single();
+
+      if (
+        addressCreateError ||
+        !createdAddress
+      ) {
+        logger.error(
+          "admin_service_address_repair_create_failed",
+          {
+            requestId,
+            action:
+              "service_address_exception_repair",
+            userId:
+              auth.userId,
+            role:
+              auth.profile.role,
+            customerId:
+              booking.customer_id,
+            bookingId:
+              booking.id,
+            error:
+              addressCreateError,
+            metadata: {
+              exceptionId:
+                current.id,
+            },
+          },
+        );
+
+        return actionFailure(
+          "The saved service address could not be created.",
+        );
+      }
+
+      serviceAddressId =
+        createdAddress.id;
+
+      addressCreated =
+        true;
+    }
+
+    const {
+      data: linkedBooking,
+      error: linkError,
+    } = await admin
+      .from("bookings")
+      .update({
+        service_address_id:
+          serviceAddressId,
+      })
+      .eq(
+        "id",
+        booking.id,
+      )
+      .eq(
+        "customer_id",
+        booking.customer_id,
+      )
+      .is(
+        "service_address_id",
+        null,
+      )
+      .select("*")
+      .maybeSingle();
+
+    if (linkError) {
+      logger.error(
+        "admin_service_address_repair_link_failed",
+        {
+          requestId,
+          action:
+            "service_address_exception_repair",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            booking.customer_id,
+          bookingId:
+            booking.id,
+          error:
+            linkError,
+          metadata: {
+            exceptionId:
+              current.id,
+            serviceAddressId,
+          },
+        },
+      );
+
+      return actionFailure(
+        "The address was saved, but the booking could not be linked to it.",
+      );
+    }
+
+    if (linkedBooking) {
+      serviceAddressId =
+        linkedBooking
+          .service_address_id;
+    } else {
+      /*
+       * Another request may have linked the booking after
+       * this action loaded it. Accept that concurrent repair
+       * rather than overwriting the newer address decision.
+       */
+      const {
+        data:
+          refreshedBooking,
+        error:
+          refreshError,
+      } = await admin
+        .from("bookings")
+        .select(
+          "service_address_id",
+        )
+        .eq(
+          "id",
+          booking.id,
+        )
+        .maybeSingle();
+
+      if (
+        refreshError ||
+        !refreshedBooking
+          ?.service_address_id
+      ) {
+        logger.error(
+          "admin_service_address_repair_concurrent_link_missing",
+          {
+            requestId,
+            action:
+              "service_address_exception_repair",
+            userId:
+              auth.userId,
+            role:
+              auth.profile.role,
+            customerId:
+              booking.customer_id,
+            bookingId:
+              booking.id,
+            error:
+              refreshError,
+            metadata: {
+              exceptionId:
+                current.id,
+              attemptedServiceAddressId:
+                serviceAddressId,
+            },
+          },
+        );
+
+        return actionFailure(
+          "The booking changed during repair. Refresh and try again.",
+        );
+      }
+
+      serviceAddressId =
+        refreshedBooking
+          .service_address_id;
+    }
+  }
+
+  if (!serviceAddressId) {
+    return actionFailure(
+      "The booking still does not have a saved service address.",
+    );
+  }
+
+  const resolutionNote =
+    booking.service_address_id
+      ? "The booking already had a valid saved service-address link."
+      : addressCreated
+        ? "An administrator created and linked the booking's saved service address."
+        : "An administrator linked the booking to its existing saved service address.";
+
+  await Promise.allSettled([
+    recordBookingEvent({
+      bookingId:
+        booking.id,
+      customerId:
+        booking.customer_id,
+      actorProfileId:
+        auth.userId,
+      requestId,
+      route:
+        "/admin/exceptions",
+      source:
+        "admin",
+      eventType:
+        "SERVICE_ADDRESS_LINK_REPAIRED",
+      outcome:
+        "success",
+      message:
+        "The booking was connected to a saved service address.",
+      idempotencyKey:
+        `booking:${booking.id}:service_address_link_repaired:${requestId}`,
+      metadata: {
+        exceptionId:
+          current.id,
+        previousServiceAddressId:
+          booking.service_address_id,
+        serviceAddressId,
+        addressCreated,
+      },
+    }),
+
+    writeAdminAuditLog({
+      action:
+        "booking_service_address_link_repaired",
+      actor_user_id:
+        auth.userId,
+      actor_email:
+        maskEmail(
+          auth.email,
+        ),
+      actor_role:
+        auth.profile.role,
+      target_type:
+        "booking",
+      target_id:
+        booking.id,
+      customer_id:
+        booking.customer_id,
+      booking_id:
+        booking.id,
+      before_summary: {
+        serviceAddressId:
+          booking.service_address_id,
+      },
+      after_summary: {
+        serviceAddressId,
+        addressCreated,
+      },
+      request_id:
+        requestId,
+      status:
+        "success",
+      metadata: {
+        exceptionId:
+          current.id,
+        exceptionType:
+          current.exception_type,
+      },
+    }),
+  ]);
+
+  await resolveBookingException({
+    bookingId:
+      booking.id,
+    dedupeKey:
+      current.dedupe_key,
+    resolutionNote,
+    resolvedByProfileId:
+      auth.userId,
+    requestId,
+    route:
+      "/admin/exceptions",
+  });
+
+  logger.info(
+    "admin_service_address_exception_repaired",
+    {
+      requestId,
+      action:
+        "service_address_exception_repair",
+      userId:
+        auth.userId,
+      role:
+        auth.profile.role,
+      customerId:
+        booking.customer_id,
+      bookingId:
+        booking.id,
+      metadata: {
+        exceptionId:
+          current.id,
+        serviceAddressId,
+        addressCreated,
+      },
+    },
+  );
+
+  revalidatePath("/admin");
+  revalidatePath(
+    "/admin/exceptions",
+  );
+  revalidatePath(
+    "/admin/bookings",
+  );
+  revalidatePath(
+    "/admin/customers",
+  );
+  revalidatePath(
+    `/admin/customers/${booking.customer_id}`,
+  );
+
+  return actionSuccess(
+    addressCreated
+      ? "Saved service address created and linked."
+      : "Saved service address linked successfully.",
   );
 }
 
