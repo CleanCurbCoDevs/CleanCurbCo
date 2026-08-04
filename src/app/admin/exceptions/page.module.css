@@ -487,6 +487,53 @@
   gap: 12px;
 }
 
+.repairPanel {
+  background:
+    rgba(0, 255, 56, 0.045);
+  border-color:
+    rgba(0, 180, 40, 0.24);
+  border-left:
+    5px solid var(--lime);
+  grid-column:
+    1 / -1;
+}
+
+.repairPanel form {
+  justify-items:
+    start;
+}
+
+.repairPrerequisite {
+  color:
+    var(--muted);
+  font-size:
+    0.82rem;
+  font-weight:
+    800;
+  line-height:
+    1.5;
+}
+
+.repairUnavailable {
+  background:
+    rgba(215, 169, 40, 0.1);
+  border:
+    1px solid
+    rgba(215, 169, 40, 0.28);
+  border-radius:
+    var(--radius);
+  color:
+    #654900;
+  font-size:
+    0.88rem;
+  font-weight:
+    850;
+  line-height:
+    1.5;
+  padding:
+    11px;
+}
+
 .closePanel {
   border-color: rgba(225, 52, 47, 0.2);
 }
@@ -562,5 +609,14 @@
   .reopenPanel form,
   .reopenPanel :global(.button) {
     width: 100%;
+  }
+
+    .repairPanel form,
+  .repairPanel :global(.button) {
+    width: 100%;
+  }
+
+  .repairPanel :global(.button) {
+    justify-content: center;
   }
 }
