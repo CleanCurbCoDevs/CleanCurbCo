@@ -6,12 +6,21 @@ import {
   markAllAdminNotificationsReadAction,
 } from "@/app/admin/actions";
 import { LogoutButton } from "@/components/logout-button";
+import {
+  getActiveBookingExceptionCount,
+} from "@/lib/server/admin-booking-exceptions";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireAdmin, type AuthResult } from "@/lib/supabase/auth";
+
+import styles from "./admin-shell.module.css";
 
 const primaryLinks = [
   { label: "Dashboard", href: "/admin" },
   { label: "Bookings", href: "/admin/bookings" },
+  {
+    label: "Exceptions",
+    href: "/admin/exceptions",
+  },
   {
     label: "Commercial",
     href: "/admin/commercial-quotes",
@@ -35,10 +44,12 @@ export async function AdminShell({
   title,
   children,
   auth,
+  activeExceptionCount,
 }: {
   title: string;
   children?: ReactNode;
   auth?: AuthResult;
+  activeExceptionCount?: number;
 }) {
   const currentAuth = auth ?? (await requireAdmin("/admin"));
 
@@ -56,13 +67,27 @@ export async function AdminShell({
     );
   }
 
-  const { data: notifications } = await getSupabaseAdmin()
-    .from("admin_notifications")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(10);
+  const [
+    notificationsResult,
+    resolvedActiveExceptionCount,
+  ] = await Promise.all([
+    getSupabaseAdmin()
+      .from("admin_notifications")
+      .select("*")
+      .order("created_at", {
+        ascending: false,
+      })
+      .limit(10),
 
-  const recentNotifications = notifications ?? [];
+    activeExceptionCount === undefined
+      ? getActiveBookingExceptionCount()
+      : Promise.resolve(
+          activeExceptionCount,
+        ),
+  ]);
+
+  const recentNotifications =
+    notificationsResult.data ?? [];
   const unreadCount = recentNotifications.filter((item) => !item.read_at).length;
 
   return (
@@ -146,8 +171,28 @@ export async function AdminShell({
         <nav className="admin-nav-panel" aria-label="Admin navigation">
           <div className="admin-nav-group admin-nav-primary">
             {primaryLinks.map((link) => (
-              <Link href={link.href} key={link.href}>
-                {link.label}
+              <Link
+                className={styles.navLink}
+                href={link.href}
+                key={link.href}
+              >
+                <span>{link.label}</span>
+
+                {link.href ===
+                  "/admin/exceptions" &&
+                resolvedActiveExceptionCount ? (
+                  <span
+                    className={
+                      styles.exceptionCount
+                    }
+                    aria-label={`${resolvedActiveExceptionCount} active exceptions`}
+                  >
+                    {resolvedActiveExceptionCount >
+                    99
+                      ? "99+"
+                      : resolvedActiveExceptionCount}
+                  </span>
+                ) : null}
               </Link>
             ))}
           </div>
