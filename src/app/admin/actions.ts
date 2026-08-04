@@ -70,6 +70,9 @@ import {
 } from "@/lib/commercial-pricing-profile";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
+import {
+  resolveBookingException,
+} from "@/lib/server/booking-exceptions";
 import { createRequestId, logger, maskEmail, maskPhone } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -370,9 +373,62 @@ export async function updateBookingAdminAction(formData: FormData) {
     await advanceReferralForBooking(admin, updatedBooking.id);
 
     if (bookingDecision) {
-      await handleBookingDecisionNotification(updatedBooking, bookingDecision, {
-        customerVisibleAdminMessage,
-      });
+      await handleBookingDecisionNotification(
+        updatedBooking,
+        bookingDecision,
+        {
+          customerVisibleAdminMessage,
+        },
+      );
+    }
+
+    if (
+      updatedBooking.status ===
+      "cancelled"
+    ) {
+      await Promise.allSettled([
+        resolveBookingException({
+          bookingId:
+            updatedBooking.id,
+          dedupeKey:
+            `booking:${updatedBooking.id}:service_address_link_failed`,
+          resolutionNote:
+            "The booking was cancelled, so a saved-address link is no longer required.",
+          resolvedByProfileId:
+            auth.userId,
+          requestId,
+          route:
+            "/admin/bookings",
+        }),
+
+        resolveBookingException({
+          bookingId:
+            updatedBooking.id,
+          dedupeKey:
+            `booking:${updatedBooking.id}:booking_claim_creation_failed`,
+          resolutionNote:
+            "The booking was cancelled, so an account or checkout claim is no longer required.",
+          resolvedByProfileId:
+            auth.userId,
+          requestId,
+          route:
+            "/admin/bookings",
+        }),
+
+        resolveBookingException({
+          bookingId:
+            updatedBooking.id,
+          dedupeKey:
+            `booking:${updatedBooking.id}:stripe_checkout_creation_failed`,
+          resolutionNote:
+            "The booking was cancelled, so a Stripe checkout session is no longer required.",
+          resolvedByProfileId:
+            auth.userId,
+          requestId,
+          route:
+            "/admin/bookings",
+        }),
+      ]);
     }
   }
 
@@ -389,6 +445,7 @@ export async function updateBookingAdminAction(formData: FormData) {
   revalidatePath("/admin/routes");
   revalidatePath("/admin/payments");
   revalidatePath("/admin/referrals");
+  revalidatePath("/admin/exceptions");
 }
 
 async function handleBookingDecisionNotification(
@@ -513,13 +570,35 @@ export async function updatePaymentStatusAction(
       bookingId: booking.id,
       metadata: { paymentStatus },
     });
-    await advanceReferralForBooking(admin, booking.id);
+    await advanceReferralForBooking(
+      admin,
+      booking.id,
+    );
+
+    if (paymentStatus === "paid") {
+      await resolveBookingException({
+        bookingId:
+          booking.id,
+        dedupeKey:
+          `booking:${booking.id}:stripe_checkout_creation_failed`,
+        resolutionNote:
+          "An administrator confirmed that payment was completed.",
+        resolvedByProfileId:
+          auth.userId,
+        requestId,
+        route:
+          "/admin/payments",
+      });
+    }
   }
 
   revalidatePath("/admin/payments");
   revalidatePath("/admin/bookings");
   revalidatePath("/admin/customers");
   revalidatePath("/admin/referrals");
+  revalidatePath("/admin");
+  revalidatePath("/admin/exceptions");
+}
 }
 
 export async function sendPaymentLinkAction(
@@ -599,17 +678,38 @@ export async function sendPaymentLinkAction(
     }
 
     await logActivity(admin, {
-      actor_profile_id: auth.userId,
-      customer_id: booking.customer_id,
-      booking_id: booking.id,
-      event_type: "payment_link_email_resent",
-      message: "Existing Stripe payment link emailed again.",
+      actor_profile_id:
+        auth.userId,
+      customer_id:
+        booking.customer_id,
+      booking_id:
+        booking.id,
+      event_type:
+        "payment_link_email_resent",
+      message:
+        "Existing Stripe payment link emailed again.",
       metadata: {
         checkoutSessionId:
           booking.stripe_checkout_session_id,
       },
     });
 
+    await resolveBookingException({
+      bookingId:
+        booking.id,
+      dedupeKey:
+        `booking:${booking.id}:stripe_checkout_creation_failed`,
+      resolutionNote:
+        "An existing valid Stripe payment link was successfully delivered by an administrator.",
+      resolvedByProfileId:
+        auth.userId,
+      requestId,
+      route:
+        "/admin/bookings",
+    });
+
+    revalidatePath("/admin");
+    revalidatePath("/admin/exceptions");
     revalidatePath("/admin/bookings");
     revalidatePath("/admin/payments");
 
@@ -848,6 +948,20 @@ export async function sendPaymentLinkAction(
       }),
     ]);
 
+    await resolveBookingException({
+      bookingId:
+        updatedBooking.id,
+      dedupeKey:
+        `booking:${updatedBooking.id}:stripe_checkout_creation_failed`,
+      resolutionNote:
+        "An administrator created, saved, and delivered a valid Stripe payment link.",
+      resolvedByProfileId:
+        auth.userId,
+      requestId,
+      route:
+        "/admin/bookings",
+    });
+    
     logger.info("admin_payment_link_created_and_sent", {
       requestId,
       action: "payment_link_create",
@@ -863,6 +977,7 @@ export async function sendPaymentLinkAction(
     });
 
     revalidatePath("/admin");
+    revalidatePath("/admin/exceptions");
     revalidatePath("/admin/bookings");
     revalidatePath("/admin/payments");
 
@@ -885,95 +1000,391 @@ export async function sendPaymentLinkAction(
   }
 }
 
-export async function sendPaymentSetupInviteAction(formData: FormData) {
-  const auth = await requireAdmin("/admin/bookings");
-  if (auth.status !== "ok") return;
+export async function sendPaymentSetupInviteAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth = await requireAdmin(
+    "/admin/bookings",
+  );
 
-  const requestId = createRequestId();
-  const bookingId = cleanString(formData.get("bookingId"), 80);
-  if (!bookingId) return;
+  if (auth.status !== "ok") {
+    return actionFailure(
+      "Admin access is required.",
+    );
+  }
 
-  const admin = getSupabaseAdmin();
-  const { data: booking } = await admin
+  const requestId =
+    createRequestId();
+
+  const bookingId = cleanString(
+    formData.get("bookingId"),
+    80,
+  );
+
+  const repairClaimRequested =
+    formData.get("repairClaim") ===
+    "true";
+
+  if (!bookingId) {
+    return actionFailure(
+      "Booking ID is missing.",
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: booking,
+    error: bookingError,
+  } = await admin
     .from("bookings")
     .select("*")
     .eq("id", bookingId)
     .maybeSingle();
 
-  if (!booking) return;
-
-  let setupUrl = createPaymentSetupLink(booking.id);
-  let accountSetupUrl: string | null = null;
-
-  if (!booking.customer_id) {
-    const token = createClaimToken();
-    await admin.from("booking_claims").insert({
-      booking_id: booking.id,
-      email: booking.email,
-      token_hash: hashClaimToken(token),
-    });
-    setupUrl = createPaymentSetupLink(booking.id, token);
-    accountSetupUrl = createAccountSetupLink(booking.id, token);
+  if (bookingError || !booking) {
+    return actionFailure(
+      "Booking could not be found.",
+    );
   }
 
-  await admin
+  let setupUrl =
+    createPaymentSetupLink(
+      booking.id,
+    );
+
+  let accountSetupUrl:
+    string | null = null;
+
+  let createdClaimId:
+    string | null = null;
+
+  const needsClaimToken =
+    !booking.customer_id ||
+    repairClaimRequested;
+
+  if (needsClaimToken) {
+    const token =
+      createClaimToken();
+
+    const {
+      data: claim,
+      error: claimError,
+    } = await admin
+      .from("booking_claims")
+      .insert({
+        booking_id:
+          booking.id,
+        email:
+          booking.email,
+        token_hash:
+          hashClaimToken(token),
+      })
+      .select("id")
+      .single();
+
+    if (claimError || !claim) {
+      logger.error(
+        "admin_booking_claim_repair_failed",
+        {
+          requestId,
+          action:
+            "payment_setup_invite_sent",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            booking.customer_id,
+          bookingId:
+            booking.id,
+          error:
+            claimError,
+        },
+      );
+
+      return actionFailure(
+        "A secure replacement claim could not be created.",
+      );
+    }
+
+    createdClaimId =
+      claim.id;
+
+    setupUrl =
+      createPaymentSetupLink(
+        booking.id,
+        token,
+      );
+
+    if (!booking.customer_id) {
+      accountSetupUrl =
+        createAccountSetupLink(
+          booking.id,
+          token,
+        );
+    }
+  }
+
+  const previousSetupStatus =
+    booking.payment_setup_status;
+
+  const previousProvider =
+    booking.payment_provider;
+
+  const {
+    error: bookingUpdateError,
+  } = await admin
     .from("bookings")
     .update({
-      payment_setup_status: "link_sent",
-      payment_provider: "stripe",
+      payment_setup_status:
+        "link_sent",
+      payment_provider:
+        "stripe",
     })
     .eq("id", booking.id);
 
+  if (bookingUpdateError) {
+    if (createdClaimId) {
+      await admin
+        .from("booking_claims")
+        .delete()
+        .eq(
+          "id",
+          createdClaimId,
+        );
+    }
+
+    logger.error(
+      "admin_payment_setup_booking_update_failed",
+      {
+        requestId,
+        action:
+          "payment_setup_invite_sent",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          booking.customer_id,
+        bookingId:
+          booking.id,
+        error:
+          bookingUpdateError,
+      },
+    );
+
+    return actionFailure(
+      "The booking could not be prepared for payment setup.",
+    );
+  }
+
+  const emailResult =
+    await sendPaymentSetupInvite(
+      booking,
+      setupUrl,
+      accountSetupUrl,
+    );
+
+  if (
+    emailResult.status !==
+    "sent"
+  ) {
+    const reason =
+      emailResult.status ===
+      "skipped"
+        ? emailResult.reason
+        : "Resend rejected the email.";
+
+    const rollbackJobs: Array<
+      PromiseLike<unknown>
+    > = [
+      admin
+        .from("bookings")
+        .update({
+          payment_setup_status:
+            previousSetupStatus,
+          payment_provider:
+            previousProvider,
+        })
+        .eq("id", booking.id),
+    ];
+
+    if (createdClaimId) {
+      rollbackJobs.push(
+        admin
+          .from("booking_claims")
+          .delete()
+          .eq(
+            "id",
+            createdClaimId,
+          ),
+      );
+    }
+
+    await Promise.allSettled(
+      rollbackJobs,
+    );
+
+    logger.error(
+      "admin_payment_setup_invite_email_failed",
+      {
+        requestId,
+        action:
+          "payment_setup_invite_sent",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          booking.customer_id,
+        bookingId:
+          booking.id,
+        metadata: {
+          emailStatus:
+            emailResult.status,
+          reason,
+          replacementClaimRolledBack:
+            Boolean(
+              createdClaimId,
+            ),
+        },
+      },
+    );
+
+    return actionFailure(
+      `The secure link was prepared, but the email was not sent: ${reason}`,
+    );
+  }
+
   await Promise.allSettled([
-    sendPaymentSetupInvite(booking, setupUrl, accountSetupUrl),
     logActivity(admin, {
-      actor_profile_id: auth.userId,
-      customer_id: booking.customer_id,
-      booking_id: booking.id,
-      event_type: "payment_setup_invite_sent",
-      message: "Payment setup invite sent from admin.",
-      metadata: { requestId },
+      actor_profile_id:
+        auth.userId,
+      customer_id:
+        booking.customer_id,
+      booking_id:
+        booking.id,
+      event_type:
+        "payment_setup_invite_sent",
+      message:
+        "Payment setup invite sent from admin.",
+      metadata: {
+        requestId,
+        replacementClaimCreated:
+          needsClaimToken,
+      },
     }),
+
     writeAdminAuditLog({
-      action: "payment_setup_invite_sent",
-      actor_user_id: auth.userId,
-      actor_email: actorEmail(auth),
-      actor_role: auth.profile.role,
-      target_type: "booking",
-      target_id: booking.id,
-      customer_id: booking.customer_id,
-      booking_id: booking.id,
+      action:
+        "payment_setup_invite_sent",
+      actor_user_id:
+        auth.userId,
+      actor_email:
+        actorEmail(auth),
+      actor_role:
+        auth.profile.role,
+      target_type:
+        "booking",
+      target_id:
+        booking.id,
+      customer_id:
+        booking.customer_id,
+      booking_id:
+        booking.id,
       before_summary: {
-        paymentSetupStatus: booking.payment_setup_status,
+        paymentSetupStatus:
+          previousSetupStatus,
+        paymentProvider:
+          previousProvider,
       },
       after_summary: {
-        paymentSetupStatus: "link_sent",
+        paymentSetupStatus:
+          "link_sent",
+        paymentProvider:
+          "stripe",
+        replacementClaimCreated:
+          needsClaimToken,
       },
-      request_id: requestId,
-      status: "success",
+      request_id:
+        requestId,
+      status:
+        "success",
     }),
+
     createAdminNotification({
-      type: "payment_setup_invite_sent",
-      title: "Payment setup invite sent",
-      message: `Payment setup invite sent to ${booking.first_name} ${booking.last_name}.`,
-      href: `/admin/bookings?q=${booking.id}`,
-      customer_id: booking.customer_id,
-      booking_id: booking.id,
-      severity: "info",
+      type:
+        "payment_setup_invite_sent",
+      title:
+        "Payment setup invite sent",
+      message:
+        `Payment setup invite sent to ${booking.first_name} ${booking.last_name}.`,
+      href:
+        `/admin/bookings?q=${booking.id}`,
+      customer_id:
+        booking.customer_id,
+      booking_id:
+        booking.id,
+      severity:
+        "info",
     }),
   ]);
 
-  logger.info("admin_payment_setup_invite_sent", {
-    requestId,
-    action: "payment_setup_invite_sent",
-    userId: auth.userId,
-    role: auth.profile.role,
-    customerId: booking.customer_id,
-    bookingId: booking.id,
-  });
+  if (needsClaimToken) {
+    await resolveBookingException({
+      bookingId:
+        booking.id,
+      dedupeKey:
+        `booking:${booking.id}:booking_claim_creation_failed`,
+      resolutionNote:
+        "An administrator created a replacement secure claim and successfully delivered the new link.",
+      resolvedByProfileId:
+        auth.userId,
+      requestId,
+      route:
+        "/admin/bookings",
+    });
+  }
 
-  revalidatePath("/admin/bookings");
-  revalidatePath("/admin/payments");
+  logger.info(
+    "admin_payment_setup_invite_sent",
+    {
+      requestId,
+      action:
+        "payment_setup_invite_sent",
+      userId:
+        auth.userId,
+      role:
+        auth.profile.role,
+      customerId:
+        booking.customer_id,
+      bookingId:
+        booking.id,
+      metadata: {
+        replacementClaimCreated:
+          needsClaimToken,
+      },
+    },
+  );
+
+  revalidatePath("/admin");
+  revalidatePath(
+    "/admin/exceptions",
+  );
+  revalidatePath(
+    "/admin/bookings",
+  );
+  revalidatePath(
+    "/admin/payments",
+  );
+
+  return actionSuccess(
+    needsClaimToken
+      ? "Replacement secure link created and emailed successfully."
+      : "Payment setup invite sent successfully.",
+  );
 }
 
 export async function updateCustomerProfileAdminAction(formData: FormData) {
