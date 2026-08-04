@@ -599,7 +599,7 @@ export async function updatePaymentStatusAction(
   revalidatePath("/admin");
   revalidatePath("/admin/exceptions");
 }
-}
+
 
 export async function sendPaymentLinkAction(
   formData: FormData,
