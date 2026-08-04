@@ -159,8 +159,12 @@ export async function openBookingException(
 export async function resolveBookingException(
   input: ResolveBookingExceptionInput,
 ): Promise<BookingExceptionRow | null> {
-  const bookingId = input.bookingId.trim();
-  const dedupeKey = input.dedupeKey.trim();
+  const bookingId =
+    input.bookingId.trim();
+
+  const dedupeKey =
+    input.dedupeKey.trim();
+
   const resolutionNote =
     input.resolutionNote.trim();
 
@@ -174,7 +178,8 @@ export async function resolveBookingException(
       {
         requestId:
           input.requestId ?? undefined,
-        route: input.route,
+        route:
+          input.route,
         bookingId:
           bookingId || undefined,
         metadata: {
@@ -189,39 +194,40 @@ export async function resolveBookingException(
     return null;
   }
 
-  const resolvedAt =
-    new Date().toISOString();
+  const admin =
+    getSupabaseAdmin();
 
-  const { data, error } =
-    await getSupabaseAdmin()
-      .from("booking_exceptions")
-      .update({
-        status: "resolved",
-        resolved_at: resolvedAt,
-        resolved_by_profile_id:
-          input.resolvedByProfileId ?? null,
-        resolution_note:
-          resolutionNote,
-      })
-      .eq("booking_id", bookingId)
-      .eq("dedupe_key", dedupeKey)
-      .in("status", [
-        "open",
-        "acknowledged",
-      ])
-      .lte("last_seen_at", resolvedAt)
-      .select("*")
-      .maybeSingle();
+  const {
+    data: current,
+    error: lookupError,
+  } = await admin
+    .from("booking_exceptions")
+    .select("*")
+    .eq(
+      "booking_id",
+      bookingId,
+    )
+    .eq(
+      "dedupe_key",
+      dedupeKey,
+    )
+    .in("status", [
+      "open",
+      "acknowledged",
+    ])
+    .maybeSingle();
 
-  if (error) {
+  if (lookupError) {
     logger.error(
-      "booking_exception_resolution_failed",
+      "booking_exception_resolution_lookup_failed",
       {
         requestId:
           input.requestId ?? undefined,
-        route: input.route,
+        route:
+          input.route,
         bookingId,
-        error,
+        error:
+          lookupError,
         metadata: {
           dedupeKey,
         },
@@ -232,10 +238,108 @@ export async function resolveBookingException(
   }
 
   /*
-   * No matching open exception is a normal no-op. For
-   * example, checkout may succeed on its first attempt.
+   * No matching active exception is a normal no-op.
+   * The repair may have succeeded on its first attempt,
+   * or another workflow may already have closed it.
    */
+  if (!current) {
+    return null;
+  }
+
+  const resolvedAt =
+    new Date().toISOString();
+
+  const {
+    data,
+    error,
+  } = await admin
+    .from("booking_exceptions")
+    .update({
+      status:
+        "resolved",
+
+      acknowledged_at:
+        current.acknowledged_at ??
+        resolvedAt,
+
+      acknowledged_by_profile_id:
+        current
+          .acknowledged_by_profile_id ??
+        input.resolvedByProfileId ??
+        null,
+
+      resolved_at:
+        resolvedAt,
+
+      resolved_by_profile_id:
+        input.resolvedByProfileId ??
+        null,
+
+      resolution_note:
+        resolutionNote,
+    })
+    .eq(
+      "id",
+      current.id,
+    )
+
+    /*
+     * Do not let an older repair result overwrite a newer
+     * recurrence, acknowledgment, assignment, or decision.
+     */
+    .eq(
+      "updated_at",
+      current.updated_at,
+    )
+    .eq(
+      "last_seen_at",
+      current.last_seen_at,
+    )
+    .in("status", [
+      "open",
+      "acknowledged",
+    ])
+    .select("*")
+    .maybeSingle();
+
+  if (error) {
+    logger.error(
+      "booking_exception_resolution_failed",
+      {
+        requestId:
+          input.requestId ?? undefined,
+        route:
+          input.route,
+        bookingId,
+        error,
+        metadata: {
+          exceptionId:
+            current.id,
+          dedupeKey,
+        },
+      },
+    );
+
+    return null;
+  }
+
   if (!data) {
+    logger.info(
+      "booking_exception_resolution_skipped_concurrent_change",
+      {
+        requestId:
+          input.requestId ?? undefined,
+        route:
+          input.route,
+        bookingId,
+        metadata: {
+          exceptionId:
+            current.id,
+          dedupeKey,
+        },
+      },
+    );
+
     return null;
   }
 
@@ -244,15 +348,18 @@ export async function resolveBookingException(
     {
       requestId:
         input.requestId ?? undefined,
-      route: input.route,
+      route:
+        input.route,
       bookingId,
       customerId:
         data.customer_id ?? undefined,
       metadata: {
-        exceptionId: data.id,
+        exceptionId:
+          data.id,
         exceptionType:
           data.exception_type,
-        dedupeKey: data.dedupe_key,
+        dedupeKey:
+          data.dedupe_key,
         occurrenceCount:
           data.occurrence_count,
       },
