@@ -1,6 +1,9 @@
 import "server-only";
 
 import { hashClaimToken } from "@/lib/booking-claims";
+import {
+  resolveBookingException,
+} from "@/lib/server/booking-exceptions";
 import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 
@@ -112,6 +115,42 @@ export async function claimBookingForCustomer(
     };
   }
 
+  await Promise.allSettled([
+    resolveBookingException({
+      bookingId:
+        input.bookingId,
+      dedupeKey:
+        `booking:${input.bookingId}:booking_claim_creation_failed`,
+      resolutionNote:
+        "The booking claim was successfully used to connect the booking to a customer account.",
+      resolvedByProfileId:
+        input.customerId,
+      requestId:
+        input.requestId,
+      route:
+        input.route,
+    }),
+
+    ...(result.serviceAddressId
+      ? [
+          resolveBookingException({
+            bookingId:
+              input.bookingId,
+            dedupeKey:
+              `booking:${input.bookingId}:service_address_link_failed`,
+            resolutionNote:
+              "The customer-claim process successfully created or linked the booking service address.",
+            resolvedByProfileId:
+              input.customerId,
+            requestId:
+              input.requestId,
+            route:
+              input.route,
+          }),
+        ]
+      : []),
+  ]);
+  
   logger.info(
     "booking_customer_link_completed",
     {
