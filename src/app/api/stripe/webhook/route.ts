@@ -6,6 +6,9 @@ import { sendPaymentSetupCompleted } from "@/lib/email/sendOperationsEmail";
 import { sendPaymentReceived } from "@/lib/email/sendPaymentReceived";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createAdminNotification } from "@/lib/server/admin-notifications";
+import {
+  resolveBookingException,
+} from "@/lib/server/booking-exceptions";
 import { createRequestId, logger } from "@/lib/server/logger";
 import { getStripe } from "@/lib/stripe";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -377,8 +380,32 @@ async function updatePaymentState(input: {
       );
     }
 
-    if (input.sendReceipt && payment.amount) {
-      await sendPaymentReceived(booking, payment.amount);
+    if (
+      input.sendReceipt &&
+      payment.amount
+    ) {
+      await sendPaymentReceived(
+        booking,
+        payment.amount,
+      );
+    }
+
+    if (
+      input.paymentStatus ===
+      "paid"
+    ) {
+      await resolveBookingException({
+        bookingId:
+          booking.id,
+        dedupeKey:
+          `booking:${booking.id}:stripe_checkout_creation_failed`,
+        resolutionNote:
+          "Stripe confirmed that payment was completed successfully.",
+        requestId:
+          input.requestId,
+        route:
+          "/api/stripe/webhook",
+      });
     }
   }
 }
