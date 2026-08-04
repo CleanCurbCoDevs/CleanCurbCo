@@ -28,6 +28,8 @@ import type {
   ProfileRow,
 } from "@/types/database";
 
+import styles from "./page.module.css";
+
 export const metadata: Metadata = {
   title: "Admin Exceptions",
 };
@@ -49,6 +51,17 @@ type ExceptionSort =
   | "last_seen_asc"
   | "occurrences"
   | "customer";
+
+type ExceptionCardProps = {
+  exception: BookingExceptionRow;
+  booking: BookingRow | null;
+  customer: ProfileRow | null;
+  assignee: ProfileRow | null;
+  acknowledgedBy: ProfileRow | null;
+  resolvedBy: ProfileRow | null;
+  assignableProfiles: ProfileRow[];
+  actionsBlocked: boolean;
+};
 
 const statusFilterValues:
   readonly ExceptionStatusFilter[] = [
@@ -98,10 +111,10 @@ export default async function AdminExceptionsPage({
         )
       : "active";
 
-  const allProfiles = [
+  const allProfiles = dedupeProfiles([
     ...context.profiles,
     ...context.assignableProfiles,
-  ];
+  ]);
 
   const bookingsById = new Map(
     context.bookings.map(
@@ -148,16 +161,21 @@ export default async function AdminExceptionsPage({
     left.localeCompare(right),
   );
 
-  const historyCount =
-    context.counts.resolved +
-    context.counts.dismissed;
+  const availableHistoryCount =
+    Math.min(
+      context.counts.resolved +
+        context.counts.dismissed,
+      250,
+    );
 
   return (
     <AdminShell
       title="Exceptions"
       auth={context.auth}
     >
-      <section className="placeholder-panel exception-command-panel">
+      <section
+        className={`placeholder-panel ${styles.commandPanel}`}
+      >
         <div className="admin-page-heading">
           <div>
             <p className="section-kicker">
@@ -169,7 +187,7 @@ export default async function AdminExceptionsPage({
             </h1>
 
             <p className="muted">
-              Exceptions stay here until the
+              Exceptions remain here until the
               underlying problem is repaired,
               dismissed with a reason, or fixed
               automatically by Clean Curb OS.
@@ -177,11 +195,14 @@ export default async function AdminExceptionsPage({
           </div>
 
           <span
-            className={
+            className={[
+              "status-badge",
               context.counts.active
-                ? "status-badge exception-active-count"
-                : "status-badge"
-            }
+                ? styles.activeCount
+                : "",
+            ]
+              .filter(Boolean)
+              .join(" ")}
           >
             {context.counts.active} active
           </span>
@@ -189,7 +210,7 @@ export default async function AdminExceptionsPage({
 
         {context.loadError ? (
           <div
-            className="exception-load-warning"
+            className={styles.loadWarning}
             role="alert"
           >
             <strong>
@@ -199,76 +220,54 @@ export default async function AdminExceptionsPage({
             <p>
               {context.loadError} Actions are
               temporarily hidden so an incomplete
-              screen cannot produce a bad decision.
+              screen cannot produce a bad
+              decision.
             </p>
           </div>
         ) : null}
 
-        <div className="exception-metric-grid">
-          <Link
-            className="exception-metric-card exception-metric-active"
+        <div className={styles.metricGrid}>
+          <MetricCard
             href="/admin/exceptions?status=active"
-          >
-            <span>Active work</span>
-            <strong>
-              {context.counts.active}
-            </strong>
-            <small>
-              Open and acknowledged
-            </small>
-          </Link>
+            label="Active work"
+            value={context.counts.active}
+            detail="Open and acknowledged"
+            tone="active"
+          />
 
-          <Link
-            className="exception-metric-card exception-metric-open"
+          <MetricCard
             href="/admin/exceptions?status=open"
-          >
-            <span>Unacknowledged</span>
-            <strong>
-              {context.counts.open}
-            </strong>
-            <small>
-              Still waiting for review
-            </small>
-          </Link>
+            label="Unacknowledged"
+            value={context.counts.open}
+            detail="Still waiting for review"
+            tone="open"
+          />
 
-          <Link
-            className="exception-metric-card exception-metric-acknowledged"
+          <MetricCard
             href="/admin/exceptions?status=acknowledged"
-          >
-            <span>In somebody&apos;s hands</span>
-            <strong>
-              {context.counts.acknowledged}
-            </strong>
-            <small>
-              Acknowledged, not closed
-            </small>
-          </Link>
+            label="In somebody's hands"
+            value={
+              context.counts.acknowledged
+            }
+            detail="Acknowledged, not closed"
+            tone="acknowledged"
+          />
 
-          <Link
-            className="exception-metric-card exception-metric-history"
+          <MetricCard
             href="/admin/exceptions?status=resolved"
-          >
-            <span>Resolved</span>
-            <strong>
-              {context.counts.resolved}
-            </strong>
-            <small>
-              Successfully handled
-            </small>
-          </Link>
+            label="Resolved"
+            value={context.counts.resolved}
+            detail="Successfully handled"
+            tone="resolved"
+          />
 
-          <Link
-            className="exception-metric-card exception-metric-dismissed"
+          <MetricCard
             href="/admin/exceptions?status=dismissed"
-          >
-            <span>Dismissed</span>
-            <strong>
-              {context.counts.dismissed}
-            </strong>
-            <small>
-              Closed as non-actionable
-            </small>
-          </Link>
+            label="Dismissed"
+            value={context.counts.dismissed}
+            detail="Closed as non-actionable"
+            tone="dismissed"
+          />
         </div>
 
         <details
@@ -281,7 +280,7 @@ export default async function AdminExceptionsPage({
 
           <AdminFilterBar
             searchValue={params.q}
-            searchPlaceholder="Customer, address, booking, error, request ID"
+            searchPlaceholder="Customer, address, booking, error, or request ID"
             resultCount={
               exceptions.length
             }
@@ -325,7 +324,7 @@ export default async function AdminExceptionsPage({
                   },
                   {
                     label:
-                      `All available (${context.counts.active + Math.min(historyCount, 250)})`,
+                      `All available (${context.counts.active + availableHistoryCount})`,
                     value:
                       "all",
                   },
@@ -459,19 +458,21 @@ export default async function AdminExceptionsPage({
           />
         </details>
 
-        {statusFilter === "resolved" ||
-        statusFilter === "dismissed" ||
-        statusFilter === "all" ? (
-          <p className="exception-history-note">
-            Closed-history results are limited to
-            the 250 most recently seen exceptions.
-            The count cards still show exact
-            lifetime totals.
+        {[
+          "resolved",
+          "dismissed",
+          "all",
+        ].includes(statusFilter) ? (
+          <p className={styles.historyNote}>
+            Closed-history results are limited
+            to the 250 most recently seen
+            exceptions. The count cards still
+            show exact lifetime totals.
           </p>
         ) : null}
 
         {exceptions.length ? (
-          <div className="exception-list">
+          <div className={styles.exceptionList}>
             {exceptions.map(
               (exception) => {
                 const booking =
@@ -512,638 +513,38 @@ export default async function AdminExceptionsPage({
                       ) ?? null
                     : null;
 
-                const isActive =
-                  exception.status ===
-                    "open" ||
-                  exception.status ===
-                    "acknowledged";
-
-                const currentAssigneeIsAssignable =
-                  exception
-                    .assigned_to_profile_id
-                    ? context.assignableProfiles.some(
-                        (profile) =>
-                          profile.id ===
-                          exception
-                            .assigned_to_profile_id,
-                      )
-                    : true;
-
-                const metadataAvailable =
-                  Object.keys(
-                    exception.metadata,
-                  ).length > 0;
-
                 return (
-                  <details
-                    className={[
-                      "exception-card",
-                      `exception-severity-${exception.severity}`,
-                      `exception-status-${exception.status}`,
-                    ].join(" ")}
-                    key={
-                      exception.id
+                  <ExceptionCard
+                    key={exception.id}
+                    exception={exception}
+                    booking={booking}
+                    customer={customer}
+                    assignee={assignee}
+                    acknowledgedBy={
+                      acknowledgedBy
                     }
-                    open={
-                      exception.severity ===
-                        "urgent" &&
-                      exception.status ===
-                        "open"
+                    resolvedBy={resolvedBy}
+                    assignableProfiles={
+                      context.assignableProfiles
                     }
-                  >
-                    <summary className="exception-card-summary">
-                      <span className="exception-summary-main">
-                        <span className="exception-badge-row">
-                          <span
-                            className={[
-                              "exception-badge",
-                              `exception-badge-severity-${exception.severity}`,
-                            ].join(" ")}
-                          >
-                            {humanize(
-                              exception.severity,
-                            )}
-                          </span>
-
-                          <span
-                            className={[
-                              "exception-badge",
-                              `exception-badge-status-${exception.status}`,
-                            ].join(" ")}
-                          >
-                            {humanize(
-                              exception.status,
-                            )}
-                          </span>
-
-                          {exception.occurrence_count >
-                          1 ? (
-                            <span className="exception-badge exception-badge-occurrences">
-                              {
-                                exception.occurrence_count
-                              }{" "}
-                              occurrences
-                            </span>
-                          ) : null}
-                        </span>
-
-                        <strong>
-                          {
-                            exception.title
-                          }
-                        </strong>
-
-                        <small>
-                          {booking
-                            ? bookingName(
-                                booking,
-                              )
-                            : "Booking details unavailable"}
-                          {" · "}
-                          Last seen{" "}
-                          {formatDate(
-                            exception.last_seen_at,
-                          )}
-                        </small>
-                      </span>
-
-                      <span className="exception-summary-action">
-                        Review
-                      </span>
-                    </summary>
-
-                    <div className="exception-card-body">
-                      <p className="exception-message">
-                        {
-                          exception.message
-                        }
-                      </p>
-
-                      <div className="exception-record-grid">
-                        <div className="exception-record">
-                          <span>
-                            Customer
-                          </span>
-                          <strong>
-                            {booking
-                              ? bookingName(
-                                  booking,
-                                )
-                              : customer
-                                ? profileName(
-                                    customer,
-                                  )
-                                : "Unknown customer"}
-                          </strong>
-                          <small>
-                            {booking?.email ??
-                              customer?.email ??
-                              "No email available"}
-                          </small>
-                          <small>
-                            {booking?.phone ??
-                              customer?.phone ??
-                              "No phone available"}
-                          </small>
-                        </div>
-
-                        <div className="exception-record">
-                          <span>
-                            Service address
-                          </span>
-                          <strong>
-                            {booking
-                              ? formatAddress(
-                                  booking,
-                                )
-                              : "Address unavailable"}
-                          </strong>
-                          <small>
-                            {booking?.neighborhood ??
-                              "No neighborhood recorded"}
-                          </small>
-                        </div>
-
-                        <div className="exception-record">
-                          <span>
-                            Assignment
-                          </span>
-                          <strong>
-                            {assignee
-                              ? profileName(
-                                  assignee,
-                                )
-                              : "Unassigned"}
-                          </strong>
-                          <small>
-                            {exception.status ===
-                            "acknowledged"
-                              ? "Acknowledged and active"
-                              : humanize(
-                                  exception.status,
-                                )}
-                          </small>
-                        </div>
-
-                        <div className="exception-record">
-                          <span>
-                            Problem
-                          </span>
-                          <strong>
-                            {humanize(
-                              exception.exception_type,
-                            )}
-                          </strong>
-                          <small>
-                            Source:{" "}
-                            {humanize(
-                              exception.source,
-                            )}
-                          </small>
-                        </div>
-                      </div>
-
-                      <div className="exception-link-row">
-                        <Link
-                          className="button button-dark"
-                          href={`/admin/bookings?q=${encodeURIComponent(
-                            exception.booking_id,
-                          )}`}
-                        >
-                          Open booking
-                        </Link>
-
-                        {exception.customer_id ? (
-                          <Link
-                            className="button button-outline"
-                            href={`/admin/customers/${encodeURIComponent(
-                              exception.customer_id,
-                            )}`}
-                          >
-                            Open customer
-                          </Link>
-                        ) : null}
-                      </div>
-
-                      <dl className="exception-lifecycle-grid">
-                        <div>
-                          <dt>
-                            First seen
-                          </dt>
-                          <dd>
-                            {formatDate(
-                              exception.first_seen_at,
-                            )}
-                          </dd>
-                        </div>
-
-                        <div>
-                          <dt>
-                            Last seen
-                          </dt>
-                          <dd>
-                            {formatDate(
-                              exception.last_seen_at,
-                            )}
-                          </dd>
-                        </div>
-
-                        <div>
-                          <dt>
-                            Acknowledged
-                          </dt>
-                          <dd>
-                            {exception.acknowledged_at
-                              ? `${formatDate(
-                                  exception.acknowledged_at,
-                                )} by ${
-                                  acknowledgedBy
-                                    ? profileName(
-                                        acknowledgedBy,
-                                      )
-                                    : "administrator"
-                                }`
-                              : "Not yet"}
-                          </dd>
-                        </div>
-
-                        <div>
-                          <dt>
-                            Closed
-                          </dt>
-                          <dd>
-                            {exception.resolved_at
-                              ? `${formatDate(
-                                  exception.resolved_at,
-                                )} by ${
-                                  resolvedBy
-                                    ? profileName(
-                                        resolvedBy,
-                                      )
-                                    : "administrator"
-                                }`
-                              : "Still active"}
-                          </dd>
-                        </div>
-                      </dl>
-
-                      {exception.resolution_note ? (
-                        <div className="exception-resolution-note">
-                          <strong>
-                            Closure note
-                          </strong>
-                          <p>
-                            {
-                              exception.resolution_note
-                            }
-                          </p>
-                        </div>
-                      ) : null}
-
-                      <details className="exception-technical-details">
-                        <summary>
-                          Technical details
-                        </summary>
-
-                        <div className="exception-technical-grid">
-                          <div>
-                            <span>
-                              Exception ID
-                            </span>
-                            <code>
-                              {
-                                exception.id
-                              }
-                            </code>
-                          </div>
-
-                          <div>
-                            <span>
-                              Booking ID
-                            </span>
-                            <code>
-                              {
-                                exception.booking_id
-                              }
-                            </code>
-                          </div>
-
-                          <div>
-                            <span>
-                              Dedupe key
-                            </span>
-                            <code>
-                              {
-                                exception.dedupe_key
-                              }
-                            </code>
-                          </div>
-
-                          <div>
-                            <span>
-                              Request ID
-                            </span>
-                            <code>
-                              {exception.request_id ??
-                                "Not recorded"}
-                            </code>
-                          </div>
-
-                          <div>
-                            <span>
-                              Source event
-                            </span>
-                            <code>
-                              {exception.source_event_id ??
-                                "Not linked"}
-                            </code>
-                          </div>
-                        </div>
-
-                        {metadataAvailable ? (
-                          <pre className="exception-metadata">
-                            {JSON.stringify(
-                              exception.metadata,
-                              null,
-                              2,
-                            )}
-                          </pre>
-                        ) : (
-                          <p className="muted">
-                            No additional metadata
-                            was recorded.
-                          </p>
-                        )}
-                      </details>
-
-                      {context.loadError ? (
-                        <div className="exception-action-blocked">
-                          Actions are unavailable
-                          until the exception data
-                          loads completely.
-                        </div>
-                      ) : isActive ? (
-                        <div className="exception-action-grid">
-                          {exception.status ===
-                          "open" ? (
-                            <section className="exception-action-panel">
-                              <h3>
-                                Acknowledge
-                              </h3>
-                              <p>
-                                Mark that somebody
-                                has reviewed the
-                                problem without
-                                closing it.
-                              </p>
-
-                              <FeedbackForm
-                                action={
-                                  updateBookingExceptionAction
-                                }
-                                pendingMessage="Acknowledging exception..."
-                                successMessage="Exception acknowledged."
-                              >
-                                <input
-                                  type="hidden"
-                                  name="exceptionId"
-                                  value={
-                                    exception.id
-                                  }
-                                />
-                                <input
-                                  type="hidden"
-                                  name="action"
-                                  value="acknowledge"
-                                />
-
-                                <ActionSubmitButton
-                                  pendingLabel="Acknowledging..."
-                                >
-                                  Acknowledge
-                                </ActionSubmitButton>
-                              </FeedbackForm>
-                            </section>
-                          ) : null}
-
-                          <section className="exception-action-panel">
-                            <h3>
-                              Assignment
-                            </h3>
-                            <p>
-                              Put the problem in
-                              somebody&apos;s hands
-                              or return it to the
-                              unassigned queue.
-                            </p>
-
-                            <FeedbackForm
-                              action={
-                                updateBookingExceptionAction
-                              }
-                              pendingMessage="Updating assignment..."
-                              successMessage="Assignment updated."
-                            >
-                              <input
-                                type="hidden"
-                                name="exceptionId"
-                                value={
-                                  exception.id
-                                }
-                              />
-                              <input
-                                type="hidden"
-                                name="action"
-                                value="assign"
-                              />
-
-                              <label className="field">
-                                <span>
-                                  Assigned to
-                                </span>
-
-                                <select
-                                  name="assigneeId"
-                                  defaultValue={
-                                    exception.assigned_to_profile_id ??
-                                    ""
-                                  }
-                                >
-                                  <option value="">
-                                    Unassigned
-                                  </option>
-
-                                  {!currentAssigneeIsAssignable &&
-                                  exception.assigned_to_profile_id ? (
-                                    <option
-                                      value={
-                                        exception.assigned_to_profile_id
-                                      }
-                                      disabled
-                                    >
-                                      {assignee
-                                        ? `${profileName(
-                                            assignee,
-                                          )} — no longer assignable`
-                                        : "Previous administrator — no longer assignable"}
-                                    </option>
-                                  ) : null}
-
-                                  {context.assignableProfiles.map(
-                                    (
-                                      profile,
-                                    ) => (
-                                      <option
-                                        value={
-                                          profile.id
-                                        }
-                                        key={
-                                          profile.id
-                                        }
-                                      >
-                                        {profileName(
-                                          profile,
-                                        )}
-                                      </option>
-                                    ),
-                                  )}
-                                </select>
-                              </label>
-
-                              <ActionSubmitButton
-                                pendingLabel="Saving assignment..."
-                              >
-                                Save assignment
-                              </ActionSubmitButton>
-                            </FeedbackForm>
-                          </section>
-
-                          <section className="exception-action-panel exception-close-panel">
-                            <h3>
-                              Close exception
-                            </h3>
-                            <p>
-                              Resolve a repaired
-                              problem or dismiss a
-                              record that does not
-                              require action. The
-                              note becomes permanent
-                              history.
-                            </p>
-
-                            <FeedbackForm
-                              action={
-                                updateBookingExceptionAction
-                              }
-                              confirmMessage="Close this exception? The note and decision will be recorded in permanent booking history."
-                              pendingMessage="Closing exception..."
-                              resetOnSuccess
-                              successMessage="Exception closed."
-                            >
-                              <input
-                                type="hidden"
-                                name="exceptionId"
-                                value={
-                                  exception.id
-                                }
-                              />
-
-                              <label className="field">
-                                <span>
-                                  Resolution or
-                                  dismissal note
-                                </span>
-
-                                <textarea
-                                  name="resolutionNote"
-                                  minLength={3}
-                                  maxLength={2000}
-                                  rows={4}
-                                  required
-                                  placeholder="What was fixed, or why does this not require action?"
-                                />
-                              </label>
-
-                              <div className="exception-close-buttons">
-                                <ActionSubmitButton
-                                  name="action"
-                                  value="resolve"
-                                  pendingLabel="Closing..."
-                                >
-                                  Resolve
-                                </ActionSubmitButton>
-
-                                <ActionSubmitButton
-                                  className="button button-outline button-danger"
-                                  name="action"
-                                  value="dismiss"
-                                  pendingLabel="Closing..."
-                                >
-                                  Dismiss
-                                </ActionSubmitButton>
-                              </div>
-                            </FeedbackForm>
-                          </section>
-                        </div>
-                      ) : (
-                        <section className="exception-reopen-panel">
-                          <div>
-                            <h3>
-                              Reopen this exception
-                            </h3>
-                            <p>
-                              Use this when the
-                              problem still requires
-                              human attention or was
-                              closed by mistake.
-                            </p>
-                          </div>
-
-                          <FeedbackForm
-                            action={
-                              updateBookingExceptionAction
-                            }
-                            confirmMessage="Reopen this exception and return it to the active queue?"
-                            pendingMessage="Reopening exception..."
-                            successMessage="Exception reopened."
-                          >
-                            <input
-                              type="hidden"
-                              name="exceptionId"
-                              value={
-                                exception.id
-                              }
-                            />
-                            <input
-                              type="hidden"
-                              name="action"
-                              value="reopen"
-                            />
-
-                            <ActionSubmitButton
-                              pendingLabel="Reopening..."
-                            >
-                              Reopen exception
-                            </ActionSubmitButton>
-                          </FeedbackForm>
-                        </section>
-                      )}
-                    </div>
-                  </details>
+                    actionsBlocked={Boolean(
+                      context.loadError,
+                    )}
+                  />
                 );
               },
             )}
           </div>
         ) : (
-          <div className="exception-empty-state">
+          <div className={styles.emptyState}>
             <strong>
               No exceptions match this view.
             </strong>
 
             <p>
               That either means the software is
-              behaving itself, or your filters are
-              hiding the garbage fire.
+              behaving itself, or the filters
+              are hiding the garbage fire.
             </p>
 
             <Link
@@ -1159,6 +560,743 @@ export default async function AdminExceptionsPage({
   );
 }
 
+function ExceptionCard({
+  exception,
+  booking,
+  customer,
+  assignee,
+  acknowledgedBy,
+  resolvedBy,
+  assignableProfiles,
+  actionsBlocked,
+}: ExceptionCardProps) {
+  const isActive =
+    exception.status === "open" ||
+    exception.status ===
+      "acknowledged";
+
+  const currentAssigneeIsAssignable =
+    exception.assigned_to_profile_id
+      ? assignableProfiles.some(
+          (profile) =>
+            profile.id ===
+            exception.assigned_to_profile_id,
+        )
+      : true;
+
+  const metadataAvailable =
+    Object.keys(
+      exception.metadata,
+    ).length > 0;
+
+  return (
+    <details
+      className={[
+        styles.exceptionCard,
+        severityClass(
+          exception.severity,
+        ),
+        statusClass(
+          exception.status,
+        ),
+      ].join(" ")}
+      open={
+        exception.severity ===
+          "urgent" &&
+        exception.status ===
+          "open"
+      }
+    >
+      <summary className={styles.cardSummary}>
+        <span className={styles.summaryMain}>
+          <span className={styles.badgeRow}>
+            <span
+              className={[
+                styles.badge,
+                severityBadgeClass(
+                  exception.severity,
+                ),
+              ].join(" ")}
+            >
+              {humanize(
+                exception.severity,
+              )}
+            </span>
+
+            <span
+              className={[
+                styles.badge,
+                statusBadgeClass(
+                  exception.status,
+                ),
+              ].join(" ")}
+            >
+              {humanize(
+                exception.status,
+              )}
+            </span>
+
+            {exception.occurrence_count >
+            1 ? (
+              <span
+                className={[
+                  styles.badge,
+                  styles.occurrenceBadge,
+                ].join(" ")}
+              >
+                {
+                  exception.occurrence_count
+                }{" "}
+                occurrences
+              </span>
+            ) : null}
+          </span>
+
+          <strong>
+            {exception.title}
+          </strong>
+
+          <small>
+            {booking
+              ? bookingName(
+                  booking,
+                )
+              : "Booking details unavailable"}
+            {" · "}
+            Last seen{" "}
+            {formatDate(
+              exception.last_seen_at,
+            )}
+          </small>
+        </span>
+
+        <span className={styles.reviewBadge}>
+          Review
+        </span>
+      </summary>
+
+      <div className={styles.cardBody}>
+        <p className={styles.message}>
+          {exception.message}
+        </p>
+
+        <div className={styles.recordGrid}>
+          <RecordCard
+            label="Customer"
+            value={
+              booking
+                ? bookingName(
+                    booking,
+                  )
+                : customer
+                  ? profileName(
+                      customer,
+                    )
+                  : "Unknown customer"
+            }
+            details={[
+              booking?.email ??
+                customer?.email ??
+                "No email available",
+              booking?.phone ??
+                customer?.phone ??
+                "No phone available",
+            ]}
+          />
+
+          <RecordCard
+            label="Service address"
+            value={
+              booking
+                ? formatAddress(
+                    booking,
+                  )
+                : "Address unavailable"
+            }
+            details={[
+              booking?.neighborhood ??
+                "No neighborhood recorded",
+            ]}
+          />
+
+          <RecordCard
+            label="Assignment"
+            value={
+              assignee
+                ? profileName(
+                    assignee,
+                  )
+                : "Unassigned"
+            }
+            details={[
+              exception.status ===
+              "acknowledged"
+                ? "Acknowledged and active"
+                : humanize(
+                    exception.status,
+                  ),
+            ]}
+          />
+
+          <RecordCard
+            label="Problem"
+            value={humanize(
+              exception.exception_type,
+            )}
+            details={[
+              `Source: ${humanize(
+                exception.source,
+              )}`,
+            ]}
+          />
+        </div>
+
+        <div className={styles.linkRow}>
+          <Link
+            className="button button-dark"
+            href={`/admin/bookings?q=${encodeURIComponent(
+              exception.booking_id,
+            )}`}
+          >
+            Open booking
+          </Link>
+
+          {exception.customer_id ? (
+            <Link
+              className="button button-outline"
+              href={`/admin/customers/${encodeURIComponent(
+                exception.customer_id,
+              )}`}
+            >
+              Open customer
+            </Link>
+          ) : null}
+        </div>
+
+        <dl className={styles.lifecycleGrid}>
+          <LifecycleItem
+            label="First seen"
+            value={formatDate(
+              exception.first_seen_at,
+            )}
+          />
+
+          <LifecycleItem
+            label="Last seen"
+            value={formatDate(
+              exception.last_seen_at,
+            )}
+          />
+
+          <LifecycleItem
+            label="Acknowledged"
+            value={
+              exception.acknowledged_at
+                ? `${formatDate(
+                    exception.acknowledged_at,
+                  )} by ${
+                    acknowledgedBy
+                      ? profileName(
+                          acknowledgedBy,
+                        )
+                      : "administrator"
+                  }`
+                : "Not yet"
+            }
+          />
+
+          <LifecycleItem
+            label="Closed"
+            value={
+              exception.resolved_at
+                ? `${formatDate(
+                    exception.resolved_at,
+                  )} by ${
+                    resolvedBy
+                      ? profileName(
+                          resolvedBy,
+                        )
+                      : "administrator"
+                  }`
+                : "Still active"
+            }
+          />
+        </dl>
+
+        {exception.resolution_note ? (
+          <div className={styles.resolutionNote}>
+            <strong>
+              Closure note
+            </strong>
+
+            <p>
+              {exception.resolution_note}
+            </p>
+          </div>
+        ) : null}
+
+        <details className={styles.technicalDetails}>
+          <summary>
+            Technical details
+          </summary>
+
+          <div className={styles.technicalGrid}>
+            <TechnicalItem
+              label="Exception ID"
+              value={exception.id}
+            />
+
+            <TechnicalItem
+              label="Booking ID"
+              value={exception.booking_id}
+            />
+
+            <TechnicalItem
+              label="Dedupe key"
+              value={exception.dedupe_key}
+            />
+
+            <TechnicalItem
+              label="Request ID"
+              value={
+                exception.request_id ??
+                "Not recorded"
+              }
+            />
+
+            <TechnicalItem
+              label="Source event"
+              value={
+                exception.source_event_id ??
+                "Not linked"
+              }
+            />
+          </div>
+
+          {metadataAvailable ? (
+            <pre className={styles.metadata}>
+              {JSON.stringify(
+                exception.metadata,
+                null,
+                2,
+              )}
+            </pre>
+          ) : (
+            <p className={styles.noMetadata}>
+              No additional metadata was
+              recorded.
+            </p>
+          )}
+        </details>
+
+        {actionsBlocked ? (
+          <div className={styles.actionBlocked}>
+            Actions are unavailable until the
+            exception data loads completely.
+          </div>
+        ) : isActive ? (
+          <ActiveExceptionActions
+            exception={exception}
+            assignee={assignee}
+            assignableProfiles={
+              assignableProfiles
+            }
+            currentAssigneeIsAssignable={
+              currentAssigneeIsAssignable
+            }
+          />
+        ) : (
+          <ReopenExceptionAction
+            exception={exception}
+          />
+        )}
+      </div>
+    </details>
+  );
+}
+
+function ActiveExceptionActions({
+  exception,
+  assignee,
+  assignableProfiles,
+  currentAssigneeIsAssignable,
+}: {
+  exception: BookingExceptionRow;
+  assignee: ProfileRow | null;
+  assignableProfiles: ProfileRow[];
+  currentAssigneeIsAssignable: boolean;
+}) {
+  return (
+    <div className={styles.actionGrid}>
+      {exception.status === "open" ? (
+        <section className={styles.actionPanel}>
+          <h3>
+            Acknowledge
+          </h3>
+
+          <p>
+            Mark that somebody has reviewed
+            the problem without closing it.
+          </p>
+
+          <FeedbackForm
+            action={
+              updateBookingExceptionAction
+            }
+            pendingMessage="Acknowledging exception..."
+            successMessage="Exception acknowledged."
+          >
+            <input
+              type="hidden"
+              name="exceptionId"
+              value={exception.id}
+            />
+
+            <input
+              type="hidden"
+              name="action"
+              value="acknowledge"
+            />
+
+            <ActionSubmitButton
+              pendingLabel="Acknowledging..."
+            >
+              Acknowledge
+            </ActionSubmitButton>
+          </FeedbackForm>
+        </section>
+      ) : null}
+
+      <section className={styles.actionPanel}>
+        <h3>
+          Assignment
+        </h3>
+
+        <p>
+          Put the problem in somebody&apos;s
+          hands or return it to the
+          unassigned queue.
+        </p>
+
+        <FeedbackForm
+          action={
+            updateBookingExceptionAction
+          }
+          pendingMessage="Updating assignment..."
+          successMessage="Assignment updated."
+        >
+          <input
+            type="hidden"
+            name="exceptionId"
+            value={exception.id}
+          />
+
+          <input
+            type="hidden"
+            name="action"
+            value="assign"
+          />
+
+          <label className="field">
+            <span>
+              Assigned to
+            </span>
+
+            <select
+              name="assigneeId"
+              defaultValue={
+                exception.assigned_to_profile_id ??
+                ""
+              }
+            >
+              <option value="">
+                Unassigned
+              </option>
+
+              {!currentAssigneeIsAssignable &&
+              exception.assigned_to_profile_id ? (
+                <option
+                  value={
+                    exception
+                      .assigned_to_profile_id
+                  }
+                  disabled
+                >
+                  {assignee
+                    ? `${profileName(
+                        assignee,
+                      )} — no longer assignable`
+                    : "Previous administrator — no longer assignable"}
+                </option>
+              ) : null}
+
+              {assignableProfiles.map(
+                (profile) => (
+                  <option
+                    value={profile.id}
+                    key={profile.id}
+                  >
+                    {profileName(
+                      profile,
+                    )}
+                  </option>
+                ),
+              )}
+            </select>
+          </label>
+
+          <ActionSubmitButton
+            pendingLabel="Saving assignment..."
+          >
+            Save assignment
+          </ActionSubmitButton>
+        </FeedbackForm>
+      </section>
+
+      <section
+        className={[
+          styles.actionPanel,
+          styles.closePanel,
+        ].join(" ")}
+      >
+        <h3>
+          Close exception
+        </h3>
+
+        <p>
+          Resolve a repaired problem or
+          dismiss a record that does not
+          require action. The note becomes
+          permanent history.
+        </p>
+
+        <FeedbackForm
+          action={
+            updateBookingExceptionAction
+          }
+          confirmMessage="Close this exception? The note and decision will be recorded in permanent booking history."
+          pendingMessage="Closing exception..."
+          resetOnSuccess
+          successMessage="Exception closed."
+        >
+          <input
+            type="hidden"
+            name="exceptionId"
+            value={exception.id}
+          />
+
+          <label className="field">
+            <span>
+              Resolution or dismissal note
+            </span>
+
+            <textarea
+              name="resolutionNote"
+              minLength={3}
+              maxLength={2000}
+              rows={4}
+              required
+              placeholder="What was fixed, or why does this not require action?"
+            />
+          </label>
+
+          <div className={styles.closeButtons}>
+            <ActionSubmitButton
+              name="action"
+              value="resolve"
+              pendingLabel="Closing..."
+            >
+              Resolve
+            </ActionSubmitButton>
+
+            <ActionSubmitButton
+              className="button button-outline button-danger"
+              name="action"
+              value="dismiss"
+              pendingLabel="Closing..."
+            >
+              Dismiss
+            </ActionSubmitButton>
+          </div>
+        </FeedbackForm>
+      </section>
+    </div>
+  );
+}
+
+function ReopenExceptionAction({
+  exception,
+}: {
+  exception: BookingExceptionRow;
+}) {
+  return (
+    <section className={styles.reopenPanel}>
+      <div>
+        <h3>
+          Reopen this exception
+        </h3>
+
+        <p>
+          Use this when the problem still
+          requires human attention or was
+          closed by mistake.
+        </p>
+      </div>
+
+      <FeedbackForm
+        action={
+          updateBookingExceptionAction
+        }
+        confirmMessage="Reopen this exception and return it to the active queue?"
+        pendingMessage="Reopening exception..."
+        successMessage="Exception reopened."
+      >
+        <input
+          type="hidden"
+          name="exceptionId"
+          value={exception.id}
+        />
+
+        <input
+          type="hidden"
+          name="action"
+          value="reopen"
+        />
+
+        <ActionSubmitButton
+          pendingLabel="Reopening..."
+        >
+          Reopen exception
+        </ActionSubmitButton>
+      </FeedbackForm>
+    </section>
+  );
+}
+
+function MetricCard({
+  href,
+  label,
+  value,
+  detail,
+  tone,
+}: {
+  href: string;
+  label: string;
+  value: number;
+  detail: string;
+  tone:
+    | "active"
+    | "open"
+    | "acknowledged"
+    | "resolved"
+    | "dismissed";
+}) {
+  const toneClasses = {
+    active:
+      styles.metricActive,
+    open:
+      styles.metricOpen,
+    acknowledged:
+      styles.metricAcknowledged,
+    resolved:
+      styles.metricResolved,
+    dismissed:
+      styles.metricDismissed,
+  };
+
+  return (
+    <Link
+      className={[
+        styles.metricCard,
+        toneClasses[tone],
+      ].join(" ")}
+      href={href}
+    >
+      <span>
+        {label}
+      </span>
+
+      <strong>
+        {value}
+      </strong>
+
+      <small>
+        {detail}
+      </small>
+    </Link>
+  );
+}
+
+function RecordCard({
+  label,
+  value,
+  details,
+}: {
+  label: string;
+  value: string;
+  details: string[];
+}) {
+  return (
+    <div className={styles.record}>
+      <span>
+        {label}
+      </span>
+
+      <strong>
+        {value}
+      </strong>
+
+      {details.map(
+        (detail, index) => (
+          <small key={`${label}-${index}`}>
+            {detail}
+          </small>
+        ),
+      )}
+    </div>
+  );
+}
+
+function LifecycleItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <dt>
+        {label}
+      </dt>
+
+      <dd>
+        {value}
+      </dd>
+    </div>
+  );
+}
+
+function TechnicalItem({
+  label,
+  value,
+}: {
+  label: string;
+  value: string;
+}) {
+  return (
+    <div>
+      <span>
+        {label}
+      </span>
+
+      <code>
+        {value}
+      </code>
+    </div>
+  );
+}
+
 function getExceptionPool(
   activeExceptions:
     BookingExceptionRow[],
@@ -1166,7 +1304,7 @@ function getExceptionPool(
     BookingExceptionRow[],
   status:
     ExceptionStatusFilter,
-) {
+): BookingExceptionRow[] {
   switch (status) {
     case "active":
       return [
@@ -1454,6 +1592,20 @@ function priorityRank(
   );
 }
 
+function dedupeProfiles(
+  profiles:
+    ProfileRow[],
+) {
+  return [
+    ...new Map(
+      profiles.map(
+        (profile) =>
+          [profile.id, profile] as const,
+      ),
+    ).values(),
+  ];
+}
+
 function profileName(
   profile:
     ProfileRow | null,
@@ -1522,6 +1674,17 @@ function formatDate(
     return "Not recorded";
   }
 
+  const date =
+    new Date(value);
+
+  if (
+    Number.isNaN(
+      date.getTime(),
+    )
+  ) {
+    return "Invalid date";
+  }
+
   return new Intl.DateTimeFormat(
     "en-US",
     {
@@ -1534,9 +1697,7 @@ function formatDate(
       minute: "2-digit",
       timeZoneName: "short",
     },
-  ).format(
-    new Date(value),
-  );
+  ).format(date);
 }
 
 function humanize(
@@ -1548,4 +1709,64 @@ function humanize(
     .replace(/\b\w/g, (letter) =>
       letter.toUpperCase(),
     );
+}
+
+function severityClass(
+  severity:
+    BookingExceptionSeverity,
+) {
+  return {
+    urgent:
+      styles.severityUrgent,
+    warning:
+      styles.severityWarning,
+    info:
+      styles.severityInfo,
+  }[severity];
+}
+
+function statusClass(
+  status:
+    BookingExceptionStatus,
+) {
+  return {
+    open:
+      styles.statusOpen,
+    acknowledged:
+      styles.statusAcknowledged,
+    resolved:
+      styles.statusResolved,
+    dismissed:
+      styles.statusDismissed,
+  }[status];
+}
+
+function severityBadgeClass(
+  severity:
+    BookingExceptionSeverity,
+) {
+  return {
+    urgent:
+      styles.badgeUrgent,
+    warning:
+      styles.badgeWarning,
+    info:
+      styles.badgeInfo,
+  }[severity];
+}
+
+function statusBadgeClass(
+  status:
+    BookingExceptionStatus,
+) {
+  return {
+    open:
+      styles.badgeOpen,
+    acknowledged:
+      styles.badgeAcknowledged,
+    resolved:
+      styles.badgeResolved,
+    dismissed:
+      styles.badgeDismissed,
+  }[status];
 }
