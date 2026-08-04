@@ -1,0 +1,21 @@
+.navLink {
+  align-items: center;
+  display: inline-flex;
+  gap: 6px;
+}
+
+.exceptionCount {
+  align-items: center;
+  background: #e1342f;
+  border: 1px solid rgba(120, 18, 14, 0.28);
+  border-radius: 999px;
+  color: white;
+  display: inline-flex;
+  font-size: 0.72rem;
+  font-weight: 950;
+  justify-content: center;
+  line-height: 1;
+  min-height: 1.35rem;
+  min-width: 1.35rem;
+  padding: 3px 5px;
+}
