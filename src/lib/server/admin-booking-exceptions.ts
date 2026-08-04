@@ -329,3 +329,52 @@ export async function getActiveBookingExceptionCount(): Promise<number> {
 
   return count ?? 0;
 }
+/*
+ * Small, bounded feed for the admin command center.
+ * The full operational queue remains exclusive to
+ * /admin/exceptions.
+ */
+export async function getRecentActiveBookingExceptions(
+  limit = 5,
+): Promise<BookingExceptionRow[]> {
+  const safeLimit = Number.isFinite(limit)
+    ? Math.min(
+        Math.max(
+          Math.trunc(limit),
+          1,
+        ),
+        10,
+      )
+    : 5;
+
+  const { data, error } =
+    await getSupabaseAdmin()
+      .from("booking_exceptions")
+      .select("*")
+      .in("status", [
+        "open",
+        "acknowledged",
+      ])
+      .order("last_seen_at", {
+        ascending: false,
+      })
+      .limit(safeLimit);
+
+  if (error) {
+    logger.error(
+      "recent_active_booking_exceptions_load_failed",
+      {
+        action:
+          "booking_exception_dashboard_feed",
+        error,
+        metadata: {
+          limit: safeLimit,
+        },
+      },
+    );
+
+    return [];
+  }
+
+  return data ?? [];
+}
