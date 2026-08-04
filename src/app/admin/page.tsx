@@ -5,6 +5,13 @@ import { AdminShell } from "@/components/shells/admin-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
 import { getAdminContext } from "@/lib/admin-data";
 import {
+  getActiveBookingExceptionCount,
+  getRecentActiveBookingExceptions,
+} from "@/lib/server/admin-booking-exceptions";
+import type {
+  BookingExceptionRow,
+} from "@/types/database";
+import {
   commercialPropertyTypeLabels,
 } from "@/types/commercial";
 
@@ -14,8 +21,27 @@ export const metadata: Metadata = {
 };
 
 export default async function AdminPage() {
-  const context = await getAdminContext("/admin");
-  const stats = getCommandCenterStats(context);
+  const context =
+    await getAdminContext("/admin");
+
+  let activeExceptionCount = 0;
+  let recentExceptions:
+    BookingExceptionRow[] = [];
+
+  if (context.auth.status === "ok") {
+    [
+      activeExceptionCount,
+      recentExceptions,
+    ] = await Promise.all([
+      getActiveBookingExceptionCount(),
+      getRecentActiveBookingExceptions(
+        5,
+      ),
+    ]);
+  }
+
+  const stats =
+    getCommandCenterStats(context);
 
 const recentBookings = context.bookings
   .filter((booking) => !["cancelled"].includes(booking.status))
@@ -40,7 +66,13 @@ const recentCommercialQuotes =
 const recentNotifications = context.adminNotifications.slice(0, 5);
 
   return (
-    <AdminShell title="Admin portal" auth={context.auth}>
+    <AdminShell
+      title="Admin portal"
+      auth={context.auth}
+      activeExceptionCount={
+        activeExceptionCount
+      }
+    >
       <section className="placeholder-panel admin-command-page">
         <div className="admin-page-heading">
           <div>
@@ -69,6 +101,18 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
           </div>
 
           <div className="admin-command-grid">
+            <CommandStatCard
+              href="/admin/exceptions"
+              label="Operational exceptions"
+              value={activeExceptionCount}
+              detail="Failures the software could not resolve automatically."
+              tone={
+                activeExceptionCount
+                  ? "danger"
+                  : "good"
+              }
+            />
+            
             <CommandStatCard
               href="/admin/bookings"
               label="New bookings"
@@ -145,6 +189,11 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
               title="Bookings"
               description="Review new bookings, approve route dates, send payment setup, and manage booking status."
             />
+            <WorkflowCard
+              href="/admin/exceptions"
+              title="Exceptions"
+              description="Review operational failures, assign ownership, document repairs, and close unresolved system problems."
+            />            
             <WorkflowCard
               href="/admin/commercial-quotes"
               title="Commercial Quotes"
@@ -276,7 +325,50 @@ const recentNotifications = context.adminNotifications.slice(0, 5);
               </Link>
             ))}
           </CommandFeedPanel>
+          <CommandFeedPanel
+            title="Operational exceptions"
+            empty="No active operational exceptions."
+            actionHref="/admin/exceptions"
+            actionLabel="Open queue"
+          >
+            {recentExceptions.map(
+              (exception) => (
+                <Link
+                  className="command-feed-row"
+                  href={`/admin/exceptions?q=${encodeURIComponent(
+                    exception.id,
+                  )}`}
+                  key={exception.id}
+                >
+                  <div>
+                    <strong>
+                      {exception.title}
+                    </strong>
 
+                    <span>
+                      {exception.message}
+                    </span>
+                  </div>
+
+                  <div className="command-feed-meta">
+                    <span
+                      className={`status-badge status-${exception.severity}`}
+                    >
+                      {humanizeStatus(
+                        exception.severity,
+                      )}
+                    </span>
+
+                    <small>
+                      {formatDateTime(
+                        exception.last_seen_at,
+                      )}
+                    </small>
+                  </div>
+                </Link>
+              ),
+            )}
+          </CommandFeedPanel>
           <CommandFeedPanel
             title="Admin notifications"
             empty="No admin notifications."
