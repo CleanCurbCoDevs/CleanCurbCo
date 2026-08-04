@@ -399,6 +399,17 @@ async function buildActionDetails(input: {
     }
 
     case "assign": {
+      if (
+        isClosedStatus(
+          input.current.status,
+        )
+      ) {
+        return {
+          error:
+            "Closed exceptions must be reopened before assignment.",
+        };
+      }
+
       const assigneeId =
         cleanString(
           input.formData.get(
@@ -435,6 +446,22 @@ async function buildActionDetails(input: {
         }
 
         assignee = data;
+      }
+
+      /*
+       * Do not create false timeline and audit entries when
+       * the requested assignment is already the current one.
+       */
+      if (
+        assigneeId ===
+        input.current
+          .assigned_to_profile_id
+      ) {
+        return {
+          error: assigneeId
+            ? "This exception is already assigned to that administrator."
+            : "This exception is already unassigned.",
+        };
       }
 
       const assigneeName =
