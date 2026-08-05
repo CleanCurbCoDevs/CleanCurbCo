@@ -7,6 +7,7 @@ import {
 
 import { getSiteUrl } from "@/lib/env";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import type { Database } from "@/types/database";
 
 export const TWILIO_INBOUND_PATH =
   "/api/twilio/inbound";
@@ -257,21 +258,20 @@ export async function setSmsContactPreference(
   const now = new Date().toISOString();
   const admin = getSupabaseAdmin();
 
-  const preferenceRecord = {
-    normalized_phone: normalizedPhone,
-    status: input.status,
-    source: input.source,
-    last_inbound_message_sid:
-      input.messageSid ?? null,
-    ...(input.status === "opted_in"
-      ? {
-          opted_in_at: now,
-          opted_out_at: null,
-        }
-      : {
-          opted_out_at: now,
-        }),
-  };
+const preferenceRecord: Database["public"]["Tables"]["sms_contact_preferences"]["Insert"] = {
+  normalized_phone: normalizedPhone,
+  status: input.status,
+  source: input.source,
+  last_inbound_message_sid:
+    input.messageSid ?? null,
+};
+
+if (input.status === "opted_in") {
+  preferenceRecord.opted_in_at = now;
+  preferenceRecord.opted_out_at = null;
+} else {
+  preferenceRecord.opted_out_at = now;
+}
 
   const { error } = await admin
     .from("sms_contact_preferences")
