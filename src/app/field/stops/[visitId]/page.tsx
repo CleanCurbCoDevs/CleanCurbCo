@@ -649,29 +649,39 @@ const afterPhotoRequirementMet =
             </p>
       
             <div className="field-completion-next-actions">
-              <form action={readyForNextStopAction}>
+              <FeedbackForm
+                action={readyForNextStopAction}
+                followRedirect
+                pendingMessage="Opening next stop..."
+                requireResult
+                successMessage="Opening next stop."
+              >
                 <input
                   type="hidden"
                   name="routeStopId"
                   value={stop.id}
                 />
-      
-                <button
+              
+                <ActionSubmitButton
                   className="field-next-stop-button"
-                  type="submit"
+                  pendingLabel="Opening Next Stop..."
                 >
                   Ready for Next Stop
-                </button>
-              </form>
+                </ActionSubmitButton>
+              </FeedbackForm>
       
               <details className="field-break-details">
                 <summary className="button button-outline">
                   Take a Break
                 </summary>
       
-                <form
+                <FeedbackForm
                   action={startBreakAction}
                   className="field-form"
+                  followRedirect
+                  pendingMessage="Starting break..."
+                  requireResult
+                  successMessage="Break started."
                 >
                   <input
                     type="hidden"
@@ -704,13 +714,13 @@ const afterPhotoRequirementMet =
                     />
                   </label>
       
-                  <button
+                  <ActionSubmitButton
                     className="button button-dark"
-                    type="submit"
+                    pendingLabel="Starting Break..."
                   >
                     Start Break
-                  </button>
-                </form>
+                  </ActionSubmitButton>
+                </FeedbackForm>
               </details>
       
               <Link
