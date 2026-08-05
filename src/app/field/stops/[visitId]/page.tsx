@@ -72,34 +72,83 @@ export default async function FieldStopPage({
   const stop = context.routeStops.find((item) => item.service_visit_id === visitId);
   const booking = context.bookings.find((item) => item.id === visit?.booking_id);
   const routeDay = context.routeDays.find((item) => item.id === stop?.route_day_id);
-  const address = context.addresses.find(
-    (item) => item.customer_id === booking?.customer_id && item.is_primary,
-  );
-  const payments = context.payments.filter(
-    (item) => item.booking_id === booking?.id || item.service_visit_id === visit?.id,
-  );
-  const latestPayment = payments[0] ?? null;
-  const photos = context.photos.filter((item) => item.route_stop_id === stop?.id);
-  const signedPhotos = await createSignedPhotos(photos);
-  const serviceChecklistBundle = await createChecklistBundle(visitId);
-  const signedChecklistDocuments = serviceChecklistBundle
-    ? await createSignedChecklistDocuments(serviceChecklistBundle.documents)
-    : [];
-
+  const address =
+    context.addresses.find(
+      (item) =>
+        item.customer_id ===
+          booking?.customer_id &&
+        item.is_primary,
+    );
+  
   if (!visit || !stop || !booking) {
     return (
-      <FieldShell title="Stop Details" auth={context.auth}>
+      <FieldShell
+        title="Stop Details"
+        auth={context.auth}
+      >
         <section className="field-card">
-          <span className="status-badge status-needs_follow_up">Missing Link</span>
-          <h2>This stop could not be loaded.</h2>
-          <p>Check that the route stop has a service visit and booking attached.</p>
-          <Link className="button button-dark" href="/field/today">
+          <span className="status-badge status-needs_follow_up">
+            Missing Link
+          </span>
+  
+          <h2>
+            This stop could not be loaded.
+          </h2>
+  
+          <p>
+            Check that the route stop has a
+            service visit and booking attached,
+            or confirm that this route is assigned
+            to your account.
+          </p>
+  
+          <Link
+            className="button button-dark"
+            href="/field/today"
+          >
             Back to Today
           </Link>
         </section>
       </FieldShell>
     );
   }
+  
+  const payments =
+    context.payments.filter(
+      (item) =>
+        item.booking_id ===
+          booking.id ||
+        item.service_visit_id ===
+          visit.id,
+    );
+  
+  const latestPayment =
+    payments[0] ?? null;
+  
+  const photos =
+    context.photos.filter(
+      (item) =>
+        item.route_stop_id ===
+        stop.id,
+    );
+  
+  const signedPhotos =
+    await createSignedPhotos(
+      photos,
+    );
+  
+  const serviceChecklistBundle =
+    await createChecklistBundle(
+      visitId,
+    );
+  
+  const signedChecklistDocuments =
+    serviceChecklistBundle
+      ? await createSignedChecklistDocuments(
+          serviceChecklistBundle
+            .documents,
+        )
+      : [];
 
   const addressText = formatBookingAddress(booking);
   const encodedAddress = encodeURIComponent(addressText);
