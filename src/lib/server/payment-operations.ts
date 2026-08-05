@@ -187,7 +187,13 @@ function paymentErrorMessage(
 
   if (
     message.includes(
-      "payment_integrity:mismatch",
+      "payment_integrity:booking_mismatch",
+    ) ||
+    message.includes(
+      "payment_integrity:visit_mismatch",
+    ) ||
+    message.includes(
+      "payment_integrity:customer_mismatch",
     ) ||
     message.includes(
       "payment_integrity:relationship_mismatch",
