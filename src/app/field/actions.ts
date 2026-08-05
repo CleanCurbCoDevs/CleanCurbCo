@@ -21,6 +21,11 @@ import {
   sendOnTheWayEmail,
   sendServiceCompletedEmail,
 } from "@/lib/email/sendFieldNotifications";
+import {
+  attachFieldServicePhoto,
+  deleteFieldServicePhoto,
+  setFieldPhotoException,
+} from "@/lib/server/field-proof";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { requireField } from "@/lib/supabase/auth";
 import { isAdminRole } from "@/lib/supabase/roles";
@@ -180,16 +185,6 @@ function removePhotoUploadExceptionNote(
     )
     .join("\n")
     .trim();
-}
-
-function hasPhotoUploadExceptionNote(
-  notes: string | null | undefined,
-) {
-  return (notes ?? "")
-    .split("\n")
-    .some((line) =>
-      line.trim().startsWith(PHOTO_UPLOAD_EXCEPTION_PREFIX),
-    );
 }
 
 function cleanMoney(formData: FormData, key: string) {
@@ -880,122 +875,90 @@ export async function saveTechnicianNotesAction(
     "Technician notes saved.",
   );
 }
+
 export async function savePhotoUploadExceptionAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  const auth = await requireFieldUser();
-  const visitId = cleanId(formData, "visitId");
+  const auth =
+    await requireFieldUser();
+
+  const visitId =
+    cleanId(
+      formData,
+      "visitId",
+    );
 
   const beforeException =
-    formData.get("beforePhotoException") === "on";
+    formData.get(
+      "beforePhotoException",
+    ) === "on";
 
   const afterException =
-    formData.get("afterPhotoException") === "on";
+    formData.get(
+      "afterPhotoException",
+    ) === "on";
 
-  const reason = cleanText(
-    formData,
-    "photoExceptionNote",
-    600,
-  )
-    .replace(/\s+/g, " ")
-    .trim();
+  const reason =
+    cleanText(
+      formData,
+      "photoExceptionNote",
+      1200,
+    )
+      .replace(
+        /\s+/g,
+        " ",
+      )
+      .trim();
 
-  const { admin, stop, visit, booking } =
+  const {
+    admin,
+    stop,
+    visit,
+    accessError,
+  } =
     await getStopBundle(
       visitId,
       auth,
     );
 
-  if (!visit || !stop) {
-    return actionFailure("This stop could not be loaded.");
-  }
-
-  if ((beforeException || afterException) && reason.length < 8) {
+  if (
+    !visit ||
+    !stop
+  ) {
     return actionFailure(
-      "Add a short explanation before using a photo exception.",
+      accessError ??
+        "This stop could not be loaded.",
     );
   }
 
-  const nextFlags = stop.issue_flags.filter(
-    (flag) =>
-      flag !== BEFORE_PHOTO_EXCEPTION_FLAG &&
-      flag !== AFTER_PHOTO_EXCEPTION_FLAG,
-  );
+  const result =
+    await setFieldPhotoException(
+      admin,
+      {
+        routeStopId:
+          stop.id,
+        actorProfileId:
+          auth.userId,
+        beforeException,
+        afterException,
+        reason:
+          reason || null,
+      },
+    );
 
-  if (beforeException) {
-    nextFlags.push(BEFORE_PHOTO_EXCEPTION_FLAG);
-  }
-
-  if (afterException) {
-    nextFlags.push(AFTER_PHOTO_EXCEPTION_FLAG);
-  }
-
-  const existingNotes = removePhotoUploadExceptionNote(
-    stop.technician_notes ?? visit.technician_notes,
-  );
-
-  const exceptionNote =
-    beforeException || afterException
-      ? `${PHOTO_UPLOAD_EXCEPTION_PREFIX} ${reason}`
-      : "";
-
-  const technicianNotes = [
-    existingNotes,
-    exceptionNote,
-  ]
-    .filter(Boolean)
-    .join("\n\n")
-    .trim();
-
-  const [stopResult, visitResult] = await Promise.all([
-    admin
-      .from("route_stops")
-      .update({
-        issue_flags: Array.from(new Set(nextFlags)),
-        technician_notes: technicianNotes,
-      })
-      .eq("id", stop.id),
-
-    admin
-      .from("service_visits")
-      .update({
-        technician_notes: technicianNotes,
-      })
-      .eq("id", visit.id),
-  ]);
-
-  if (stopResult.error || visitResult.error) {
+  if (!result.ok) {
     return actionFailure(
-      stopResult.error?.message ??
-        visitResult.error?.message ??
-        "The photo exception could not be saved.",
+      result.message,
     );
   }
 
-  await recordServiceEvent({
-    actorId: auth.userId,
-    booking,
-    visit,
-    stop,
-    eventType:
-      beforeException || afterException
-        ? "photo_upload_exception_saved"
-        : "photo_upload_exception_cleared",
-    message:
-      beforeException || afterException
-        ? "A documented photo-upload exception was saved."
-        : "The photo-upload exception was cleared.",
-    metadata: {
-      beforeException,
-      afterException,
-      reason: reason || null,
-    },
-  });
-
-  revalidateField(visit.id);
+  revalidateField(
+    visit.id,
+  );
 
   return actionSuccess(
-    beforeException || afterException
+    beforeException ||
+    afterException
       ? "Photo exception documented."
       : "Photo exception cleared.",
   );
@@ -1017,6 +980,15 @@ type PrepareServicePhotoUploadInput = {
 };
 
 type FinalizeServicePhotoUploadInput = {
+  visitId: string;
+  photoType: PhotoType;
+  storageBucket: string;
+  storagePath: string;
+  contentType: string;
+  size: number;
+};
+
+type DiscardServicePhotoUploadInput = {
   visitId: string;
   photoType: PhotoType;
   storageBucket: string;
@@ -1077,6 +1049,17 @@ export async function prepareServicePhotoUploadAction(
     return actionFailure("This stop could not be loaded.");
   }
 
+  if (
+    !photoUploadStageAllowed(
+      stop.status,
+      photoType,
+    )
+  ) {
+    return actionFailure(
+      "This type of photo cannot be uploaded at the stop’s current stage.",
+    );
+  }
+  
   const extension = extensionForServicePhoto(contentType);
   const storagePath =
     `${visit.id}/${photoType}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
@@ -1093,6 +1076,34 @@ export async function prepareServicePhotoUploadAction(
     );
   }
 
+function photoUploadStageAllowed(
+  status: FieldStopStatus,
+  photoType: PhotoType,
+) {
+  if (
+    photoType === "before"
+  ) {
+    return (
+      status === "arrived" ||
+      status === "in_progress"
+    );
+  }
+
+  if (
+    photoType === "after"
+  ) {
+    return (
+      status === "in_progress"
+    );
+  }
+
+  return (
+    status === "on_the_way" ||
+    status === "arrived" ||
+    status === "in_progress"
+  );
+}
+  
   return actionSuccess("Photo upload prepared.", {
     bucket: SERVICE_PHOTO_BUCKET,
     path: storagePath,
@@ -1103,147 +1114,349 @@ export async function prepareServicePhotoUploadAction(
 
 export async function finalizeServicePhotoUploadAction(
   input: FinalizeServicePhotoUploadInput,
-): Promise<ActionResult<{ photoId: string }>> {
-  const auth = await requireFieldUser();
+): Promise<
+  ActionResult<{
+    photoId: string;
+  }>
+> {
+  const auth =
+    await requireFieldUser();
 
-  const visitId = String(input?.visitId ?? "").trim();
-  const photoType = String(input?.photoType ?? "").trim() as PhotoType;
-  const storageBucket = String(input?.storageBucket ?? "").trim();
-  const storagePath = String(input?.storagePath ?? "").trim();
+  const visitId =
+    String(
+      input?.visitId ??
+      "",
+    ).trim();
 
-  if (!visitId || !validServicePhotoTypes.includes(photoType)) {
-    return actionFailure("Choose a valid service stop and photo type.");
-  }
+  const photoType =
+    String(
+      input?.photoType ??
+      "",
+    ).trim() as PhotoType;
 
-  if (storageBucket !== SERVICE_PHOTO_BUCKET) {
-    return actionFailure("The photo was uploaded to an invalid storage bucket.");
-  }
+  const storageBucket =
+    String(
+      input?.storageBucket ??
+      "",
+    ).trim();
 
-  const { admin, stop, visit, booking } = await getStopBundle(
-    visitId,
-    auth,
-  );
+  const storagePath =
+    String(
+      input?.storagePath ??
+      "",
+    ).trim();
 
-  if (!visit || !stop || !booking) {
-    return actionFailure("This stop could not be loaded.");
-  }
+  const contentType =
+    String(
+      input?.contentType ??
+      "",
+    )
+      .trim()
+      .toLowerCase();
 
-  const requiredPrefix = `${visit.id}/${photoType}/`;
+  const size =
+    Number(
+      input?.size ??
+      0,
+    );
 
   if (
-    !storagePath.startsWith(requiredPrefix) ||
-    storagePath.includes("..")
+    !visitId ||
+    !validServicePhotoTypes.includes(
+      photoType,
+    )
   ) {
-    return actionFailure("The uploaded photo path is invalid.");
+    return actionFailure(
+      "Choose a valid service stop and photo type.",
+    );
   }
 
-  const slashIndex = storagePath.lastIndexOf("/");
-  const folder = storagePath.slice(0, slashIndex);
-  const fileName = storagePath.slice(slashIndex + 1);
+  if (
+    storageBucket !==
+    SERVICE_PHOTO_BUCKET
+  ) {
+    return actionFailure(
+      "The photo was uploaded to an invalid storage bucket.",
+    );
+  }
 
-  const { data: storedObjects, error: listError } = await admin.storage
-    .from(SERVICE_PHOTO_BUCKET)
-    .list(folder, {
-      limit: 100,
-      search: fileName,
-    });
+  if (
+    !validServicePhotoContentTypes.has(
+      contentType,
+    )
+  ) {
+    return actionFailure(
+      "Use a JPG, PNG, WEBP, HEIC, or HEIF image.",
+    );
+  }
+
+  if (
+    !Number.isFinite(size) ||
+    size <= 0 ||
+    size >
+      MAX_SERVICE_PHOTO_BYTES
+  ) {
+    return actionFailure(
+      "Each photo must be 20 MB or smaller.",
+    );
+  }
+
+  const {
+    admin,
+    stop,
+    visit,
+    booking,
+    accessError,
+  } =
+    await getStopBundle(
+      visitId,
+      auth,
+    );
+
+  if (
+    !visit ||
+    !stop ||
+    !booking
+  ) {
+    return actionFailure(
+      accessError ??
+        "This stop could not be loaded.",
+    );
+  }
+
+  const requiredPrefix =
+    `${visit.id}/${photoType}/`;
+
+  if (
+    !storagePath.startsWith(
+      requiredPrefix,
+    ) ||
+    storagePath.includes(
+      "..",
+    )
+  ) {
+    return actionFailure(
+      "The uploaded photo path is invalid.",
+    );
+  }
+
+  const slashIndex =
+    storagePath.lastIndexOf(
+      "/",
+    );
+
+  const folder =
+    storagePath.slice(
+      0,
+      slashIndex,
+    );
+
+  const fileName =
+    storagePath.slice(
+      slashIndex + 1,
+    );
+
+  const {
+    data: storedObjects,
+    error: listError,
+  } = await admin.storage
+    .from(
+      SERVICE_PHOTO_BUCKET,
+    )
+    .list(
+      folder,
+      {
+        limit: 100,
+        search: fileName,
+      },
+    );
 
   if (
     listError ||
-    !storedObjects?.some((object) => object.name === fileName)
+    !storedObjects?.some(
+      (object) =>
+        object.name ===
+        fileName,
+    )
+  ) {
+    await admin.storage
+      .from(
+        SERVICE_PHOTO_BUCKET,
+      )
+      .remove([
+        storagePath,
+      ]);
+
+    return actionFailure(
+      "Supabase has not confirmed this photo yet. Select it and try the upload again.",
+    );
+  }
+
+  const result =
+    await attachFieldServicePhoto(
+      admin,
+      {
+        routeStopId:
+          stop.id,
+        actorProfileId:
+          auth.userId,
+        photoType,
+        storageBucket,
+        storagePath,
+        contentType,
+        fileSize:
+          size,
+      },
+    );
+
+  if (!result.ok) {
+    await admin.storage
+      .from(
+        SERVICE_PHOTO_BUCKET,
+      )
+      .remove([
+        storagePath,
+      ]);
+
+    return actionFailure(
+      result.message,
+    );
+  }
+
+  revalidateField(
+    visit.id,
+  );
+
+  return actionSuccess(
+    result.data
+      .alreadyAttached
+      ? "Photo was already attached to this stop."
+      : "Photo confirmed and attached to this stop.",
+    {
+      photoId:
+        result.data.photoId,
+    },
+  );
+}
+
+export async function discardPreparedServicePhotoUploadAction(
+  input: DiscardServicePhotoUploadInput,
+): Promise<ActionResult> {
+  const auth =
+    await requireFieldUser();
+
+  const visitId =
+    String(
+      input?.visitId ??
+      "",
+    ).trim();
+
+  const photoType =
+    String(
+      input?.photoType ??
+      "",
+    ).trim() as PhotoType;
+
+  const storageBucket =
+    String(
+      input?.storageBucket ??
+      "",
+    ).trim();
+
+  const storagePath =
+    String(
+      input?.storagePath ??
+      "",
+    ).trim();
+
+  if (
+    !visitId ||
+    !validServicePhotoTypes.includes(
+      photoType,
+    ) ||
+    storageBucket !==
+      SERVICE_PHOTO_BUCKET
   ) {
     return actionFailure(
-      "Supabase has not confirmed this photo yet. Try the upload again.",
+      "The unfinished photo upload could not be identified.",
     );
   }
 
-  const { data: existingPhoto } = await admin
-    .from("service_photos")
+  const {
+    admin,
+    visit,
+    accessError,
+  } =
+    await getStopBundle(
+      visitId,
+      auth,
+    );
+
+  if (!visit) {
+    return actionFailure(
+      accessError ??
+        "This stop could not be loaded.",
+    );
+  }
+
+  const requiredPrefix =
+    `${visit.id}/${photoType}/`;
+
+  if (
+    !storagePath.startsWith(
+      requiredPrefix,
+    ) ||
+    storagePath.includes(
+      "..",
+    )
+  ) {
+    return actionFailure(
+      "The unfinished upload path is invalid.",
+    );
+  }
+
+  const {
+    data: attachedPhoto,
+  } = await admin
+    .from(
+      "service_photos",
+    )
     .select("id")
-    .eq("storage_bucket", SERVICE_PHOTO_BUCKET)
-    .eq("storage_path", storagePath)
+    .eq(
+      "storage_bucket",
+      storageBucket,
+    )
+    .eq(
+      "storage_path",
+      storagePath,
+    )
     .maybeSingle();
 
-  if (existingPhoto?.id) {
-    return actionSuccess("Photo already attached to this stop.", {
-      photoId: existingPhoto.id,
-    });
+  if (attachedPhoto?.id) {
+    return actionSuccess(
+      "The photo was already attached and was not discarded.",
+    );
   }
 
-  const { data: photo, error: insertError } = await admin
-    .from("service_photos")
-    .insert({
-      service_visit_id: visit.id,
-      route_stop_id: stop.id,
-      booking_id: booking.id,
-      customer_id: booking.customer_id,
-      photo_type: photoType,
-      storage_bucket: SERVICE_PHOTO_BUCKET,
-      storage_path: storagePath,
-      uploaded_by: auth.userId,
-      is_customer_visible:
-        photoType === "before" || photoType === "after",
-    })
-    .select("id")
-    .single();
+  const {
+    error,
+  } = await admin.storage
+    .from(
+      storageBucket,
+    )
+    .remove([
+      storagePath,
+    ]);
 
-  if (insertError || !photo?.id) {
-    await admin.storage
-      .from(SERVICE_PHOTO_BUCKET)
-      .remove([storagePath]);
-
+  if (error) {
     return actionFailure(
-      insertError?.message
-        ? `Photo reached storage, but the service record failed: ${insertError.message}`
-        : "Photo reached storage, but it could not be attached to the stop.",
+      "The unfinished upload could not be cleaned up automatically.",
     );
   }
 
-  const sideEffects: Array<PromiseLike<unknown>> = [
-    recordServiceEvent({
-      actorId: auth.userId,
-      booking,
-      visit,
-      stop,
-      eventType: `${photoType}_photo_uploaded`,
-      message: `1 ${photoType} photo uploaded and confirmed.`,
-      metadata: { path: storagePath, directUpload: true },
-    }),
-  ];
-
-  if (photoType === "before") {
-    sideEffects.push(
-      admin
-        .from("service_visits")
-        .update({
-          before_photo_urls: Array.from(
-            new Set([...(visit.before_photo_urls ?? []), storagePath]),
-          ),
-        })
-        .eq("id", visit.id),
-    );
-  }
-
-  if (photoType === "after") {
-    sideEffects.push(
-      admin
-        .from("service_visits")
-        .update({
-          after_photo_urls: Array.from(
-            new Set([...(visit.after_photo_urls ?? []), storagePath]),
-          ),
-        })
-        .eq("id", visit.id),
-    );
-  }
-
-  await Promise.allSettled(sideEffects);
-
-  revalidateField(visit.id);
-
-  return actionSuccess("Photo confirmed and attached to this stop.", {
-    photoId: photo.id,
-  });
+  return actionSuccess(
+    "Unfinished photo upload discarded.",
+  );
 }
 
 function extensionForServicePhoto(contentType: string) {
@@ -1261,80 +1474,6 @@ function extensionForServicePhoto(contentType: string) {
   }
 }
 
-
-export async function uploadServicePhotosAction(formData: FormData) {
-  const auth = await requireFieldUser();
-  const visitId = cleanId(formData, "visitId");
-  const photoType = cleanId(formData, "photoType") as PhotoType;
-  const { admin, stop, visit, booking } = await getStopBundle(
-    visitId,
-    auth,
-  );
-  if (!visit || !stop || !booking || !["before", "after", "issue", "other"].includes(photoType)) {
-    return;
-  }
-
-  const files = formData
-    .getAll("photos")
-    .filter((file): file is File => file instanceof File && file.size > 0);
-
-  const uploadedPaths: string[] = [];
-  for (const file of files) {
-    const extension = file.type === "image/png" ? "png" : "jpg";
-    const storagePath = `${visit.id}/${photoType}/${Date.now()}-${crypto.randomUUID()}.${extension}`;
-    const buffer = Buffer.from(await file.arrayBuffer());
-    const { error } = await admin.storage
-      .from("service-photos")
-      .upload(storagePath, buffer, {
-        contentType: file.type || "image/jpeg",
-        upsert: false,
-      });
-
-    if (error) continue;
-
-    uploadedPaths.push(storagePath);
-    await admin.from("service_photos").insert({
-      service_visit_id: visit.id,
-      route_stop_id: stop.id,
-      booking_id: booking.id,
-      customer_id: booking.customer_id,
-      photo_type: photoType,
-      storage_bucket: "service-photos",
-      storage_path: storagePath,
-      uploaded_by: auth.userId,
-      is_customer_visible: photoType === "before" || photoType === "after",
-    });
-  }
-
-  if (uploadedPaths.length && (photoType === "before" || photoType === "after")) {
-    if (photoType === "before") {
-      await admin
-        .from("service_visits")
-        .update({ before_photo_urls: [...(visit.before_photo_urls ?? []), ...uploadedPaths] })
-        .eq("id", visit.id);
-    } else {
-      await admin
-        .from("service_visits")
-        .update({ after_photo_urls: [...(visit.after_photo_urls ?? []), ...uploadedPaths] })
-        .eq("id", visit.id);
-    }
-  }
-
-  if (uploadedPaths.length) {
-    await recordServiceEvent({
-      actorId: auth.userId,
-      booking,
-      visit,
-      stop,
-      eventType: `${photoType}_photos_uploaded`,
-      message: `${uploadedPaths.length} ${photoType} photo(s) uploaded.`,
-      metadata: { paths: uploadedPaths },
-    });
-  }
-
-  revalidateField(visit.id);
-}
-
 export async function deleteServicePhotoAction(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -1342,10 +1481,16 @@ export async function deleteServicePhotoAction(
     await requireFieldUser();
 
   const photoId =
-    cleanId(formData, "photoId");
+    cleanId(
+      formData,
+      "photoId",
+    );
 
-  const visitId =
-    cleanId(formData, "visitId");
+  const submittedVisitId =
+    cleanId(
+      formData,
+      "visitId",
+    );
 
   if (!photoId) {
     return actionFailure(
@@ -1356,163 +1501,91 @@ export async function deleteServicePhotoAction(
   const admin =
     getSupabaseAdmin();
 
-  const {
-    data: photo,
-    error: photoError,
-  } = await admin
-    .from("service_photos")
-    .select("*")
-    .eq("id", photoId)
-    .maybeSingle();
-
-  if (photoError) {
-    return fieldMutationFailure(
-      "load_service_photo",
-      "The photo record could not be loaded.",
-      photoError,
+  const result =
+    await deleteFieldServicePhoto(
+      admin,
       {
         photoId,
-        visitId,
+        actorProfileId:
+          auth.userId,
       },
     );
+
+  if (!result.ok) {
+    return actionFailure(
+      result.message,
+    );
   }
 
-  if (!photo) {
-    return actionFailure(
-      "This photo no longer exists.",
-    );
-  }
-
-  const photoAccess =
-    await getAuthorizedFieldStopBundle(
-      {
-        auth,
-        routeStopId:
-          photo.route_stop_id,
-        visitId:
-          photo.service_visit_id ??
-          (visitId || null),
-        bookingId:
-          photo.booking_id,
-      },
-    );
-  
-  if (!photoAccess.ok) {
-    return actionFailure(
-      photoAccess.message,
-    );
-  }
-  
   if (
-    photo.route_stop_id &&
-    photo.route_stop_id !==
-      photoAccess.stop.id
+    result.data
+      .alreadyDeleted
   ) {
-    return actionFailure(
-      "The photo does not belong to this field stop.",
+    revalidateField(
+      submittedVisitId ||
+        undefined,
     );
-  }
-  
-  if (
-    photo.service_visit_id &&
-    photo.service_visit_id !==
-      photoAccess.visit.id
-  ) {
-    return actionFailure(
-      "The photo does not belong to this service visit.",
-    );
-  }
-  
-  if (
-    visitId &&
-    photo.service_visit_id &&
-    photo.service_visit_id !==
-      visitId
-  ) {
-    return actionFailure(
-      "The photo does not belong to this service visit.",
-    );
-  }
 
-  const {
-    data: deletedPhoto,
-    error: deleteError,
-  } = await admin
-    .from("service_photos")
-    .delete()
-    .eq("id", photo.id)
-    .select("id")
-    .maybeSingle();
-
-  if (
-    deleteError ||
-    !deletedPhoto
-  ) {
-    return fieldMutationFailure(
-      "delete_service_photo",
-      "The photo could not be removed from the stop.",
-      deleteError,
-      {
-        photoId,
-        visitId:
-          visitId ||
-          photo.service_visit_id,
-      },
+    return actionSuccess(
+      "This photo was already deleted.",
     );
   }
-
-  const {
-    error: storageError,
-  } = await admin.storage
-    .from(photo.storage_bucket)
-    .remove([
-      photo.storage_path,
-    ]);
 
   let storageWarning = "";
 
-  if (storageError) {
-    const requestId =
-      createRequestId();
+  if (
+    result.data
+      .storageBucket &&
+    result.data
+      .storagePath
+  ) {
+    const {
+      error: storageError,
+    } = await admin.storage
+      .from(
+        result.data
+          .storageBucket,
+      )
+      .remove([
+        result.data
+          .storagePath,
+      ]);
 
-    logger.warn(
-      "field_photo_storage_cleanup_failed",
-      {
-        requestId,
-        action:
-          "delete_service_photo",
-        userId: auth.userId,
-        error: storageError,
-        metadata: {
-          photoId,
-          storageBucket:
-            photo.storage_bucket,
-          storagePath:
-            photo.storage_path,
+    if (storageError) {
+      const requestId =
+        createRequestId();
+
+      logger.warn(
+        "field_photo_storage_cleanup_failed",
+        {
+          requestId,
+          action:
+            "delete_service_photo",
+          userId:
+            auth.userId,
+          error:
+            storageError,
+          metadata: {
+            photoId,
+            storageBucket:
+              result.data
+                .storageBucket,
+            storagePath:
+              result.data
+                .storagePath,
+          },
         },
-      },
-    );
+      );
 
-    storageWarning =
-      ` The stop record was updated, but storage cleanup needs review. Reference: ${requestId}`;
+      storageWarning =
+        ` The proof record was removed, but storage cleanup needs review. Reference: ${requestId}`;
+    }
   }
 
-  await recordServiceEvent({
-    actorId: auth.userId,
-    eventType:
-      "photo_deleted",
-    message:
-      "A service photo was deleted before completion.",
-    metadata: {
-      photoId,
-      storagePath:
-        photo.storage_path,
-    },
-  });
-
   revalidateField(
-    visitId ||
-      photo.service_visit_id,
+    result.data.visitId ??
+      submittedVisitId ||
+      undefined,
   );
 
   return actionSuccess(
@@ -1555,20 +1628,22 @@ export async function completeStopAction(
     );
   }
 
-  const photoExceptionRecorded =
-    hasPhotoUploadExceptionNote(
-      stop.technician_notes ??
-        visit.technician_notes,
-    );
-
   const beforePhotoException =
-    photoExceptionRecorded &&
+    Boolean(
+      stop
+        .before_photo_exception_reason
+        ?.trim(),
+    ) &&
     stop.issue_flags.includes(
       BEFORE_PHOTO_EXCEPTION_FLAG,
     );
 
   const afterPhotoException =
-    photoExceptionRecorded &&
+    Boolean(
+      stop
+        .after_photo_exception_reason
+        ?.trim(),
+    ) &&
     stop.issue_flags.includes(
       AFTER_PHOTO_EXCEPTION_FLAG,
     );
