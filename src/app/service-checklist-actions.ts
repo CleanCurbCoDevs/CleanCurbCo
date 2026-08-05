@@ -78,6 +78,33 @@ async function saveChecklistItemsFromForm(
   );
 }
 
+function validatedChecklistItemIds(
+  formData: FormData,
+  allowedItemIds: Set<string>,
+) {
+  const itemIds = formData
+    .getAll("itemId")
+    .map((value) =>
+      cleanString(value, 80),
+    )
+    .filter(Boolean);
+
+  if (
+    itemIds.some(
+      (itemId) =>
+        !allowedItemIds.has(
+          itemId,
+        ),
+    )
+  ) {
+    return null;
+  }
+
+  return Array.from(
+    new Set(itemIds),
+  );
+}
+
 export async function saveServiceChecklistDraftAction(formData: FormData) {
   const visitId = cleanString(formData.get("visitId"), 80);
   const returnTo = returnToFrom(formData, visitId ? `/field/stops/${visitId}` : "/field/today");
@@ -133,33 +160,6 @@ export async function saveServiceChecklistDraftAction(formData: FormData) {
     actorId:
       auth.userId,
   });
-
-  function validatedChecklistItemIds(
-    formData: FormData,
-    allowedItemIds: Set<string>,
-  ) {
-    const itemIds = formData
-      .getAll("itemId")
-      .map((value) =>
-        cleanString(value, 80),
-      )
-      .filter(Boolean);
-  
-    if (
-      itemIds.some(
-        (itemId) =>
-          !allowedItemIds.has(
-            itemId,
-          ),
-      )
-    ) {
-      return null;
-    }
-  
-    return Array.from(
-      new Set(itemIds),
-    );
-  }
   
   await admin
     .from("service_checklists")
