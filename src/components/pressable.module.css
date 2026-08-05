@@ -1,0 +1,32 @@
+.pressable {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  transition:
+    transform 120ms ease,
+    filter 120ms ease,
+    opacity 120ms ease;
+}
+
+.pressable:active:not(:disabled) {
+  transform: translateY(1px) scale(0.985);
+  filter: brightness(0.94);
+}
+
+.pressable:disabled {
+  cursor: not-allowed;
+}
+
+.pressable[data-pending="true"] {
+  cursor: progress;
+  opacity: 0.78;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pressable {
+    transition: none;
+  }
+
+  .pressable:active:not(:disabled) {
+    transform: none;
+  }
+}
