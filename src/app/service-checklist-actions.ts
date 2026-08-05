@@ -300,9 +300,6 @@ export async function submitServiceChecklistAction(formData: FormData) {
         pdf_storage_bucket: "service-documents",
         pdf_storage_path: storagePath,
         pdf_generated_at: submittedAt,
-        service_completed: true,
-        completed_by: auth.userId,
-        completed_at: submittedAt,
       })
       .eq("id", bundle.checklist.id);
 
