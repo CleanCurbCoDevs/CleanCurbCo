@@ -241,6 +241,10 @@ if (!stripeCustomerId) {
           `Clean Curb Co. booking for ${booking.street_address}`,
         payment_type: "booking",
         metadata: paymentMetadata,
+        checkout_generation: 1,
+        checkout_state: "creating",
+        checkout_attempted_at:
+          new Date().toISOString(),
       })
       .select("*")
       .single();
@@ -436,6 +440,14 @@ const session =
           stripe_checkout_session_id: session.id,
           stripe_payment_intent_id: paymentIntentId,
           checkout_url: checkoutUrl,
+          checkout_state:
+            "ready",
+
+          checkout_finalized_at:
+            new Date().toISOString(),
+
+          checkout_error:
+            null,
           metadata: {
             ...paymentMetadata,
             payment_id: payment.id,
@@ -472,19 +484,57 @@ const session =
         .eq("id", booking.id),
     ]);
 
-    if (paymentUpdate.error || bookingUpdate.error) {
-      logger.warn("booking_checkout_database_update_incomplete", {
-        requestId,
-        route: "/api/bookings",
-        bookingId: booking.id,
-        error:
-          paymentUpdate.error ??
-          bookingUpdate.error,
-        metadata: {
-          paymentId: payment.id,
-          stripeCheckoutSessionId: session.id,
+    const databaseUpdateError =
+      paymentUpdate.error ??
+      bookingUpdate.error;
+
+    if (databaseUpdateError) {
+      let expirationError:
+        unknown = null;
+
+      try {
+        if (
+          session.status ===
+          "open"
+        ) {
+          await stripe
+            .checkout
+            .sessions
+            .expire(
+              session.id,
+            );
+        }
+      } catch (error) {
+        expirationError =
+          error;
+      }
+
+      logger.error(
+        "booking_checkout_database_update_incomplete",
+        {
+          requestId,
+          route:
+            "/api/bookings",
+          bookingId:
+            booking.id,
+          error:
+            databaseUpdateError,
+          metadata: {
+            paymentId:
+              payment.id,
+            stripeCheckoutSessionId:
+              session.id,
+            stripeSessionExpirationFailed:
+              Boolean(
+                expirationError,
+              ),
+          },
         },
-      });
+      );
+
+      throw new Error(
+        "Stripe Checkout could not be safely attached to the booking.",
+      );
     }
 
     logger.info("booking_checkout_created", {
@@ -515,7 +565,11 @@ const session =
       await admin
         .from("payments")
         .update({
-          status: "cancelled",
+        status: "failed",
+          checkout_state:
+            "failed",
+          checkout_error:
+            message,
           metadata: {
             ...paymentMetadata,
             checkout_creation_failed_at:
