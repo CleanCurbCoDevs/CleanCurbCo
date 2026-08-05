@@ -155,23 +155,45 @@ async function updatePaymentState(input: {
     );
   }
 
+  const preserveSettledPayment =
+    existingPayment.status ===
+      "refunded" ||
+    (
+      existingPayment.status ===
+        "paid" &&
+      input.paymentStatus !==
+        "refunded"
+    );
+
+  const effectivePaymentStatus:
+    PaymentStatus =
+      existingPayment.status ===
+      "refunded"
+        ? "refunded"
+        : preserveSettledPayment
+          ? "paid"
+          : input.paymentStatus;
+
   const checkoutState:
     PaymentRow["checkout_state"] =
-      input.paymentStatus ===
-      "paid"
-        ? "paid"
-        : input.paymentStatus ===
-            "failed"
-          ? "failed"
-          : input.paymentStatus ===
-              "cancelled"
-            ? "cancelled"
-            : "ready";
+      effectivePaymentStatus ===
+      "refunded"
+        ? "refunded"
+        : effectivePaymentStatus ===
+            "paid"
+          ? "paid"
+          : effectivePaymentStatus ===
+              "failed"
+            ? "failed"
+            : effectivePaymentStatus ===
+                "cancelled"
+              ? "cancelled"
+              : "ready";
 
   const paymentUpdate:
     Partial<PaymentRow> = {
       status:
-        input.paymentStatus,
+        effectivePaymentStatus,
 
       stripe_checkout_session_id:
         input.checkoutSessionId ??
@@ -186,27 +208,38 @@ async function updatePaymentState(input: {
         undefined,
 
       received_at:
-        input.paymentStatus ===
-        "paid"
-          ? now
-          : undefined,
+        existingPayment.received_at ??
+        (
+          effectivePaymentStatus ===
+          "paid"
+            ? now
+            : undefined
+        ),
 
       checkout_state:
         checkoutState,
 
       checkout_finalized_at:
-        input.paymentStatus ===
-        "paid"
-          ? now
-          : existingPayment
-              .checkout_finalized_at,
+        existingPayment
+          .checkout_finalized_at ??
+        (
+          effectivePaymentStatus ===
+            "paid" ||
+          effectivePaymentStatus ===
+            "refunded"
+            ? now
+            : null
+        ),
 
       checkout_error:
-        input.paymentStatus ===
-        "failed"
-          ? input.failureMessage ??
-            "Stripe reported a failed payment."
-          : null,
+        preserveSettledPayment
+          ? existingPayment
+              .checkout_error
+          : effectivePaymentStatus ===
+              "failed"
+            ? input.failureMessage ??
+              "Stripe reported a failed payment."
+            : null,
 
       metadata: {
         ...(
@@ -227,6 +260,7 @@ async function updatePaymentState(input: {
     };
 
   if (
+    !preserveSettledPayment &&
     input.receivedAmount !== undefined &&
     input.receivedAmount !== null
   ) {
