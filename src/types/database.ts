@@ -511,6 +511,23 @@ export type ServiceChecklistRow = {
   pdf_storage_path: string | null;
   pdf_generated_at: string | null;
   correction_notes: string | null;
+  submission_generation:
+    number;
+
+  submission_state:
+    | "draft"
+    | "creating"
+    | "ready"
+    | "failed";
+
+  submission_started_at:
+    string | null;
+
+  submission_finalized_at:
+    string | null;
+
+  submission_error:
+    string | null;
   arrived_at_property: boolean;
   bins_located: boolean;
   before_photos_taken: boolean;
@@ -583,8 +600,14 @@ export type ServiceChecklistDocumentRow = {
   storage_path: string;
   is_customer_visible: boolean;
   generated_by: string | null;
-  generated_at: string;
-  notes: string | null;
+  generated_at:
+    string;
+
+  submission_generation:
+    number;
+
+  notes:
+    string | null;
 };
 
 export type ServicePhotoRow = {
