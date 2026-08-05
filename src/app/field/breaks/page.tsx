@@ -29,7 +29,9 @@ import {
 } from "@/app/field/actions";
 import { FieldShell } from "@/components/shells/field-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
-import { getFieldContext } from "@/lib/field-data";
+import {
+  getFieldBreaksContext,
+} from "@/lib/server/field-page-data";
 import { isAdminRole } from "@/lib/supabase/roles";
 
 export const metadata: Metadata = {
@@ -163,7 +165,10 @@ export default async function FieldBreaksPage({
   searchParams,
 }: FieldBreaksPageProps) {
   const params = await searchParams;
-  const context = await getFieldContext("/field/breaks");
+  const context =
+    await getFieldBreaksContext(
+      "/field/breaks",
+    );
 
   if (context.auth.status !== "ok") {
     return (
