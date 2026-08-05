@@ -1,8 +1,21 @@
 "use client";
 
-import { useState, useTransition } from "react";
-import { useRouter } from "next/navigation";
-import { useActionFeedback } from "@/components/action-feedback";
+import {
+  useEffect,
+  useState,
+  useTransition,
+} from "react";
+
+import {
+  useRouter,
+} from "next/navigation";
+
+import {
+  useActionFeedback,
+} from "@/components/action-feedback";
+
+import pressableStyles
+  from "@/components/pressable.module.css";
 
 type PaymentLinkButtonProps = {
   bookingId: string;
@@ -21,6 +34,26 @@ type PaymentLinkButtonProps = {
   forceOneTime?: boolean;
 };
 
+async function copyText(
+  value: string,
+) {
+  if (
+    !navigator.clipboard
+      ?.writeText
+  ) {
+    return false;
+  }
+
+  try {
+    await navigator.clipboard
+      .writeText(value);
+
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export function PaymentLinkButton({
   bookingId,
   serviceVisitId,
@@ -37,61 +70,169 @@ export function PaymentLinkButton({
   redirectOnCreate = false,
   forceOneTime = true,
 }: PaymentLinkButtonProps) {
-  
-  const router = useRouter();
-  const feedback = useActionFeedback();
-  const [isPending, startTransition] = useTransition();
-  const [checkoutUrl, setCheckoutUrl] = useState(existingCheckoutUrl ?? "");
-  const [error, setError] = useState("");
+  const router =
+    useRouter();
+
+  const feedback =
+    useActionFeedback();
+
+  const [
+    isPending,
+    startTransition,
+  ] = useTransition();
+
+  const [
+    checkoutUrl,
+    setCheckoutUrl,
+  ] = useState(
+    existingCheckoutUrl ?? "",
+  );
+
+  const [
+    error,
+    setError,
+  ] = useState("");
+
+  useEffect(() => {
+    setCheckoutUrl(
+      existingCheckoutUrl ?? "",
+    );
+  }, [
+    existingCheckoutUrl,
+  ]);
 
   function createLink() {
     setError("");
-    startTransition(async () => {
-      const response = await fetch("/api/stripe/create-checkout-session", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          booking_id: bookingId,
-          service_visit_id: serviceVisitId,
-          route_stop_id: routeStopId,
-          payment_id: paymentId,
-          amount,
-          payment_type: paymentType,
-          frequency,
-          bin_count: binCount,
-          add_ons: addOns,
-          returnPath,
-          forceOneTime,
-        }),
-      });
-      
-      const data = (await response.json()) as {
-        checkoutUrl?: string;
-        error?: string;
-      };
 
-      if (!response.ok || !data.checkoutUrl) {
-        const message = data.error ?? "Could not create a payment link.";
-        setError(message);
-        feedback.error(message);
-        return;
-      }
-      if (redirectOnCreate) {
-        window.location.assign(data.checkoutUrl);
-        return;
-      }
-      
-      setCheckoutUrl(data.checkoutUrl);
-      await navigator.clipboard?.writeText(data.checkoutUrl).catch(() => undefined);
-      feedback.success("Stripe payment link created and copied.");
-      router.refresh();
-    });
+    startTransition(
+      async () => {
+        try {
+          const response =
+            await fetch(
+              "/api/stripe/create-checkout-session",
+              {
+                method:
+                  "POST",
+
+                headers: {
+                  "Content-Type":
+                    "application/json",
+                },
+
+                body:
+                  JSON.stringify({
+                    booking_id:
+                      bookingId,
+
+                    service_visit_id:
+                      serviceVisitId,
+
+                    route_stop_id:
+                      routeStopId,
+
+                    payment_id:
+                      paymentId,
+
+                    amount,
+
+                    payment_type:
+                      paymentType,
+
+                    frequency,
+
+                    bin_count:
+                      binCount,
+
+                    add_ons:
+                      addOns,
+
+                    returnPath,
+
+                    forceOneTime,
+                  }),
+              },
+            );
+
+          let data: {
+            checkoutUrl?: string;
+            error?: string;
+          } = {};
+
+          try {
+            data =
+              await response.json();
+          } catch {
+            data = {};
+          }
+
+          if (
+            !response.ok ||
+            !data.checkoutUrl
+          ) {
+            const message =
+              data.error ??
+              "Could not create a payment link.";
+
+            setError(
+              message,
+            );
+
+            feedback.error(
+              message,
+            );
+
+            return;
+          }
+
+          if (redirectOnCreate) {
+            window.location.assign(
+              data.checkoutUrl,
+            );
+
+            return;
+          }
+
+          setCheckoutUrl(
+            data.checkoutUrl,
+          );
+
+          const copied =
+            await copyText(
+              data.checkoutUrl,
+            );
+
+          feedback.success(
+            copied
+              ? "Stripe payment link created and copied."
+              : "Stripe payment link created. Use Copy Link to copy it manually.",
+          );
+
+          router.refresh();
+        } catch {
+          const message =
+            "The payment-link request failed. Check your connection and try again.";
+
+          setError(message);
+          feedback.error(message);
+        }
+      },
+    );
   }
 
   return (
     <div className="payment-link-control">
       <button
-        className="button button-dark"
+        aria-busy={isPending}
+        className={[
+          "button",
+          "button-dark",
+          pressableStyles.pressable,
+        ].join(" ")}
+        data-pending={
+          isPending
+            ? "true"
+            : undefined
+        }
         type="button"
         onClick={createLink}
         disabled={isPending}
@@ -102,29 +243,65 @@ export function PaymentLinkButton({
             : "Creating..."
           : label}
       </button>
-      {!redirectOnCreate && checkoutUrl ? (
-        <a className="button button-outline" href={checkoutUrl} target="_blank" rel="noreferrer">
+
+      {!redirectOnCreate &&
+      checkoutUrl ? (
+        <a
+          className="button button-outline"
+          href={checkoutUrl}
+          target="_blank"
+          rel="noreferrer"
+        >
           Open Link
         </a>
       ) : null}
-      {!redirectOnCreate && checkoutUrl ? (
+
+      {!redirectOnCreate &&
+      checkoutUrl ? (
         <button
-          className="button button-outline"
+          className={[
+            "button",
+            "button-outline",
+            pressableStyles.pressable,
+          ].join(" ")}
           type="button"
           onClick={() => {
-            void navigator.clipboard?.writeText(checkoutUrl);
-            feedback.success("Payment link copied.");
+            void (
+              async () => {
+                const copied =
+                  await copyText(
+                    checkoutUrl,
+                  );
+
+                if (copied) {
+                  feedback.success(
+                    "Payment link copied.",
+                  );
+                } else {
+                  feedback.error(
+                    "The payment link could not be copied automatically.",
+                  );
+                }
+              }
+            )();
           }}
         >
           Copy Link
         </button>
       ) : null}
-      {!redirectOnCreate && checkoutUrl ? (
+
+      {!redirectOnCreate &&
+      checkoutUrl ? (
         <p className="muted">
-          Link copied and saved to the booking.
+          Payment link saved to the booking.
         </p>
       ) : null}
-      {error ? <p className="form-error">{error}</p> : null}
+
+      {error ? (
+        <p className="form-error">
+          {error}
+        </p>
+      ) : null}
     </div>
   );
 }
