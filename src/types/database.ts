@@ -659,7 +659,31 @@ export type PaymentRow = {
   checkout_url: string | null;
   description: string | null;
   payment_type: string | null;
-  metadata: Record<string, unknown>;
+  metadata:
+    Record<string, unknown>;
+
+  checkout_generation:
+    number;
+
+  checkout_state:
+    | "not_started"
+    | "creating"
+    | "ready"
+    | "paid"
+    | "failed"
+    | "cancelled";
+
+  checkout_attempted_at:
+    string | null;
+
+  checkout_finalized_at:
+    string | null;
+
+  checkout_error:
+    string | null;
+
+  last_payment_email_sent_at:
+    string | null;
 };
 
 export type CareerApplicationRow = {
