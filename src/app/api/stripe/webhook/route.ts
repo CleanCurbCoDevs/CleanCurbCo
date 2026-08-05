@@ -155,18 +155,76 @@ async function updatePaymentState(input: {
     );
   }
 
-  const paymentUpdate: Partial<PaymentRow> = {
-    status: input.paymentStatus,
-    stripe_checkout_session_id: input.checkoutSessionId ?? undefined,
-    stripe_payment_intent_id: input.paymentIntentId ?? undefined,
-    stripe_subscription_id: input.subscriptionId ?? undefined,
-    received_at: input.paymentStatus === "paid" ? now : undefined,
-    metadata: {
-      ...(existingPayment?.metadata ?? {}),
-      ...(input.metadata ?? {}),
-      last_stripe_event: input.eventType,
-    },
-  };
+  const checkoutState:
+    PaymentRow["checkout_state"] =
+      input.paymentStatus ===
+      "paid"
+        ? "paid"
+        : input.paymentStatus ===
+            "failed"
+          ? "failed"
+          : input.paymentStatus ===
+              "cancelled"
+            ? "cancelled"
+            : "ready";
+
+  const paymentUpdate:
+    Partial<PaymentRow> = {
+      status:
+        input.paymentStatus,
+
+      stripe_checkout_session_id:
+        input.checkoutSessionId ??
+        undefined,
+
+      stripe_payment_intent_id:
+        input.paymentIntentId ??
+        undefined,
+
+      stripe_subscription_id:
+        input.subscriptionId ??
+        undefined,
+
+      received_at:
+        input.paymentStatus ===
+        "paid"
+          ? now
+          : undefined,
+
+      checkout_state:
+        checkoutState,
+
+      checkout_finalized_at:
+        input.paymentStatus ===
+        "paid"
+          ? now
+          : existingPayment
+              .checkout_finalized_at,
+
+      checkout_error:
+        input.paymentStatus ===
+        "failed"
+          ? input.failureMessage ??
+            "Stripe reported a failed payment."
+          : null,
+
+      metadata: {
+        ...(
+          existingPayment
+            .metadata ?? {}
+        ),
+
+        ...(
+          input.metadata ?? {}
+        ),
+
+        last_stripe_event:
+          input.eventType,
+
+        last_stripe_event_id:
+          input.stripeEventId,
+      },
+    };
 
   if (
     input.receivedAmount !== undefined &&
