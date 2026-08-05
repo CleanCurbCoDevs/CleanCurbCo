@@ -125,7 +125,7 @@ function fieldMutationFailure(
   message: string,
   error?: unknown,
   metadata?: Record<string, unknown>,
-): ActionResult {
+): ActionResult<never> {
   const requestId =
     createRequestId();
 
