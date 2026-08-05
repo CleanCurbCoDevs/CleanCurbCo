@@ -468,6 +468,17 @@ export type RouteStopRow = {
   completed_at: string | null;
   technician_notes: string | null;
   issue_flags: string[];
+  before_photo_exception_reason:
+    string | null;
+
+  after_photo_exception_reason:
+    string | null;
+
+  photo_exception_recorded_at:
+    string | null;
+
+  photo_exception_recorded_by_user_id:
+    string | null;
   optimoroute_order_no: string | null;
   optimoroute_order_id: string | null;
   optimoroute_sync_status: OptimoRouteSyncStatus;
@@ -589,6 +600,14 @@ export type ServicePhotoRow = {
   uploaded_by: string | null;
   caption: string | null;
   is_customer_visible: boolean;
+  content_type:
+    string | null;
+
+  file_size:
+    number | null;
+
+  confirmed_at:
+    string | null;
 };
 
 export type RouteBreakRow = {
