@@ -1583,9 +1583,10 @@ export async function deleteServicePhotoAction(
   }
 
   revalidateField(
-    result.data.visitId ??
-      submittedVisitId ||
-      undefined,
+    (
+      result.data.visitId ??
+      submittedVisitId
+    ) || undefined,
   );
 
   return actionSuccess(
