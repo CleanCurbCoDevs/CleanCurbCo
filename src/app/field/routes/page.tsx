@@ -12,7 +12,13 @@ import Link from "next/link";
 
 import { FieldShell } from "@/components/shells/field-shell";
 import { humanizeStatus } from "@/lib/booking-utils";
-import { businessToday, getFieldContext } from "@/lib/field-data";
+import {
+  businessToday,
+} from "@/lib/field-data";
+
+import {
+  getFieldRoutesContext,
+} from "@/lib/server/field-page-data";
 import { sortStopsForField } from "@/lib/optimoroute/route-sync";
 
 export const metadata: Metadata = {
@@ -20,7 +26,10 @@ export const metadata: Metadata = {
 };
 
 export default async function FieldRoutesPage() {
-  const context = await getFieldContext("/field/routes");
+  const context =
+    await getFieldRoutesContext(
+      "/field/routes",
+    );
   const today = businessToday();
 
   const visibleRoutes = context.routeDays
@@ -116,9 +125,16 @@ function RouteGroup({
   emptyTitle: string;
   emptyDescription: string;
   routes: Awaited<
-    ReturnType<typeof getFieldContext>
+    ReturnType<
+      typeof getFieldRoutesContext
+    >
   >["routeDays"];
-  context: Awaited<ReturnType<typeof getFieldContext>>;
+
+  context: Awaited<
+    ReturnType<
+      typeof getFieldRoutesContext
+    >
+  >;
   today: string;
   icon: typeof Route;
 }) {
