@@ -12,7 +12,15 @@ import {
 } from "@/lib/server/field-access";
 import { getCurrentProfile } from "@/lib/supabase/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
-import { isFieldRole } from "@/lib/supabase/roles";
+import {
+  isAdminRole,
+  isFieldRole,
+} from "@/lib/supabase/roles";
+import {
+  failStripeCheckout,
+  finalizeStripeCheckout,
+  reserveStripeCheckout,
+} from "@/lib/server/payment-operations";
 import type {
   BookingRow,
   PaymentRow,
@@ -55,15 +63,28 @@ function cleanText(payload: CheckoutPayload, key: string, fallback = "") {
   return typeof value === "string" ? value.trim().slice(0, 220) : fallback;
 }
 
-function cleanAmount(payload: CheckoutPayload, fallback: number) {
-  const rawAmount = payload.amount;
+function cleanAmount(
+  payload: CheckoutPayload,
+  fallback: number,
+) {
+  const rawAmount =
+    payload.amount;
+
   const amount =
     typeof rawAmount === "number"
       ? rawAmount
-      : typeof rawAmount === "string"
+      : typeof rawAmount ===
+          "string"
         ? Number(rawAmount)
         : fallback;
-  return Number.isFinite(amount) ? Math.max(1, Math.round(amount)) : fallback;
+
+  if (!Number.isFinite(amount)) {
+    return fallback;
+  }
+
+  return Math.round(
+    amount * 100,
+  ) / 100;
 }
 
 function cleanFrequency(
@@ -192,7 +213,8 @@ export async function POST(request: Request) {
   const paymentId = cleanId(payload, "payment_id", "paymentId");
   let routeStopId = cleanId(payload, "route_stop_id", "routeStopId");
   const requestedCustomerId = cleanId(payload, "customer_id", "customerId");
-  const paymentType = cleanPaymentType(payload);
+  const requestedPaymentType =
+    cleanPaymentType(payload);
 
   let routeStop: RouteStopRow | null = null;
   let booking: BookingRow | null = null;
@@ -492,280 +514,1033 @@ export async function POST(request: Request) {
     );
   }
 
-  const isFieldUser = isFieldRole(auth.profile.role);
+  const isFieldUser =
+    isFieldRole(
+      auth.profile.role,
+    );
+
+  const isAdminUser =
+    isAdminRole(
+      auth.profile.role,
+    );
+
   const effectiveCustomerId =
     booking?.customer_id ??
     payment?.customer_id ??
-    requestedCustomerId ??
-    auth.userId;
-  const ownsPayment = effectiveCustomerId === auth.userId;
+    (
+      requestedCustomerId ||
+      (
+        auth.profile.role ===
+        "customer"
+          ? auth.userId
+          : null
+      )
+    );
 
-  if (!isFieldUser && !ownsPayment) {
+  const ownsPayment =
+    Boolean(
+      effectiveCustomerId,
+    ) &&
+    effectiveCustomerId ===
+      auth.userId;
+
+  if (
+    !isFieldUser &&
+    !ownsPayment
+  ) {
     return NextResponse.json(
-      { error: "You cannot create a link for this payment." },
-      { status: 403 },
+      {
+        error:
+          "You cannot create a link for this payment.",
+        requestId,
+      },
+      {
+        status: 403,
+      },
     );
   }
 
-  const profile =
-    effectiveCustomerId && effectiveCustomerId !== auth.userId
+  if (
+    !isAdminUser &&
+    !booking &&
+    !payment
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "A customer or technician checkout must be linked to an existing booking or payment.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+
+  let customerProfile:
+    | ProfileRow
+    | null =
+      effectiveCustomerId ===
+      auth.userId
+        ? auth.profile
+        : null;
+
+  if (
+    effectiveCustomerId &&
+    effectiveCustomerId !==
+      auth.userId
+  ) {
+    const {
+      data,
+      error,
+    } = await admin
+      .from("profiles")
+      .select("*")
+      .eq(
+        "id",
+        effectiveCustomerId,
+      )
+      .maybeSingle();
+
+    if (error) {
+      logger.error(
+        "stripe_checkout_profile_lookup_failed",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_checkout_create",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            effectiveCustomerId,
+          bookingId:
+            booking?.id ??
+            null,
+          error,
+        },
+      );
+
+      return NextResponse.json(
+        {
+          error:
+            "The customer payment profile could not be loaded.",
+          requestId,
+        },
+        {
+          status: 500,
+        },
+      );
+    }
+
+    customerProfile =
+      data ?? null;
+  }
+
+  const existingPaymentType =
+    payment?.payment_type &&
+    validPaymentTypes.includes(
+      payment.payment_type as PaymentType,
+    )
       ? (
-          await admin
-            .from("profiles")
-            .select("*")
-            .eq("id", effectiveCustomerId)
-            .maybeSingle()
-        ).data ?? auth.profile
-      : auth.profile;
+          payment.payment_type as PaymentType
+        )
+      : null;
 
-  const frequency = cleanFrequency(payload, booking?.frequency ?? null);
-  const binCountRaw = payload.bin_count ?? payload.binCount;
-  const binCount =
-    typeof binCountRaw === "number"
-      ? binCountRaw
-      : typeof binCountRaw === "string"
-        ? Number(binCountRaw)
-        : booking?.bin_count ?? 0;
-  const addOns = cleanAddOns(payload, booking?.add_ons ?? []);
-  const amount = cleanAmount(payload, payment?.amount ?? booking?.estimated_price ?? 0);
+  const paymentType:
+    PaymentType =
+      isAdminUser
+        ? requestedPaymentType
+        : existingPaymentType ??
+          (
+            requestedPaymentType ===
+            "booking"
+              ? "booking"
+              : "payment_link"
+          );
 
-  if (amount <= 0) {
+  if (
+    payment?.status ===
+      "paid" ||
+    payment?.status ===
+      "refunded"
+  ) {
     return NextResponse.json(
-      { error: "Payment amount must be greater than zero." },
-      { status: 400 },
+      {
+        error:
+          "This payment is already settled.",
+        requestId,
+      },
+      {
+        status: 409,
+      },
     );
   }
 
-  const customerEmail = booking?.email ?? profile.email ?? auth.email;
+  if (
+    !isAdminUser &&
+    booking?.payment_status ===
+      "paid"
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "This booking is already paid.",
+        requestId,
+      },
+      {
+        status: 409,
+      },
+    );
+  }
+
+  if (
+    isAdminUser &&
+    booking?.payment_status ===
+      "paid" &&
+    (
+      paymentType ===
+        "booking" ||
+      paymentType ===
+        "payment_link"
+    )
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The booking is already paid. Use an add-on or manual-invoice payment type for a separate charge.",
+        requestId,
+      },
+      {
+        status: 409,
+      },
+    );
+  }
+
+  const existingAmount =
+    Number(
+      payment?.total_amount ??
+      payment?.amount ??
+      booking?.estimated_price ??
+      0,
+    );
+
+  const requestedAmount =
+    cleanAmount(
+      payload,
+      existingAmount,
+    );
+
+  const amount =
+    isAdminUser
+      ? requestedAmount
+      : existingAmount;
+
+  if (
+    !Number.isFinite(amount) ||
+    amount <= 0 ||
+    amount > 50000
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "Payment amount must be between $0.01 and $50,000.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+
+  if (
+    !isAdminUser &&
+    Number.isFinite(
+      requestedAmount,
+    ) &&
+    Math.abs(
+      requestedAmount -
+      amount,
+    ) >= 0.01
+  ) {
+    logger.warn(
+      "stripe_checkout_client_amount_ignored",
+      {
+        requestId,
+        route,
+        action:
+          "stripe_checkout_create",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          effectiveCustomerId,
+        bookingId:
+          booking?.id ??
+          null,
+        metadata: {
+          requestedAmount,
+          authoritativeAmount:
+            amount,
+        },
+      },
+    );
+  }
+
+  const amountCents =
+    Math.round(
+      amount * 100,
+    );
+
+  const frequency =
+    booking
+      ? booking.frequency
+      : cleanFrequency(
+          payload,
+          null,
+        );
+
+  const binCount =
+    booking
+      ? booking.bin_count
+      : Number(
+          payload.bin_count ??
+          payload.binCount ??
+          0,
+        );
+
+  const addOns =
+    booking
+      ? booking.add_ons
+      : cleanAddOns(
+          payload,
+          [],
+        );
+
+  const customerEmail =
+    booking?.email ??
+    customerProfile?.email ??
+    auth.email;
+
   const customerName =
     booking
       ? `${booking.first_name} ${booking.last_name}`.trim()
-      : [profile.first_name, profile.last_name].filter(Boolean).join(" ");
-
-  let stripeCustomerId = profile.stripe_customer_id ?? payment?.stripe_customer_id ?? null;
-  if (!stripeCustomerId) {
-    try {
-      const customer = await stripe.customers.create({
-        email: customerEmail ?? undefined,
-        name: customerName || undefined,
-        metadata: {
-          profile_id: profile.id,
-          source: "clean_curb_co",
-        },
-      });
-      stripeCustomerId = customer.id;
-    } catch (error) {
-      return stripePermissionError("customers.write", error, {
-        requestId,
-        userId: auth.userId,
-        role: auth.profile.role,
-        customerId: effectiveCustomerId,
-        bookingId: booking?.id ?? null,
-      });
-    }
-
-    await admin
-      .from("profiles")
-      .update({ stripe_customer_id: stripeCustomerId })
-      .eq("id", profile.id);
-  }
+      : [
+          customerProfile
+            ?.first_name,
+          customerProfile
+            ?.last_name,
+        ]
+          .filter(Boolean)
+          .join(" ");
 
   const description =
-    cleanText(payload, "description") ||
-    (booking
-      ? `Clean Curb Co. service at ${formatBookingAddress(booking)}`
-      : "Clean Curb Co. service");
+    isAdminUser
+      ? (
+          cleanText(
+            payload,
+            "description",
+          ) ||
+          (
+            booking
+              ? `Clean Curb Co. service at ${formatBookingAddress(
+                  booking,
+                )}`
+              : "Clean Curb Co. service"
+          )
+        )
+      : payment?.description ??
+        (
+          booking
+            ? `Clean Curb Co. service at ${formatBookingAddress(
+                booking,
+              )}`
+            : "Clean Curb Co. service"
+        );
 
-  let paymentRecord = payment;
+  let stripeCustomerId =
+    booking
+      ?.stripe_customer_id ??
+    customerProfile
+      ?.stripe_customer_id ??
+    payment
+      ?.stripe_customer_id ??
+    null;
+
   const paymentMetadata = {
-    booking_id: booking?.id ?? "",
-    customer_id: effectiveCustomerId,
-    service_visit_id: visit?.id ?? "",
-    route_stop_id: routeStop?.id ?? routeStopId,
-    frequency: frequency ?? "",
-    bin_count: Number.isFinite(binCount) ? binCount : "",
-    add_ons: addOns,
-    payment_type: paymentType,
-    source: "clean_curb_co",
+    booking_id:
+      booking?.id ?? "",
+    customer_id:
+      effectiveCustomerId ??
+      "",
+    service_visit_id:
+      visit?.id ?? "",
+    route_stop_id:
+      routeStop?.id ??
+      routeStopId,
+    frequency:
+      frequency ?? "",
+    bin_count:
+      Number.isFinite(
+        binCount,
+      )
+        ? binCount
+        : "",
+    add_ons:
+      addOns,
+    payment_type:
+      paymentType,
+    source:
+      "clean_curb_co",
+    service_amount:
+      amount,
+    tip_amount:
+      0,
+    total_amount:
+      amount,
   };
 
-  if (!paymentRecord) {
-    const { data, error } = await admin
-      .from("payments")
-      .insert({
-        customer_id: effectiveCustomerId || null,
-        booking_id: booking?.id ?? null,
-        service_visit_id: visit?.id ?? null,
+  const reservation =
+    await reserveStripeCheckout(
+      admin,
+      {
+        paymentId:
+          paymentId ||
+          null,
+        customerId:
+          effectiveCustomerId ??
+          null,
+        bookingId:
+          booking?.id ??
+          null,
+        serviceVisitId:
+          visit?.id ??
+          null,
         amount,
         currency,
-        status: "pending",
-        provider: "stripe",
-        stripe_customer_id: stripeCustomerId,
         description,
-        payment_type: paymentType,
-        metadata: paymentMetadata,
-      })
-      .select("*")
-      .single();
+        paymentType,
+        stripeCustomerId,
+        metadata:
+          paymentMetadata,
+      },
+    );
 
-    if (error || !data) {
-      return NextResponse.json(
-        { error: "Could not create payment record." },
-        { status: 500 },
-      );
-    }
-    paymentRecord = data;
+  if (!reservation.ok) {
+    logger.error(
+      "stripe_checkout_reservation_failed",
+      {
+        requestId,
+        route,
+        action:
+          "stripe_checkout_create",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          effectiveCustomerId,
+        bookingId:
+          booking?.id ??
+          null,
+        error:
+          reservation.error,
+      },
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          reservation.message,
+        requestId,
+      },
+      {
+        status: 500,
+      },
+    );
   }
 
-  const recurringCount =
-    booking && payload.forceOneTime !== true && paymentType === "booking"
-      ? recurringIntervalCount(frequency)
-      : null;
-  const mode: Stripe.Checkout.SessionCreateParams.Mode = recurringCount
-    ? "subscription"
-    : "payment";
-  const returnPath = safeReturnPath(payload.returnPath, auth.profile.role);
-  const siteUrl = getSiteUrl();
-  const stripeMetadata = stringifyMetadata({
-    ...paymentMetadata,
-    payment_id: paymentRecord.id,
-    founding_neighbor_special: booking
-      ? getFoundingNeighborSpecialStatus({
-          binCount: booking.bin_count,
-          frequency: booking.frequency,
-          addOns: booking.add_ons,
-          neighborhood: booking.neighborhood,
-          createdAt: booking.created_at,
-          estimatedPrice: amount,
-        }).status
-      : "",
-  });
-  const encodedReturnPath = encodeURIComponent(returnPath);
+  if (
+    reservation.data
+      .reuseExisting &&
+    reservation.data
+      .checkoutUrl
+  ) {
+    return NextResponse.json({
+      checkoutUrl:
+        reservation.data
+          .checkoutUrl,
+      paymentId:
+        reservation.data
+          .paymentId,
+      stripeCheckoutSessionId:
+        reservation.data
+          .stripeCheckoutSessionId ??
+        null,
+      reused:
+        true,
+      requestId,
+    });
+  }
 
-  let session: Stripe.Checkout.Session;
-  try {
-    session = await stripe.checkout.sessions.create({
-      mode,
-      customer: stripeCustomerId,
-      line_items: [
-        {
-          quantity: 1,
-          price_data: {
-            currency,
-            unit_amount: amount * 100,
-            product_data: {
-              name:
-                mode === "subscription"
-                  ? "Clean Curb Co. recurring bin cleaning"
-                  : "Clean Curb Co. service payment",
-              description,
-              metadata: stripeMetadata,
+  if (
+    reservation.data
+      .inProgress
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "A payment link is already being created. Try again in a moment.",
+        paymentId:
+          reservation.data
+            .paymentId,
+        requestId,
+      },
+      {
+        status: 409,
+      },
+    );
+  }
+
+  const reservedPaymentId =
+    reservation.data
+      .paymentId;
+
+  const generation =
+    reservation.data
+      .generation;
+
+  if (!stripeCustomerId) {
+    try {
+      const customer =
+        await stripe.customers.create(
+          {
+            email:
+              customerEmail ??
+              undefined,
+            name:
+              customerName ||
+              undefined,
+            metadata: {
+              profile_id:
+                effectiveCustomerId ??
+                "",
+              booking_id:
+                booking?.id ??
+                "",
+              source:
+                "clean_curb_co",
             },
-            recurring: recurringCount
-              ? {
-                  interval: "month",
-                  interval_count: recurringCount,
-                }
-              : undefined,
+          },
+          {
+            idempotencyKey:
+              `payment-customer-${reservedPaymentId}-${generation}`,
+          },
+        );
+
+      stripeCustomerId =
+        customer.id;
+    } catch (error) {
+      await failStripeCheckout(
+        admin,
+        {
+          paymentId:
+            reservedPaymentId,
+          generation,
+          error:
+            error instanceof
+            Error
+              ? error.message
+              : "Stripe customer creation failed.",
+          metadata: {
+            failure_stage:
+              "customer_creation",
           },
         },
-      ],
-      success_url: `${siteUrl}/billing/success?payment=success&returnPath=${encodedReturnPath}&session_id={CHECKOUT_SESSION_ID}`,
-      cancel_url: `${siteUrl}/billing/success?payment=cancelled&returnPath=${encodedReturnPath}`,
-      metadata: stripeMetadata,
-      ...(mode === "payment"
-        ? {
-            payment_intent_data: {
-              metadata: stripeMetadata,
-            },
-          }
-        : {
-            subscription_data: {
-              metadata: stripeMetadata,
-            },
-          }),
+      );
+
+      return stripePermissionError(
+        "customers.write",
+        error,
+        {
+          requestId,
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            effectiveCustomerId,
+          bookingId:
+            booking?.id ??
+            null,
+        },
+      );
+    }
+
+    const customerUpdates:
+      Array<
+        PromiseLike<{
+          error:
+            | unknown
+            | null;
+        }>
+      > = [];
+
+    if (customerProfile) {
+      customerUpdates.push(
+        admin
+          .from("profiles")
+          .update({
+            stripe_customer_id:
+              stripeCustomerId,
+          })
+          .eq(
+            "id",
+            customerProfile.id,
+          ),
+      );
+    }
+
+    if (booking) {
+      customerUpdates.push(
+        admin
+          .from("bookings")
+          .update({
+            stripe_customer_id:
+              stripeCustomerId,
+          })
+          .eq(
+            "id",
+            booking.id,
+          ),
+      );
+    }
+
+    const updateResults =
+      await Promise.all(
+        customerUpdates,
+      );
+
+    const customerSaveError =
+      updateResults.find(
+        (result) =>
+          result.error,
+      )?.error;
+
+    if (customerSaveError) {
+      logger.warn(
+        "stripe_customer_id_save_incomplete",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_checkout_create",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          customerId:
+            effectiveCustomerId,
+          bookingId:
+            booking?.id ??
+            null,
+          error:
+            customerSaveError,
+          metadata: {
+            stripeCustomerId,
+          },
+        },
+      );
+    }
+  }
+
+  const forceOneTime =
+    payload.forceOneTime ===
+    true;
+
+  const recurringCount =
+    booking &&
+    !forceOneTime &&
+    paymentType === "booking"
+      ? recurringIntervalCount(
+          frequency,
+        )
+      : null;
+
+  const mode:
+    Stripe.Checkout.SessionCreateParams.Mode =
+      recurringCount
+        ? "subscription"
+        : "payment";
+
+  const returnPath =
+    safeReturnPath(
+      payload.returnPath,
+      auth.profile.role,
+    );
+
+  const siteUrl =
+    getSiteUrl();
+
+  const stripeMetadata =
+    stringifyMetadata({
+      ...paymentMetadata,
+      payment_id:
+        reservedPaymentId,
+      checkout_generation:
+        generation,
+
+      founding_neighbor_special:
+        booking
+          ? getFoundingNeighborSpecialStatus(
+              {
+                binCount:
+                  booking.bin_count,
+                frequency:
+                  booking.frequency,
+                addOns:
+                  booking.add_ons,
+                neighborhood:
+                  booking.neighborhood,
+                createdAt:
+                  booking.created_at,
+                estimatedPrice:
+                  amount,
+              },
+            ).status
+          : "",
     });
+
+  const encodedReturnPath =
+    encodeURIComponent(
+      returnPath,
+    );
+
+  let session:
+    Stripe.Checkout.Session;
+
+  try {
+    session =
+      await stripe.checkout.sessions.create(
+        {
+          mode,
+          customer:
+            stripeCustomerId,
+
+          line_items: [
+            {
+              quantity: 1,
+
+              price_data: {
+                currency,
+
+                unit_amount:
+                  amountCents,
+
+                product_data: {
+                  name:
+                    mode ===
+                    "subscription"
+                      ? "Clean Curb Co. recurring bin cleaning"
+                      : "Clean Curb Co. service payment",
+
+                  description,
+
+                  metadata:
+                    stripeMetadata,
+                },
+
+                recurring:
+                  recurringCount
+                    ? {
+                        interval:
+                          "month",
+
+                        interval_count:
+                          recurringCount,
+                      }
+                    : undefined,
+              },
+            },
+          ],
+
+          success_url:
+            `${siteUrl}/billing/success` +
+            `?payment=success` +
+            `&returnPath=${encodedReturnPath}` +
+            `&session_id={CHECKOUT_SESSION_ID}`,
+
+          cancel_url:
+            `${siteUrl}/billing/success` +
+            `?payment=cancelled` +
+            `&returnPath=${encodedReturnPath}`,
+
+          metadata:
+            stripeMetadata,
+
+          ...(mode ===
+          "payment"
+            ? {
+                payment_intent_data:
+                  {
+                    metadata:
+                      stripeMetadata,
+                  },
+              }
+            : {
+                subscription_data:
+                  {
+                    metadata:
+                      stripeMetadata,
+                  },
+              }),
+        },
+        {
+          idempotencyKey:
+            `payment-checkout-${reservedPaymentId}-${generation}`,
+        },
+      );
   } catch (error) {
+    await failStripeCheckout(
+      admin,
+      {
+        paymentId:
+          reservedPaymentId,
+        generation,
+        error:
+          error instanceof
+          Error
+            ? error.message
+            : "Stripe checkout creation failed.",
+        metadata: {
+          failure_stage:
+            "session_creation",
+          stripe_mode:
+            mode,
+        },
+      },
+    );
+
     return stripePermissionError(
-      mode === "subscription"
+      mode ===
+      "subscription"
         ? "checkout.sessions.write/subscriptions.write/prices.write"
         : "checkout.sessions.write/payment_intents.write/prices.write",
       error,
       {
         requestId,
-        userId: auth.userId,
-        role: auth.profile.role,
-        customerId: effectiveCustomerId,
-        bookingId: booking?.id ?? null,
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          effectiveCustomerId,
+        bookingId:
+          booking?.id ??
+          null,
       },
     );
   }
 
-  const checkoutUrl = session.url ?? "";
-  const paymentIntentId =
-    typeof session.payment_intent === "string" ? session.payment_intent : null;
-  const subscriptionId =
-    typeof session.subscription === "string" ? session.subscription : null;
+  const checkoutUrl =
+    session.url ?? "";
 
-  await admin
-    .from("payments")
-    .update({
-      amount,
-      currency,
-      status: "pending",
-      provider: "stripe",
-      stripe_customer_id: stripeCustomerId,
-      stripe_checkout_session_id: session.id,
-      stripe_payment_intent_id: paymentIntentId,
-      stripe_subscription_id: subscriptionId,
-      checkout_url: checkoutUrl,
-      description,
-      payment_type: paymentType,
-      metadata: {
-        ...paymentMetadata,
-        payment_id: paymentRecord.id,
-        stripe_mode: mode,
+  if (!checkoutUrl) {
+    await failStripeCheckout(
+      admin,
+      {
+        paymentId:
+          reservedPaymentId,
+        generation,
+        error:
+          "Stripe created a session without a checkout URL.",
+        metadata: {
+          failure_stage:
+            "missing_checkout_url",
+          stripe_checkout_session_id:
+            session.id,
+        },
       },
-    })
-    .eq("id", paymentRecord.id);
+    );
 
-  if (booking?.id) {
-    await admin
-      .from("bookings")
-      .update({
-        payment_status: "pending",
-        payment_provider: "stripe",
-        payment_link: checkoutUrl,
-        stripe_checkout_session_id: session.id,
-        stripe_payment_intent_id: paymentIntentId,
-        stripe_subscription_id: subscriptionId,
-      })
-      .eq("id", booking.id);
+    return NextResponse.json(
+      {
+        error:
+          "Stripe created an incomplete checkout session.",
+        requestId,
+      },
+      {
+        status: 502,
+      },
+    );
   }
 
-  logger.info("stripe_checkout_session_created", {
-    requestId,
-    route,
-    action: "stripe_checkout_create",
-    userId: auth.userId,
-    role: auth.profile.role,
-    customerId: effectiveCustomerId,
-    bookingId: booking?.id ?? null,
-    durationMs: Math.round(performance.now() - startedAt),
-    metadata: {
-      paymentId: paymentRecord.id,
-      mode,
-      paymentType,
-      amount,
-      currency,
+  const paymentIntentId =
+    typeof session.payment_intent ===
+    "string"
+      ? session.payment_intent
+      : null;
+
+  const subscriptionId =
+    typeof session.subscription ===
+    "string"
+      ? session.subscription
+      : null;
+
+  const finalization =
+    await finalizeStripeCheckout(
+      admin,
+      {
+        paymentId:
+          reservedPaymentId,
+        generation,
+        stripeCustomerId,
+        checkoutSessionId:
+          session.id,
+        paymentIntentId,
+        subscriptionId,
+        checkoutUrl,
+        metadata: {
+          ...paymentMetadata,
+          payment_id:
+            reservedPaymentId,
+          stripe_mode:
+            mode,
+          checkout_started_at:
+            new Date().toISOString(),
+        },
+      },
+    );
+
+  if (!finalization.ok) {
+    let expirationError:
+      unknown = null;
+
+    try {
+      if (
+        session.status ===
+        "open"
+      ) {
+        await stripe
+          .checkout
+          .sessions
+          .expire(
+            session.id,
+          );
+      }
+    } catch (error) {
+      expirationError =
+        error;
+    }
+
+    await failStripeCheckout(
+      admin,
+      {
+        paymentId:
+          reservedPaymentId,
+        generation,
+        error:
+          finalization.message,
+        metadata: {
+          failure_stage:
+            "database_finalization",
+          stripe_checkout_session_id:
+            session.id,
+          stripe_session_expiration_failed:
+            Boolean(
+              expirationError,
+            ),
+        },
+      },
+    );
+
+    logger.error(
+      "stripe_checkout_database_finalization_failed",
+      {
+        requestId,
+        route,
+        action:
+          "stripe_checkout_create",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          effectiveCustomerId,
+        bookingId:
+          booking?.id ??
+          null,
+        error:
+          finalization.error ??
+          expirationError,
+        metadata: {
+          paymentId:
+            reservedPaymentId,
+          stripeCheckoutSessionId:
+            session.id,
+          generation,
+        },
+      },
+    );
+
+    return NextResponse.json(
+      {
+        error:
+          "Stripe Checkout could not be safely attached to the payment record. No usable link was returned.",
+        requestId,
+      },
+      {
+        status: 500,
+      },
+    );
+  }
+
+  logger.info(
+    "stripe_checkout_session_created",
+    {
+      requestId,
+      route,
+      action:
+        "stripe_checkout_create",
+      userId:
+        auth.userId,
+      role:
+        auth.profile.role,
+      customerId:
+        effectiveCustomerId,
+      bookingId:
+        booking?.id ??
+        null,
+      durationMs:
+        Math.round(
+          performance.now() -
+          startedAt,
+        ),
+      metadata: {
+        paymentId:
+          reservedPaymentId,
+        mode,
+        paymentType,
+        amount,
+        amountCents,
+        currency,
+        generation,
+      },
     },
-  });
+  );
 
   return NextResponse.json({
     checkoutUrl,
-    paymentId: paymentRecord.id,
-    stripeCheckoutSessionId: session.id,
+    paymentId:
+      reservedPaymentId,
+    stripeCheckoutSessionId:
+      session.id,
     mode,
+    reused:
+      false,
     requestId,
   });
 }
