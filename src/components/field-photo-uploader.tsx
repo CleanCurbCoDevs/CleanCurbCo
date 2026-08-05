@@ -95,63 +95,126 @@ export function FieldPhotoUploader({
   }
 
   async function uploadSelectedPhotos() {
-    if (!files.length || isUploading) return;
+    if (
+      !files.length ||
+      isUploading
+    ) {
+      return;
+    }
 
-    const queue = [...files];
+    const queue = [
+      ...files,
+    ];
+
     let completed = 0;
+
     let pendingUpload:
       | {
           bucket: string;
           path: string;
         }
       | null = null;
-    setIsUploading(true);
-    setNotice(null);
+
+    setIsUploading(
+      true,
+    );
+
+    setNotice(
+      null,
+    );
 
     try {
-      for (let index = 0; index < queue.length; index += 1) {
-        const file = queue[index];
-        const contentType = normalizeImageContentType(file);
+      for (
+        let index = 0;
+        index < queue.length;
+        index += 1
+      ) {
+        const file =
+          queue[index];
+
+        const contentType =
+          normalizeImageContentType(
+            file,
+          );
 
         if (!contentType) {
-          throw new Error(`${file.name} is not a supported image format.`);
-        }
-
-        setProgress(`Preparing photo ${index + 1} of ${queue.length}...`);
-        pendingUpload = {
-          bucket:
-            prepared.data.bucket,
-          path:
-            prepared.data.path,
-        };
-        const prepared = await prepareServicePhotoUploadAction({
-          visitId,
-          photoType,
-          fileName: file.name,
-          contentType,
-          size: file.size,
-        });
-      
-        if (!prepared.ok || !prepared.data) {
           throw new Error(
-            prepared.error ?? `Could not prepare ${file.name} for upload.`,
+            `${file.name} is not a supported image format.`,
           );
         }
 
-        setProgress(`Uploading photo ${index + 1} of ${queue.length}...`);
+        setProgress(
+          `Preparing photo ${index + 1} of ${queue.length}...`,
+        );
 
-        const { error: uploadError } = await supabase.storage
-          .from(prepared.data.bucket)
-          .uploadToSignedUrl(
-            prepared.data.path,
-            prepared.data.token,
-            file,
+        const prepared =
+          await prepareServicePhotoUploadAction(
             {
-              cacheControl: "3600",
-              contentType: prepared.data.contentType,
-              upsert: false,
+              visitId,
+              photoType,
+              fileName:
+                file.name,
+              contentType,
+              size:
+                file.size,
             },
           );
+
+        if (
+          !prepared.ok ||
+          !prepared.data
+        ) {
+          throw new Error(
+            prepared.error ??
+              `Could not prepare ${file.name} for upload.`,
+          );
+        }
+
+        pendingUpload = {
+          bucket:
+            prepared.data
+              .bucket,
+
+          path:
+            prepared.data
+              .path,
+        };
+
+        setProgress(
+          `Uploading photo ${index + 1} of ${queue.length}...`,
+        );
+
+        const {
+          error:
+            uploadError,
+        } =
+          await supabase
+            .storage
+            .from(
+              prepared.data
+                .bucket,
+            )
+            .uploadToSignedUrl(
+              prepared.data
+                .path,
+
+              prepared.data
+                .token,
+
+              file,
+
+              {
+                cacheControl:
+                  "3600",
+
+                contentType:
+                  prepared.data
+                    .contentType,
+
+                upsert:
+                  false,
+              },
+            );
 
         if (uploadError) {
           throw new Error(
@@ -159,38 +222,58 @@ export function FieldPhotoUploader({
           );
         }
 
-        setProgress(`Confirming photo ${index + 1} of ${queue.length}...`);
+        setProgress(
+          `Confirming photo ${index + 1} of ${queue.length}...`,
+        );
 
         let finalized =
           await finalizeServicePhotoUploadAction(
             {
               visitId,
               photoType,
+
               storageBucket:
-                prepared.data.bucket,
+                prepared.data
+                  .bucket,
+
               storagePath:
-                prepared.data.path,
+                prepared.data
+                  .path,
+
               contentType:
-                prepared.data.contentType,
+                prepared.data
+                  .contentType,
+
               size:
                 file.size,
             },
           );
 
-        // Storage listings can occasionally lag immediately after an upload.
+        // Supabase storage listings can briefly lag
+        // immediately after a successful upload.
         if (!finalized.ok) {
-          await sleep(750);
+          await sleep(
+            750,
+          );
+
           finalized =
             await finalizeServicePhotoUploadAction(
               {
                 visitId,
                 photoType,
+
                 storageBucket:
-                  prepared.data.bucket,
+                  prepared.data
+                    .bucket,
+
                 storagePath:
-                  prepared.data.path,
+                  prepared.data
+                    .path,
+
                 contentType:
-                  prepared.data.contentType,
+                  prepared.data
+                    .contentType,
+
                 size:
                   file.size,
               },
@@ -203,19 +286,35 @@ export function FieldPhotoUploader({
               `${file.name} reached storage but could not be attached to this stop.`,
           );
         }
+
         pendingUpload =
           null;
+
         completed += 1;
-        setFiles(queue.slice(completed));
+
+        setFiles(
+          queue.slice(
+            completed,
+          ),
+        );
       }
 
-      setProgress("");
+      setProgress(
+        "",
+      );
+
       setNotice({
-        tone: "success",
-        message: `${completed} ${
-          completed === 1 ? "photo is" : "photos are"
-        } confirmed in Supabase and attached to this stop.`,
+        tone:
+          "success",
+
+        message:
+          `${completed} ${
+            completed === 1
+              ? "photo is"
+              : "photos are"
+          } confirmed in Supabase and attached to this stop.`,
       });
+
       router.refresh();
     } catch (caught) {
       if (pendingUpload) {
@@ -223,31 +322,49 @@ export function FieldPhotoUploader({
           {
             visitId,
             photoType,
+
             storageBucket:
-              pendingUpload.bucket,
+              pendingUpload
+                .bucket,
+
             storagePath:
-              pendingUpload.path,
+              pendingUpload
+                .path,
           },
         );
       }
+
       const message =
-        caught instanceof Error && caught.message
+        caught instanceof
+          Error &&
+        caught.message
           ? caught.message
           : "Photo upload failed.";
 
-      setProgress("");
+      setProgress(
+        "",
+      );
+
       setNotice({
-        tone: "error",
+        tone:
+          "error",
+
         message:
           completed > 0
             ? `${completed} ${
-                completed === 1 ? "photo was" : "photos were"
+                completed ===
+                1
+                  ? "photo was"
+                  : "photos were"
               } saved before the failure. ${message}`
             : message,
       });
+
       router.refresh();
     } finally {
-      setIsUploading(false);
+      setIsUploading(
+        false,
+      );
     }
   }
 
