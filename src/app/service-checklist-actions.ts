@@ -11,6 +11,9 @@ import {
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createRequestId, logger, maskEmail } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  getAuthorizedFieldStopBundle,
+} from "@/lib/server/field-access";
 import { requireAdmin, requireField } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, pickEnum } from "@/lib/validation";
 import type { ChecklistItemStatus, Database } from "@/types/database";
@@ -37,12 +40,15 @@ async function logServiceEvent(
   }
 }
 
-async function saveChecklistItemsFromForm(input: {
-  admin: AdminClient;
-  formData: FormData;
-  itemIds: string[];
-  actorId: string;
-}) {
+async function saveChecklistItemsFromForm(
+  input: {
+    admin: AdminClient;
+    formData: FormData;
+    checklistId: string;
+    itemIds: string[];
+    actorId: string;
+  },
+) {
   const resolvedAt = new Date().toISOString();
 
   await Promise.all(
@@ -63,7 +69,11 @@ async function saveChecklistItemsFromForm(input: {
           resolved_at: status === "pending" ? null : resolvedAt,
           resolved_by: status === "pending" ? null : input.actorId,
         })
-        .eq("id", itemId);
+      .eq("id", itemId)
+      .eq(
+        "checklist_id",
+        input.checklistId,
+      );
     }),
   );
 }
@@ -75,23 +85,82 @@ export async function saveServiceChecklistDraftAction(formData: FormData) {
 
   if (auth.status !== "ok" || !visitId) return;
 
+  const access =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        visitId,
+      },
+    );
+  
+  if (!access.ok) {
+    redirectWithStatus(
+      returnTo,
+      access.status === 403
+        ? "forbidden"
+        : "missing",
+    );
+  }
+    
   const admin = getSupabaseAdmin();
   const bundle = await ensureServiceChecklistBundle(admin, visitId);
   if (!bundle) redirectWithStatus(returnTo, "missing");
   if (bundle.checklist.status === "submitted") redirectWithStatus(returnTo, "locked");
 
-  const itemIds = formData
-    .getAll("itemId")
-    .map((value) => cleanString(value, 80))
-    .filter(Boolean);
+  const itemIds =
+    validatedChecklistItemIds(
+      formData,
+      new Set(
+        bundle.items.map(
+          (item) => item.id,
+        ),
+      ),
+    );
+  
+  if (!itemIds) {
+    redirectWithStatus(
+      returnTo,
+      "invalid_items",
+    );
+  }
 
   await saveChecklistItemsFromForm({
     admin,
     formData,
+    checklistId:
+      bundle.checklist.id,
     itemIds,
-    actorId: auth.userId,
+    actorId:
+      auth.userId,
   });
 
+  function validatedChecklistItemIds(
+    formData: FormData,
+    allowedItemIds: Set<string>,
+  ) {
+    const itemIds = formData
+      .getAll("itemId")
+      .map((value) =>
+        cleanString(value, 80),
+      )
+      .filter(Boolean);
+  
+    if (
+      itemIds.some(
+        (itemId) =>
+          !allowedItemIds.has(
+            itemId,
+          ),
+      )
+    ) {
+      return null;
+    }
+  
+    return Array.from(
+      new Set(itemIds),
+    );
+  }
+  
   await admin
     .from("service_checklists")
     .update({
@@ -124,6 +193,23 @@ export async function submitServiceChecklistAction(formData: FormData) {
 
   if (auth.status !== "ok" || !visitId) return;
 
+  const access =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        visitId,
+      },
+    );
+  
+  if (!access.ok) {
+    redirectWithStatus(
+      returnTo,
+      access.status === 403
+        ? "forbidden"
+        : "missing",
+    );
+  }
+  
   if (formData.get("finalizeAck") !== "on") {
     redirectWithStatus(returnTo, "ack_required");
   }
@@ -135,16 +221,32 @@ export async function submitServiceChecklistAction(formData: FormData) {
     redirectWithStatus(returnTo, "locked");
   }
 
-  const itemIds = formData
-    .getAll("itemId")
-    .map((value) => cleanString(value, 80))
-    .filter(Boolean);
+  const itemIds =
+    validatedChecklistItemIds(
+      formData,
+      new Set(
+        initialBundle.items.map(
+          (item) => item.id,
+        ),
+      ),
+    );
+  
+  if (!itemIds) {
+    redirectWithStatus(
+      returnTo,
+      "invalid_items",
+    );
+  }
 
   await saveChecklistItemsFromForm({
     admin,
     formData,
+    checklistId:
+      initialBundle
+        .checklist.id,
     itemIds,
-    actorId: auth.userId,
+    actorId:
+      auth.userId,
   });
 
   const submittedAt = new Date().toISOString();
