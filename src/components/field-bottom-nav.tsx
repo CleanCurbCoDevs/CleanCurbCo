@@ -7,8 +7,23 @@ import {
   LogOut,
   MapPinned,
 } from "lucide-react";
+
 import Link from "next/link";
-import { usePathname } from "next/navigation";
+
+import {
+  usePathname,
+} from "next/navigation";
+
+import {
+  type FormEvent,
+  useState,
+} from "react";
+
+import {
+  useActionFeedback,
+} from "@/components/action-feedback";
+
+import pressableStyles from "./pressable.module.css";
 
 const fieldLinks = [
   {
@@ -35,6 +50,50 @@ const fieldLinks = [
 
 export function FieldBottomNav() {
   const pathname = usePathname();
+  const feedback =
+    useActionFeedback();
+
+  const [
+    isLoggingOut,
+    setIsLoggingOut,
+  ] = useState(false);
+
+  async function handleLogout(
+    event: FormEvent<HTMLFormElement>,
+  ) {
+    event.preventDefault();
+
+    if (isLoggingOut) {
+      return;
+    }
+
+    setIsLoggingOut(true);
+
+    try {
+      const response = await fetch(
+        "/api/auth/logout",
+        {
+          method: "POST",
+        },
+      );
+
+      if (!response.ok) {
+        throw new Error(
+          "Logout failed.",
+        );
+      }
+
+      window.location.assign(
+        "/field/login",
+      );
+    } catch {
+      setIsLoggingOut(false);
+
+      feedback.error(
+        "Could not sign out. Try again.",
+      );
+    }
+  }
 
   return (
     <nav
@@ -46,25 +105,59 @@ export function FieldBottomNav() {
 
         const isActive =
           pathname === link.href ||
-          pathname.startsWith(`${link.href}/`);
+          pathname.startsWith(
+            `${link.href}/`,
+          );
 
         return (
           <Link
-            className={isActive ? "field-nav-active" : undefined}
+            className={
+              isActive
+                ? "field-nav-active"
+                : undefined
+            }
             href={link.href}
             key={link.href}
-            aria-current={isActive ? "page" : undefined}
+            aria-current={
+              isActive
+                ? "page"
+                : undefined
+            }
           >
-            <Icon size={21} aria-hidden="true" />
+            <Icon
+              size={21}
+              aria-hidden="true"
+            />
+
             <span>{link.label}</span>
           </Link>
         );
       })}
 
-      <form action="/auth/signout" method="post">
-        <button type="submit">
-          <LogOut size={21} aria-hidden="true" />
-          <span>Logout</span>
+      <form onSubmit={handleLogout}>
+        <button
+          aria-busy={isLoggingOut}
+          className={
+            pressableStyles.pressable
+          }
+          data-pending={
+            isLoggingOut
+              ? "true"
+              : "false"
+          }
+          disabled={isLoggingOut}
+          type="submit"
+        >
+          <LogOut
+            size={21}
+            aria-hidden="true"
+          />
+
+          <span>
+            {isLoggingOut
+              ? "Signing Out"
+              : "Logout"}
+          </span>
         </button>
       </form>
     </nav>
