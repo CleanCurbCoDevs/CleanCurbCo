@@ -157,53 +157,110 @@ export default async function FieldStopPage({
   const beforePhotos = signedPhotos.filter((photo) => photo.photo_type === "before");
   const afterPhotos = signedPhotos.filter((photo) => photo.photo_type === "after");
   const checklistComplete =
-  serviceChecklistBundle?.checklist.status === "submitted";
-  const hasBeforePhotos = beforePhotos.length > 0;
-  const hasAfterPhotos = afterPhotos.length > 0;
-  const photoExceptionNote = getPhotoUploadExceptionNote(
-  stop.technician_notes ?? visit.technician_notes,
-);
+    serviceChecklistBundle
+      ?.checklist
+      .status ===
+    "submitted";
 
-const hasPhotoExceptionNote =
-  Boolean(photoExceptionNote);
+  const hasBeforePhotos =
+    beforePhotos.length > 0;
 
-const beforePhotoException =
-  hasPhotoExceptionNote &&
-  stop.issue_flags.includes("before_photo_exception");
+  const hasAfterPhotos =
+    afterPhotos.length > 0;
 
-const afterPhotoException =
-  hasPhotoExceptionNote &&
-  stop.issue_flags.includes("after_photo_exception");
+  const beforePhotoExceptionReason =
+    stop
+      .before_photo_exception_reason
+      ?.trim() ??
+    "";
 
-const beforePhotoRequirementMet =
-  hasBeforePhotos || beforePhotoException;
+  const afterPhotoExceptionReason =
+    stop
+      .after_photo_exception_reason
+      ?.trim() ??
+    "";
 
-const afterPhotoRequirementMet =
-  hasAfterPhotos || afterPhotoException;
+  const photoExceptionNote =
+    beforePhotoExceptionReason ||
+    afterPhotoExceptionReason;
+
+  const beforePhotoException =
+    Boolean(
+      beforePhotoExceptionReason,
+    ) &&
+    stop.issue_flags.includes(
+      "before_photo_exception",
+    );
+
+  const afterPhotoException =
+    Boolean(
+      afterPhotoExceptionReason,
+    ) &&
+    stop.issue_flags.includes(
+      "after_photo_exception",
+    );
+
+  const beforePhotoRequirementMet =
+    hasBeforePhotos ||
+    beforePhotoException;
+
+  const afterPhotoRequirementMet =
+    hasAfterPhotos ||
+    afterPhotoException;
+
+  const proofLocked =
+    stop.status ===
+      "completed" ||
+    stop.status ===
+      "skipped" ||
+    stop.status ===
+      "needs_follow_up" ||
+    stop.status ===
+      "rescheduled" ||
+    stop.status ===
+      "cancelled";
+
+  const photoDeletionLocked =
+    proofLocked ||
+    checklistComplete;
+
   const completionRequirements = [
     {
-      label: hasBeforePhotos
-        ? "Before photo uploaded"
-        : beforePhotoException
-          ? "Before photo exception documented"
-          : "Before photo uploaded",
-      complete: beforePhotoRequirementMet,
+      label:
+        hasBeforePhotos
+          ? "Before photo uploaded"
+          : beforePhotoException
+            ? "Before photo exception documented"
+            : "Before photo uploaded",
+
+      complete:
+        beforePhotoRequirementMet,
     },
+
     {
-      label: "Cleaning checklist submitted",
-      complete: checklistComplete,
+      label:
+        "Cleaning checklist submitted",
+
+      complete:
+        checklistComplete,
     },
+
     {
-      label: hasAfterPhotos
-        ? "After photo uploaded"
-        : afterPhotoException
-          ? "After photo exception documented"
-          : "After photo uploaded",
-      complete: afterPhotoRequirementMet,
+      label:
+        hasAfterPhotos
+          ? "After photo uploaded"
+          : afterPhotoException
+            ? "After photo exception documented"
+            : "After photo uploaded",
+
+      complete:
+        afterPhotoRequirementMet,
     },
   ];
 
   const photoExceptionPanel =
+    stop.status ===
+      "in_progress" &&
     (
       !hasBeforePhotos ||
       beforePhotoException ||
@@ -321,6 +378,17 @@ const afterPhotoRequirementMet =
   const issuePhotoTools = (
     <PhotoSection
       actionLabel="Upload Issue Photos"
+      canDelete={
+        !photoDeletionLocked
+      }
+      canUpload={
+        stop.status ===
+          "on_the_way" ||
+        stop.status ===
+          "arrived" ||
+        stop.status ===
+          "in_progress"
+      }
       photos={issuePhotos}
       photoType="issue"
       title="Issue / Other Photos"
@@ -563,6 +631,15 @@ const afterPhotoRequirementMet =
 
       <PhotoSection
         actionLabel="Upload Before Photos"
+        canDelete={
+          !photoDeletionLocked
+        }
+        canUpload={
+          stop.status ===
+            "arrived" ||
+          stop.status ===
+            "in_progress"
+        }
         photos={beforePhotos}
         photoType="before"
         title="Before Photos"
@@ -586,6 +663,13 @@ const afterPhotoRequirementMet =
 
       <PhotoSection
         actionLabel="Upload After Photos"
+        canDelete={
+          !photoDeletionLocked
+        }
+        canUpload={
+          stop.status ===
+          "in_progress"
+        }
         photos={afterPhotos}
         photoType="after"
         title="After Photos"
@@ -792,139 +876,247 @@ function PhotoSection({
   photoType,
   visitId,
   photos,
+  canUpload,
+  canDelete,
 }: {
   title: string;
+
   actionLabel: string;
-  photoType: "before" | "after" | "issue";
+
+  photoType:
+    | "before"
+    | "after"
+    | "issue";
+
   visitId: string;
-  photos: Array<ServicePhotoRow & { signedUrl: string | null }>;
+
+  photos: Array<
+    ServicePhotoRow & {
+      signedUrl:
+        string | null;
+    }
+  >;
+
+  canUpload:
+    boolean;
+
+  canDelete:
+    boolean;
 }) {
-  const isBefore = photoType === "before";
-  const isAfter = photoType === "after";
-  const isIssue = photoType === "issue";
+  const isBefore =
+    photoType ===
+    "before";
 
-  const heading = isBefore
-    ? "Before Photos"
-    : isAfter
-      ? "After Photos"
-      : "Issue Photos";
+  const isAfter =
+    photoType ===
+    "after";
 
-  const description = isBefore
-    ? "Document the condition before cleaning begins."
-    : isAfter
-      ? "Show the finished result before leaving the stop."
-      : "Capture anything unusual, damaged, blocked, or unsafe.";
+  const isIssue =
+    photoType ===
+    "issue";
 
-  const emptyMessage = isBefore
-    ? "No before photos yet."
-    : isAfter
-      ? "No after photos yet."
-      : "No issue photos uploaded.";
+  const heading =
+    isBefore
+      ? "Before Photos"
+      : isAfter
+        ? "After Photos"
+        : "Issue Photos";
+
+  const description =
+    isBefore
+      ? "Document the condition before cleaning begins."
+      : isAfter
+        ? "Show the finished result before leaving the stop."
+        : "Capture anything unusual, damaged, blocked, or unsafe.";
+
+  const emptyMessage =
+    isBefore
+      ? "No before photos yet."
+      : isAfter
+        ? "No after photos yet."
+        : "No issue photos uploaded.";
 
   return (
     <section
       className={[
         "photo-stage",
         `photo-stage-${photoType}`,
-        photos.length ? "has-photos" : "",
+        photos.length
+          ? "has-photos"
+          : "",
       ]
-        .filter(Boolean)
-        .join(" ")}
+        .filter(
+          Boolean,
+        )
+        .join(
+          " ",
+        )}
     >
       <div className="photo-stage-heading">
         <div>
-          <p className="section-kicker">{heading}</p>
-          <h2>{title}</h2>
-          <p>{description}</p>
+          <p className="section-kicker">
+            {heading}
+          </p>
+
+          <h2>
+            {title}
+          </h2>
+
+          <p>
+            {description}
+          </p>
         </div>
 
         <div className="photo-stage-count">
-          <strong>{photos.length}</strong>
-          <span>{photos.length === 1 ? "photo" : "photos"}</span>
+          <strong>
+            {photos.length}
+          </strong>
+
+          <span>
+            {photos.length === 1
+              ? "photo"
+              : "photos"}
+          </span>
         </div>
       </div>
-      
-      <FieldPhotoUploader
-        actionLabel={actionLabel}
-        photoType={photoType}
-        visitId={visitId}
-      />
+
+      {canUpload ? (
+        <FieldPhotoUploader
+          actionLabel={
+            actionLabel
+          }
+          photoType={
+            photoType
+          }
+          visitId={
+            visitId
+          }
+        />
+      ) : (
+        <div className="photo-stage-empty">
+          <span aria-hidden="true">
+            🔒
+          </span>
+
+          <div>
+            <strong>
+              Photo uploads are locked at this stage.
+            </strong>
+
+            <small>
+              Move the stop to the correct service stage before adding this type of photo.
+            </small>
+          </div>
+        </div>
+      )}
 
       {photos.length ? (
         <>
           <div className="photo-stage-success">
-            <span aria-hidden="true">✓</span>
+            <span aria-hidden="true">
+              ✓
+            </span>
 
             <div>
               <strong>
-                {photos.length} {photoType}{" "}
-                {photos.length === 1 ? "photo" : "photos"} saved
+                {photos.length}{" "}
+                {photoType}{" "}
+                {photos.length ===
+                1
+                  ? "photo"
+                  : "photos"}{" "}
+                saved
               </strong>
 
               <small>
-                Add more at any time before completing the stop.
+                Service photos remain attached to this stop’s proof-of-work record.
               </small>
             </div>
           </div>
 
           <div className="field-photo-grid photo-stage-grid">
-            {photos.map((photo, index) => (
-              <figure className="photo-stage-item" key={photo.id}>
-                <div className="photo-stage-image">
-                  {photo.signedUrl ? (
-                    // Supabase signed service-photo URLs are short-lived and intentionally rendered directly.
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      alt={`${photo.photo_type} service upload ${index + 1}`}
-                      src={photo.signedUrl}
-                    />
-                  ) : (
-                    <div className="field-photo-placeholder">
-                      Photo unavailable
-                    </div>
-                  )}
-
-                  <span className="photo-stage-index">
-                    {index + 1}
-                  </span>
-                </div>
-
-                <FeedbackForm
-                  action={deleteServicePhotoAction}
-                  pendingMessage="Deleting photo..."
-                  successMessage="Photo deleted."
+            {photos.map(
+              (
+                photo,
+                index,
+              ) => (
+                <figure
+                  className="photo-stage-item"
+                  key={
+                    photo.id
+                  }
                 >
-                  <input
-                    type="hidden"
-                    name="photoId"
-                    value={photo.id}
-                  />
+                  <div className="photo-stage-image">
+                    {photo.signedUrl ? (
+                      // Supabase signed service-photo URLs are short-lived
+                      // and intentionally rendered directly.
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        alt={`${photo.photo_type} service upload ${index + 1}`}
+                        src={
+                          photo.signedUrl
+                        }
+                      />
+                    ) : (
+                      <div className="field-photo-placeholder">
+                        Photo unavailable
+                      </div>
+                    )}
 
-                  <input
-                    type="hidden"
-                    name="visitId"
-                    value={visitId}
-                  />
+                    <span className="photo-stage-index">
+                      {index + 1}
+                    </span>
+                  </div>
 
-                  <ActionSubmitButton
-                    className="photo-delete-button"
-                    pendingLabel="Deleting..."
-                  >
-                    Delete
-                  </ActionSubmitButton>
-                </FeedbackForm>
-              </figure>
-            ))}
+                  {canDelete ? (
+                    <FeedbackForm
+                      action={
+                        deleteServicePhotoAction
+                      }
+                      pendingMessage="Deleting photo..."
+                      successMessage="Photo deleted."
+                    >
+                      <input
+                        type="hidden"
+                        name="photoId"
+                        value={
+                          photo.id
+                        }
+                      />
+
+                      <input
+                        type="hidden"
+                        name="visitId"
+                        value={
+                          visitId
+                        }
+                      />
+
+                      <ActionSubmitButton
+                        className="photo-delete-button"
+                        pendingLabel="Deleting..."
+                      >
+                        Delete
+                      </ActionSubmitButton>
+                    </FeedbackForm>
+                  ) : null}
+                </figure>
+              ),
+            )}
           </div>
         </>
       ) : (
         <div className="photo-stage-empty">
           <span aria-hidden="true">
-            {isIssue ? "⚠" : "📷"}
+            {isIssue
+              ? "⚠"
+              : "📷"}
           </span>
 
           <div>
-            <strong>{emptyMessage}</strong>
+            <strong>
+              {emptyMessage}
+            </strong>
 
             <small>
               {isIssue
@@ -982,20 +1174,6 @@ async function createSignedChecklistDocuments(
 function formatArrivalWindow(start: string | null, end: string | null) {
   if (!start && !end) return "Not set";
   return [start, end].filter(Boolean).join(" - ");
-}
-
-function getPhotoUploadExceptionNote(
-  notes: string | null | undefined,
-) {
-  const prefix = "[Photo upload exception]";
-
-  const exceptionLine = (notes ?? "")
-    .split("\n")
-    .find((line) => line.trim().startsWith(prefix));
-
-  return exceptionLine
-    ? exceptionLine.trim().slice(prefix.length).trim()
-    : "";
 }
 
 function formatFieldTime(value: string) {
