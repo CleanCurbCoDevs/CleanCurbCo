@@ -2,8 +2,13 @@
 
 import { AlertTriangle, ArrowRight, CalendarClock } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { useMemo, useState, useTransition } from "react";
-
+import {
+  useEffect,
+  useMemo,
+  useState,
+  useTransition,
+} from "react";
+import pressableStyles from "./pressable.module.css";
 import {
   markStopFollowUpAction,
   requestFieldRescheduleAction,
@@ -54,28 +59,46 @@ export function FieldStopActions({
 
   const completed = terminalStatuses.includes(status);
 
+  useEffect(() => {
+    setStatus(initialStatus);
+  }, [initialStatus]);
+  
   const nextAction = useMemo(
     () => getNextAction(status, clearance.cleared),
     [clearance.cleared, status],
   );
 
-  function runStatus(nextStatus: FieldStopStatus) {
-    const formData = new FormData();
+function runStatus(
+  nextStatus: FieldStopStatus,
+) {
+  const formData =
+    new FormData();
 
-    formData.set("visitId", visitId);
-    formData.set("status", nextStatus);
+  formData.set(
+    "visitId",
+    visitId,
+  );
 
-    setPendingStatus(nextStatus);
+  formData.set(
+    "status",
+    nextStatus,
+  );
 
-    startTransition(async () => {
-      const result = await updateStopStatusAction(formData);
+  setPendingStatus(nextStatus);
 
-      setPendingStatus(null);
+  startTransition(async () => {
+    try {
+      const result =
+        await updateStopStatusAction(
+          formData,
+        );
 
       if (!result.ok) {
         feedback.error(
-          result.error ?? "Could not update stop status.",
+          result.error ??
+            "Could not update stop status.",
         );
+
         return;
       }
 
@@ -83,12 +106,23 @@ export function FieldStopActions({
 
       feedback.success(
         result.message ??
-          `Stop marked ${humanizeStatus(nextStatus)}.`,
+          `Stop marked ${humanizeStatus(
+            nextStatus,
+          )}.`,
       );
 
       router.refresh();
-    });
-  }
+    } catch (error) {
+      feedback.error(
+        error instanceof Error
+          ? error.message
+          : "Could not update stop status.",
+      );
+    } finally {
+      setPendingStatus(null);
+    }
+  });
+}
 
   return (
     <section className="field-next-action-card">
@@ -119,7 +153,14 @@ export function FieldStopActions({
 
       {nextAction.status ? (
         <button
-          className="field-next-action-button"
+          className={[
+            "field-next-action-button",
+            pressableStyles.pressable,
+          ].join(" ")}
+          aria-busy={isPending}
+          data-pending={
+            isPending ? "true" : "false"
+          }
           disabled={
             isPending ||
             completed ||
