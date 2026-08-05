@@ -2,6 +2,9 @@ import { forbidden, redirect } from "next/navigation";
 import { isSupabaseConfigured } from "@/lib/env";
 import { logger } from "@/lib/server/logger";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import {
+  isRecoverableSupabaseSessionError,
+} from "@/lib/supabase/auth-errors";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import { isAdminRole, isFieldRole } from "@/lib/supabase/roles";
 import type { ProfileRow } from "@/types/database";
@@ -34,15 +37,106 @@ export async function getCurrentProfile(): Promise<AuthResult> {
     };
   }
 
-  const supabase = await createServerSupabaseClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  const supabase =
+    await createServerSupabaseClient();
+
+  let user:
+    | Awaited<
+        ReturnType<
+          typeof supabase.auth.getUser
+        >
+      >["data"]["user"]
+    | null = null;
+
+  try {
+    const {
+      data,
+      error,
+    } =
+      await supabase.auth.getUser();
+
+    if (error) {
+      if (
+        isRecoverableSupabaseSessionError(
+          error,
+        )
+      ) {
+        logger.warn(
+          "auth_stale_session_detected",
+          {
+            action:
+              "auth_profile_lookup",
+            error,
+          },
+        );
+
+        return {
+          status: "forbidden",
+          message:
+            "Your session expired. Please log in again.",
+        };
+      }
+
+      logger.error(
+        "auth_user_lookup_failed",
+        {
+          action:
+            "auth_profile_lookup",
+          error,
+        },
+      );
+
+      return {
+        status: "forbidden",
+        message:
+          "Your session could not be verified. Please log in again.",
+      };
+    }
+
+    user = data.user;
+  } catch (error) {
+    if (
+      isRecoverableSupabaseSessionError(
+        error,
+      )
+    ) {
+      logger.warn(
+        "auth_stale_session_detected",
+        {
+          action:
+            "auth_profile_lookup",
+          error,
+        },
+      );
+
+      return {
+        status: "forbidden",
+        message:
+          "Your session expired. Please log in again.",
+      };
+    }
+
+    logger.error(
+      "auth_user_lookup_failed",
+      {
+        action:
+          "auth_profile_lookup",
+        error,
+      },
+    );
+
+    return {
+      status: "forbidden",
+      message:
+        "Your session could not be verified. Please log in again.",
+    };
+  }
 
   if (!user) {
     return {
       status: "forbidden",
-      message: "Please log in to continue.",
+      message:
+        "Please log in to continue.",
     };
   }
 
