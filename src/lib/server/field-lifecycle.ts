@@ -201,6 +201,14 @@ function lifecycleErrorMessage(
 
   if (
     message.includes(
+      "field_lifecycle:checklist_archive_required",
+    )
+  ) {
+    return "The checklist PDF archive is not ready yet. Submit the final checklist again before completing this stop.";
+  }
+  
+  if (
+    message.includes(
       "field_lifecycle:before_photo_required",
     )
   ) {
