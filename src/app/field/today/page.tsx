@@ -16,7 +16,13 @@ import {
   formatBookingAddress,
   humanizeStatus,
 } from "@/lib/booking-utils";
-import { businessToday, getFieldContext } from "@/lib/field-data";
+import {
+  businessToday,
+} from "@/lib/field-data";
+
+import {
+  getFieldTodayContext,
+} from "@/lib/server/field-page-data";
 import { sortStopsForField } from "@/lib/optimoroute/route-sync";
 
 export const metadata: Metadata = {
@@ -31,7 +37,10 @@ export const metadata: Metadata = {
 };
 
 export default async function FieldTodayPage() {
-  const context = await getFieldContext("/field/today");
+  const context =
+    await getFieldTodayContext(
+      "/field/today",
+    );
   const today = businessToday();
 
   const todaysRoutes = context.routeDays.filter(
@@ -77,13 +86,23 @@ export default async function FieldTodayPage() {
       )
     : null;
 
-  const nextAddress = nextBooking
-    ? context.addresses.find(
-        (address) =>
-          address.customer_id === nextBooking.customer_id &&
-          address.is_primary,
-      )
-    : null;
+  const nextAddress =
+    nextBooking
+      ? context.addresses.find(
+          (address) =>
+            address.id ===
+            nextBooking
+              .service_address_id,
+        ) ??
+        context.addresses.find(
+          (address) =>
+            address.customer_id ===
+              nextBooking
+                .customer_id &&
+            address.is_primary,
+        ) ??
+        null
+      : null;
 
   const nextPayment = nextStop
     ? context.payments.find(
