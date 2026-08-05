@@ -1,9 +1,12 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { redirect } from "next/navigation";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/action-result";
 import { formatBookingAddress } from "@/lib/booking-utils";
+import {
+  createRequestId,
+  logger,
+} from "@/lib/server/logger";
 import {
   sendFieldPaymentLinkEmail,
   sendOnTheWayEmail,
@@ -113,6 +116,34 @@ const followUpReasonsRequiringNotes: readonly FieldFollowUpReason[] = [
 
 type FieldFollowUpReason = (typeof fieldFollowUpReasons)[number];
 
+type FieldRedirectData = {
+  redirectTo: string;
+};
+
+function fieldMutationFailure(
+  action: string,
+  message: string,
+  error?: unknown,
+  metadata?: Record<string, unknown>,
+): ActionResult {
+  const requestId =
+    createRequestId();
+
+  logger.error(
+    "field_mutation_failed",
+    {
+      requestId,
+      action,
+      error,
+      metadata,
+    },
+  );
+
+  return actionFailure(
+    `${message} Reference: ${requestId}`,
+  );
+}
+
 function cleanId(formData: FormData, key: string) {
   return String(formData.get(key) ?? "").trim();
 }
@@ -194,25 +225,65 @@ async function getStopBundle(visitId: string) {
   return { admin, stop: routeStop, visit: visit ?? null, booking: booking ?? null };
 }
 
-async function recordServiceEvent(input: {
-  actorId: string;
-  booking?: BookingRow | null;
-  visit?: ServiceVisitRow | null;
-  stop?: RouteStopRow | null;
-  eventType: string;
-  message: string;
-  metadata?: Record<string, unknown>;
-}) {
-  const admin = getSupabaseAdmin();
-  await admin.from("service_events").insert({
-    actor_profile_id: input.actorId,
-    booking_id: input.booking?.id ?? null,
-    service_visit_id: input.visit?.id ?? null,
-    route_stop_id: input.stop?.id ?? null,
-    event_type: input.eventType,
-    message: input.message,
-    metadata: input.metadata ?? {},
-  });
+async function recordServiceEvent(
+  input: {
+    actorId: string;
+    booking?: BookingRow | null;
+    visit?: ServiceVisitRow | null;
+    stop?: RouteStopRow | null;
+    eventType: string;
+    message: string;
+    metadata?: Record<
+      string,
+      unknown
+    >;
+  },
+) {
+  const admin =
+    getSupabaseAdmin();
+
+  const { error } = await admin
+    .from("service_events")
+    .insert({
+      actor_profile_id:
+        input.actorId,
+      booking_id:
+        input.booking?.id ?? null,
+      service_visit_id:
+        input.visit?.id ?? null,
+      route_stop_id:
+        input.stop?.id ?? null,
+      event_type:
+        input.eventType,
+      message: input.message,
+      metadata:
+        input.metadata ?? {},
+    });
+
+  if (error) {
+    logger.warn(
+      "field_service_event_failed",
+      {
+        action:
+          "record_service_event",
+        userId: input.actorId,
+        bookingId:
+          input.booking?.id ??
+          null,
+        error,
+        metadata: {
+          eventType:
+            input.eventType,
+          visitId:
+            input.visit?.id ??
+            null,
+          routeStopId:
+            input.stop?.id ??
+            null,
+        },
+      },
+    );
+  }
 }
 
 function revalidateField(visitId?: string | null) {
@@ -228,46 +299,161 @@ function revalidateField(visitId?: string | null) {
 export async function updateStopStatusAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  const auth = await requireFieldUser();
-  const visitId = cleanId(formData, "visitId");
-  const status = cleanId(formData, "status") as FieldStopStatus;
-  const validStatuses: FieldStopStatus[] = [
-    "scheduled",
-    "on_the_way",
-    "arrived",
-    "in_progress",
-    "completed",
-    "skipped",
-    "needs_follow_up",
-    "rescheduled",
-    "cancelled",
-  ];
+  const auth =
+    await requireFieldUser();
 
-  if (!visitId || !validStatuses.includes(status)) {
-    return actionFailure("Choose a valid stop status.");
+  const visitId =
+    cleanId(formData, "visitId");
+
+  const status = cleanId(
+    formData,
+    "status",
+  ) as FieldStopStatus;
+
+  const validStatuses:
+    FieldStopStatus[] = [
+      "scheduled",
+      "on_the_way",
+      "arrived",
+      "in_progress",
+      "completed",
+      "skipped",
+      "needs_follow_up",
+      "rescheduled",
+      "cancelled",
+    ];
+
+  if (
+    !visitId ||
+    !validStatuses.includes(status)
+  ) {
+    return actionFailure(
+      "Choose a valid stop status.",
+    );
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
-  if (!visit || !stop) return actionFailure("This stop could not be loaded.");
+  const {
+    admin,
+    stop,
+    visit,
+    booking,
+  } =
+    await getStopBundle(visitId);
 
-  const timestamp = new Date().toISOString();
-  const stopUpdate: Partial<RouteStopRow> = { status };
-  if (status === "in_progress" && !stop.started_at) stopUpdate.started_at = timestamp;
-  if (["completed", "skipped", "needs_follow_up"].includes(status)) {
-    stopUpdate.completed_at = timestamp;
+  if (!visit || !stop) {
+    return actionFailure(
+      "This stop could not be loaded.",
+    );
   }
 
-  await Promise.all([
-    admin.from("route_stops").update(stopUpdate).eq("id", stop.id),
-    admin.from("service_visits").update({ status }).eq("id", visit.id),
+  const timestamp =
+    new Date().toISOString();
+
+  const stopUpdate:
+    Partial<RouteStopRow> = {
+      status,
+    };
+
+  if (
+    status === "in_progress" &&
+    !stop.started_at
+  ) {
+    stopUpdate.started_at =
+      timestamp;
+  }
+
+  if (
+    [
+      "completed",
+      "skipped",
+      "needs_follow_up",
+    ].includes(status)
+  ) {
+    stopUpdate.completed_at =
+      timestamp;
+  }
+
+  const [
+    stopResult,
+    visitResult,
+  ] = await Promise.all([
+    admin
+      .from("route_stops")
+      .update(stopUpdate)
+      .eq("id", stop.id),
+
+    admin
+      .from("service_visits")
+      .update({ status })
+      .eq("id", visit.id),
   ]);
 
-  if (booking && status === "on_the_way") {
-    await sendOnTheWayEmail(booking, {
-      bookingId: booking.id,
-      visitId: visit.id,
-      routeStopId: stop.id,
-    });
+  const updateError =
+    stopResult.error ??
+    visitResult.error;
+
+  if (updateError) {
+    return fieldMutationFailure(
+      "update_stop_status",
+      "The stop status could not be saved.",
+      updateError,
+      {
+        visitId,
+        routeStopId: stop.id,
+        requestedStatus: status,
+      },
+    );
+  }
+
+  let emailWarning = "";
+
+  if (
+    booking &&
+    status === "on_the_way" &&
+    stop.status !== "on_the_way"
+  ) {
+    try {
+      const emailResult =
+        await sendOnTheWayEmail(
+          booking,
+          {
+            bookingId: booking.id,
+            visitId: visit.id,
+            routeStopId:
+              stop.id,
+          },
+        );
+
+      if (
+        emailResult.status !==
+        "sent"
+      ) {
+        emailWarning =
+          " The stop updated, but the customer email was not sent.";
+      }
+    } catch (error) {
+      logger.warn(
+        "field_on_the_way_email_failed",
+        {
+          action:
+            "update_stop_status",
+          userId: auth.userId,
+          customerId:
+            booking.customer_id,
+          bookingId:
+            booking.id,
+          error,
+          metadata: {
+            visitId: visit.id,
+            routeStopId:
+              stop.id,
+          },
+        },
+      );
+
+      emailWarning =
+        " The stop updated, but the customer email was not sent.";
+    }
   }
 
   await recordServiceEvent({
@@ -275,15 +461,24 @@ export async function updateStopStatusAction(
     booking,
     visit,
     stop,
-    eventType: `stop_${status}`,
+    eventType:
+      `stop_${status}`,
     message:
       status === "arrived"
         ? "Technician marked arrived internally. No customer arrival notification was sent."
-        : `Field stop marked ${status.replaceAll("_", " ")}.`,
+        : `Field stop marked ${status.replaceAll(
+            "_",
+            " ",
+          )}.`,
   });
 
   revalidateField(visit.id);
-  return actionSuccess(statusSuccessMessage(status));
+
+  return actionSuccess(
+    `${statusSuccessMessage(
+      status,
+    )}${emailWarning}`,
+  );
 }
 
 export async function markStopFollowUpAction(
@@ -519,34 +714,59 @@ export async function saveChecklistAction(formData: FormData) {
   revalidateField(visit.id);
 }
 
-export async function saveTechnicianNotesAction(formData: FormData) {
-  const auth = await requireFieldUser();
-  const visitId = cleanId(formData, "visitId");
-  const submittedTechnicianNotes = cleanText(
-    formData,
-    "technicianNotes",
-    1800,
-  );
+export async function saveTechnicianNotesAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth =
+    await requireFieldUser();
+
+  const visitId =
+    cleanId(formData, "visitId");
+
+  const submittedTechnicianNotes =
+    cleanText(
+      formData,
+      "technicianNotes",
+      1800,
+    );
 
   const issueFlags = formData
     .getAll("issueFlags")
-    .map((value) => String(value))
+    .map((value) =>
+      String(value),
+    )
     .filter(Boolean);
 
-  const { admin, stop, visit, booking } =
+  const {
+    admin,
+    stop,
+    visit,
+    booking,
+  } =
     await getStopBundle(visitId);
 
-  if (!visit || !stop) return;
+  if (!visit || !stop) {
+    return actionFailure(
+      "This stop could not be loaded.",
+    );
+  }
 
-  const preservedPhotoFlags = stop.issue_flags.filter(
-    (flag) =>
-      flag === BEFORE_PHOTO_EXCEPTION_FLAG ||
-      flag === AFTER_PHOTO_EXCEPTION_FLAG,
-  );
+  const preservedPhotoFlags =
+    stop.issue_flags.filter(
+      (flag) =>
+        flag ===
+          BEFORE_PHOTO_EXCEPTION_FLAG ||
+        flag ===
+          AFTER_PHOTO_EXCEPTION_FLAG,
+    );
 
-  const nextIssueFlags = Array.from(
-    new Set([...issueFlags, ...preservedPhotoFlags]),
-  );
+  const nextIssueFlags =
+    Array.from(
+      new Set([
+        ...issueFlags,
+        ...preservedPhotoFlags,
+      ]),
+    );
 
   const currentNotes =
     stop.technician_notes ??
@@ -559,7 +779,9 @@ export async function saveTechnicianNotesAction(formData: FormData) {
       .find((line) =>
         line
           .trim()
-          .startsWith(PHOTO_UPLOAD_EXCEPTION_PREFIX),
+          .startsWith(
+            PHOTO_UPLOAD_EXCEPTION_PREFIX,
+          ),
       )
       ?.trim() ?? "";
 
@@ -573,39 +795,66 @@ export async function saveTechnicianNotesAction(formData: FormData) {
     .join("\n\n")
     .trim();
 
-  await Promise.all([
+  const [
+    stopResult,
+    visitResult,
+  ] = await Promise.all([
     admin
       .from("route_stops")
       .update({
-        technician_notes: technicianNotes,
-        issue_flags: nextIssueFlags,
+        technician_notes:
+          technicianNotes,
+        issue_flags:
+          nextIssueFlags,
       })
       .eq("id", stop.id),
 
     admin
       .from("service_visits")
       .update({
-        technician_notes: technicianNotes,
+        technician_notes:
+          technicianNotes,
       })
       .eq("id", visit.id),
   ]);
+
+  const saveError =
+    stopResult.error ??
+    visitResult.error;
+
+  if (saveError) {
+    return fieldMutationFailure(
+      "save_technician_notes",
+      "The technician notes could not be saved.",
+      saveError,
+      {
+        visitId,
+        routeStopId: stop.id,
+      },
+    );
+  }
 
   await recordServiceEvent({
     actorId: auth.userId,
     booking,
     visit,
     stop,
-    eventType: "technician_notes_saved",
+    eventType:
+      "technician_notes_saved",
     message:
       "Technician notes and issue flags were saved.",
     metadata: {
-      issueFlags: nextIssueFlags,
+      issueFlags:
+        nextIssueFlags,
     },
   });
 
   revalidateField(visit.id);
-}
 
+  return actionSuccess(
+    "Technician notes saved.",
+  );
+}
 export async function savePhotoUploadExceptionAction(
   formData: FormData,
 ): Promise<ActionResult> {
@@ -1048,30 +1297,149 @@ export async function uploadServicePhotosAction(formData: FormData) {
   revalidateField(visit.id);
 }
 
-export async function deleteServicePhotoAction(formData: FormData) {
-  const auth = await requireFieldUser();
-  const photoId = cleanId(formData, "photoId");
-  const visitId = cleanId(formData, "visitId");
-  const admin = getSupabaseAdmin();
+export async function deleteServicePhotoAction(
+  formData: FormData,
+): Promise<ActionResult> {
+  const auth =
+    await requireFieldUser();
 
-  const { data: photo } = await admin
+  const photoId =
+    cleanId(formData, "photoId");
+
+  const visitId =
+    cleanId(formData, "visitId");
+
+  if (!photoId) {
+    return actionFailure(
+      "The photo could not be identified.",
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: photo,
+    error: photoError,
+  } = await admin
     .from("service_photos")
     .select("*")
     .eq("id", photoId)
     .maybeSingle();
 
-  if (!photo) return;
+  if (photoError) {
+    return fieldMutationFailure(
+      "load_service_photo",
+      "The photo record could not be loaded.",
+      photoError,
+      {
+        photoId,
+        visitId,
+      },
+    );
+  }
 
-  await admin.storage.from(photo.storage_bucket).remove([photo.storage_path]);
-  await admin.from("service_photos").delete().eq("id", photo.id);
+  if (!photo) {
+    return actionFailure(
+      "This photo no longer exists.",
+    );
+  }
+
+  if (
+    visitId &&
+    photo.service_visit_id &&
+    photo.service_visit_id !==
+      visitId
+  ) {
+    return actionFailure(
+      "The photo does not belong to this service visit.",
+    );
+  }
+
+  const {
+    data: deletedPhoto,
+    error: deleteError,
+  } = await admin
+    .from("service_photos")
+    .delete()
+    .eq("id", photo.id)
+    .select("id")
+    .maybeSingle();
+
+  if (
+    deleteError ||
+    !deletedPhoto
+  ) {
+    return fieldMutationFailure(
+      "delete_service_photo",
+      "The photo could not be removed from the stop.",
+      deleteError,
+      {
+        photoId,
+        visitId:
+          visitId ||
+          photo.service_visit_id,
+      },
+    );
+  }
+
+  const {
+    error: storageError,
+  } = await admin.storage
+    .from(photo.storage_bucket)
+    .remove([
+      photo.storage_path,
+    ]);
+
+  let storageWarning = "";
+
+  if (storageError) {
+    const requestId =
+      createRequestId();
+
+    logger.warn(
+      "field_photo_storage_cleanup_failed",
+      {
+        requestId,
+        action:
+          "delete_service_photo",
+        userId: auth.userId,
+        error: storageError,
+        metadata: {
+          photoId,
+          storageBucket:
+            photo.storage_bucket,
+          storagePath:
+            photo.storage_path,
+        },
+      },
+    );
+
+    storageWarning =
+      ` The stop record was updated, but storage cleanup needs review. Reference: ${requestId}`;
+  }
+
   await recordServiceEvent({
     actorId: auth.userId,
-    eventType: "photo_deleted",
-    message: "A service photo was deleted before completion.",
-    metadata: { photoId },
+    eventType:
+      "photo_deleted",
+    message:
+      "A service photo was deleted before completion.",
+    metadata: {
+      photoId,
+      storagePath:
+        photo.storage_path,
+    },
   });
 
-  revalidateField(visitId || photo.service_visit_id);
+  revalidateField(
+    visitId ||
+      photo.service_visit_id,
+  );
+
+  return actionSuccess(
+    `Photo deleted.${storageWarning}`,
+  );
 }
 
 export async function completeStopAction(
@@ -1271,57 +1639,274 @@ export async function completeStopAction(
   return actionSuccess("Stop completed.");
 }
 
-export async function readyForNextStopAction(formData: FormData) {
-  const auth = await requireFieldUser();
-  const currentStopId = cleanId(formData, "routeStopId");
-  const admin = getSupabaseAdmin();
+export async function readyForNextStopAction(
+  formData: FormData,
+): Promise<
+  ActionResult<FieldRedirectData>
+> {
+  const auth =
+    await requireFieldUser();
 
-  const { data: currentStop } = await admin
+  const currentStopId =
+    cleanId(
+      formData,
+      "routeStopId",
+    );
+
+  if (!currentStopId) {
+    return actionFailure(
+      "The current stop could not be identified.",
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: currentStop,
+    error: currentStopError,
+  } = await admin
     .from("route_stops")
     .select("*")
     .eq("id", currentStopId)
     .maybeSingle();
 
-  if (!currentStop?.route_day_id) {
-    redirect("/field/today");
+  if (currentStopError) {
+    return fieldMutationFailure(
+      "load_current_stop",
+      "The current stop could not be loaded.",
+      currentStopError,
+      {
+        routeStopId:
+          currentStopId,
+      },
+    );
   }
 
-  const { data: nextStop } = await admin
+  if (
+    !currentStop?.route_day_id
+  ) {
+    return actionFailure(
+      "The current stop is not linked to a route.",
+    );
+  }
+
+  if (
+    currentStop.status !==
+    "completed"
+  ) {
+    return actionFailure(
+      "Complete the current stop before moving to the next one.",
+    );
+  }
+
+  const {
+    data: nextStop,
+    error: nextStopError,
+  } = await admin
     .from("route_stops")
     .select("*")
-    .eq("route_day_id", currentStop.route_day_id)
-    .gt("stop_order", currentStop.stop_order)
-    .not("status", "in", "(completed,skipped,cancelled,rescheduled)")
-    .order("stop_order", { ascending: true })
+    .eq(
+      "route_day_id",
+      currentStop.route_day_id,
+    )
+    .gt(
+      "stop_order",
+      currentStop.stop_order,
+    )
+    .not(
+      "status",
+      "in",
+      "(completed,skipped,cancelled,rescheduled)",
+    )
+    .order("stop_order", {
+      ascending: true,
+    })
     .limit(1)
     .maybeSingle();
 
-  if (!nextStop?.service_visit_id) {
-    redirect("/field/today");
+  if (nextStopError) {
+    return fieldMutationFailure(
+      "load_next_stop",
+      "The next stop could not be loaded.",
+      nextStopError,
+      {
+        routeStopId:
+          currentStop.id,
+        routeDayId:
+          currentStop.route_day_id,
+      },
+    );
   }
 
-  const { data: visit } = await admin
+  if (
+    !nextStop?.service_visit_id
+  ) {
+    revalidateField();
+
+    return actionSuccess(
+      "Route complete. No additional stops remain.",
+      {
+        redirectTo:
+          "/field/today",
+      },
+    );
+  }
+
+  const {
+    data: visit,
+    error: visitError,
+  } = await admin
     .from("service_visits")
     .select("*")
-    .eq("id", nextStop.service_visit_id)
+    .eq(
+      "id",
+      nextStop.service_visit_id,
+    )
     .maybeSingle();
-  const { data: booking } = visit?.booking_id
-    ? await admin.from("bookings").select("*").eq("id", visit.booking_id).maybeSingle()
-    : { data: null };
 
-  await Promise.all([
-    admin.from("route_stops").update({ status: "on_the_way" }).eq("id", nextStop.id),
-    visit
-      ? admin.from("service_visits").update({ status: "on_the_way" }).eq("id", visit.id)
-      : Promise.resolve(),
-  ]);
+  if (
+    visitError ||
+    !visit
+  ) {
+    return fieldMutationFailure(
+      "load_next_visit",
+      "The next service visit could not be loaded.",
+      visitError,
+      {
+        routeStopId:
+          nextStop.id,
+        visitId:
+          nextStop.service_visit_id,
+      },
+    );
+  }
 
-  if (booking && visit) {
-    await sendOnTheWayEmail(booking, {
-      bookingId: booking.id,
-      visitId: visit.id,
-      routeStopId: nextStop.id,
-    });
+  let booking:
+    BookingRow | null = null;
+
+  if (visit.booking_id) {
+    const {
+      data,
+      error,
+    } = await admin
+      .from("bookings")
+      .select("*")
+      .eq(
+        "id",
+        visit.booking_id,
+      )
+      .maybeSingle();
+
+    if (error) {
+      return fieldMutationFailure(
+        "load_next_booking",
+        "The next booking could not be loaded.",
+        error,
+        {
+          bookingId:
+            visit.booking_id,
+          visitId: visit.id,
+        },
+      );
+    }
+
+    booking = data ?? null;
+  }
+
+  const wasAlreadyOnTheWay =
+    nextStop.status ===
+    "on_the_way";
+
+  if (!wasAlreadyOnTheWay) {
+    const [
+      stopResult,
+      visitResult,
+    ] = await Promise.all([
+      admin
+        .from("route_stops")
+        .update({
+          status:
+            "on_the_way",
+        })
+        .eq("id", nextStop.id),
+
+      admin
+        .from("service_visits")
+        .update({
+          status:
+            "on_the_way",
+        })
+        .eq("id", visit.id),
+    ]);
+
+    const updateError =
+      stopResult.error ??
+      visitResult.error;
+
+    if (updateError) {
+      return fieldMutationFailure(
+        "start_next_stop",
+        "The next stop could not be marked on the way.",
+        updateError,
+        {
+          routeStopId:
+            nextStop.id,
+          visitId: visit.id,
+        },
+      );
+    }
+  }
+
+  let emailWarning = "";
+
+  if (
+    booking &&
+    !wasAlreadyOnTheWay
+  ) {
+    try {
+      const emailResult =
+        await sendOnTheWayEmail(
+          booking,
+          {
+            bookingId:
+              booking.id,
+            visitId: visit.id,
+            routeStopId:
+              nextStop.id,
+          },
+        );
+
+      if (
+        emailResult.status !==
+        "sent"
+      ) {
+        emailWarning =
+          " The customer email was not sent.";
+      }
+    } catch (error) {
+      logger.warn(
+        "next_stop_email_failed",
+        {
+          action:
+            "ready_for_next_stop",
+          userId: auth.userId,
+          customerId:
+            booking.customer_id,
+          bookingId:
+            booking.id,
+          error,
+          metadata: {
+            visitId: visit.id,
+            routeStopId:
+              nextStop.id,
+          },
+        },
+      );
+
+      emailWarning =
+        " The customer email was not sent.";
+    }
   }
 
   await recordServiceEvent({
@@ -1329,41 +1914,184 @@ export async function readyForNextStopAction(formData: FormData) {
     booking,
     visit,
     stop: nextStop,
-    eventType: "next_stop_on_the_way",
-    message: "Technician moved to the next stop and on-the-way email was triggered.",
+    eventType:
+      wasAlreadyOnTheWay
+        ? "next_stop_resumed"
+        : "next_stop_on_the_way",
+    message:
+      wasAlreadyOnTheWay
+        ? "Technician reopened the next on-the-way stop."
+        : "Technician moved to the next stop.",
   });
 
-  redirect(`/field/stops/${nextStop.service_visit_id}`);
+  revalidateField(visit.id);
+
+  return actionSuccess(
+    wasAlreadyOnTheWay
+      ? "Opening the next stop."
+      : `Next stop marked on the way.${emailWarning}`,
+    {
+      redirectTo:
+        `/field/stops/${visit.id}`,
+    },
+  );
 }
 
-export async function startBreakAction(formData: FormData) {
-  const routeDayId = cleanId(formData, "routeDayId");
-  const routeStopId = cleanId(formData, "routeStopId");
-  const requestedReason = cleanId(formData, "reason") as BreakReason;
-  const reason = validBreakReasons.includes(requestedReason)
-    ? requestedReason
-    : "other";
-  const notes = cleanText(formData, "notes", 600);
-  const auth = await requireFieldUser();
-  const admin = getSupabaseAdmin();
+export async function startBreakAction(
+  formData: FormData,
+): Promise<
+  ActionResult<FieldRedirectData>
+> {
+  const auth =
+    await requireFieldUser();
 
-  if (breakReasonsRequiringNotes.includes(reason) && !notes) {
-    const params = new URLSearchParams({
-      break_error: "notes_required",
-      reason,
-    });
-    if (routeStopId) params.set("routeStopId", routeStopId);
-    redirect(`/field/breaks?${params.toString()}`);
+  const routeDayId =
+    cleanId(
+      formData,
+      "routeDayId",
+    );
+
+  const routeStopId =
+    cleanId(
+      formData,
+      "routeStopId",
+    );
+
+  const requestedReason =
+    cleanId(
+      formData,
+      "reason",
+    ) as BreakReason;
+
+  const notes =
+    cleanText(
+      formData,
+      "notes",
+      600,
+    );
+
+  if (
+    !validBreakReasons.includes(
+      requestedReason,
+    )
+  ) {
+    return actionFailure(
+      "Choose a valid break reason.",
+    );
   }
 
-  await admin.from("route_breaks").insert({
-    route_day_id: routeDayId || null,
-    technician_id: auth.userId,
-    reason,
-    notes,
-  });
+  const reason =
+    requestedReason;
+
+  if (
+    breakReasonsRequiringNotes.includes(
+      reason,
+    ) &&
+    !notes
+  ) {
+    return actionFailure(
+      `${reason.replaceAll(
+        "_",
+        " ",
+      )} requires a note so admin knows what happened.`,
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  const {
+    data: activeBreak,
+    error: activeBreakError,
+  } = await admin
+    .from("route_breaks")
+    .select("id, reason")
+    .eq(
+      "technician_id",
+      auth.userId,
+    )
+    .is("ended_at", null)
+    .limit(1)
+    .maybeSingle();
+
+  if (activeBreakError) {
+    return fieldMutationFailure(
+      "check_active_break",
+      "The app could not verify your current break status.",
+      activeBreakError,
+      {
+        technicianId:
+          auth.userId,
+      },
+    );
+  }
+
+  if (activeBreak) {
+    return actionFailure(
+      "You already have an active break. End it before starting another one.",
+    );
+  }
+
+  const {
+    data: createdBreak,
+    error: insertError,
+  } = await admin
+    .from("route_breaks")
+    .insert({
+      route_day_id:
+        routeDayId || null,
+      technician_id:
+        auth.userId,
+      reason,
+      notes: notes || null,
+    })
+    .select("id")
+    .single();
+
+  if (
+    insertError ||
+    !createdBreak
+  ) {
+    if (
+      insertError?.code ===
+      "23505"
+    ) {
+      return actionFailure(
+        "You already have an active break. Refresh the page to view it.",
+      );
+    }
+
+    return fieldMutationFailure(
+      "start_break",
+      "The break could not be started.",
+      insertError,
+      {
+        technicianId:
+          auth.userId,
+        routeDayId:
+          routeDayId || null,
+        routeStopId:
+          routeStopId || null,
+        reason,
+      },
+    );
+  }
 
   revalidateField();
+
+  const redirectTo =
+    routeStopId
+      ? `/field/breaks?routeStopId=${encodeURIComponent(
+          routeStopId,
+        )}`
+      : "/field/breaks";
+
+  return actionSuccess(
+    "Break started.",
+    {
+      redirectTo,
+    },
+  );
 }
 
 export async function endBreakAction(formData: FormData) {
