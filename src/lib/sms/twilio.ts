@@ -257,34 +257,89 @@ export async function setSmsContactPreference(
   const now = new Date().toISOString();
   const admin = getSupabaseAdmin();
 
+  const preferenceRecord = {
+    normalized_phone: normalizedPhone,
+    status: input.status,
+    source: input.source,
+    last_inbound_message_sid:
+      input.messageSid ?? null,
+    ...(input.status === "opted_in"
+      ? {
+          opted_in_at: now,
+          opted_out_at: null,
+        }
+      : {
+          opted_out_at: now,
+        }),
+  };
+
   const { error } = await admin
     .from("sms_contact_preferences")
-    .upsert(
-      {
-        normalized_phone: normalizedPhone,
-        status: input.status,
-        opted_in_at:
-          input.status === "opted_in"
-            ? now
-            : null,
-        opted_out_at:
-          input.status === "opted_out"
-            ? now
-            : null,
-        source: input.source,
-        last_inbound_message_sid:
-          input.messageSid ?? null,
-      },
-      {
-        onConflict: "normalized_phone",
-      },
-    );
+    .upsert(preferenceRecord, {
+      onConflict: "normalized_phone",
+    });
 
   if (error) {
     return {
       ok: false as const,
       reason: error.message,
     };
+  }
+
+  /*
+   * Keep portal profiles synchronized without altering
+   * the historical consent snapshot stored on bookings.
+   */
+  try {
+    const { data: profiles } = await admin
+      .from("profiles")
+      .select(
+        "id, phone, sms_opt_in_at, sms_consent_version",
+      );
+
+    const matchingProfiles = (profiles ?? []).filter(
+      (profile) =>
+        normalizeSmsPhone(profile.phone ?? "") ===
+        normalizedPhone,
+    );
+
+    const profileIds =
+      input.status === "opted_in"
+        ? matchingProfiles
+            .filter(
+              (profile) =>
+                profile.sms_opt_in_at ||
+                profile.sms_consent_version,
+            )
+            .map((profile) => profile.id)
+        : matchingProfiles.map(
+            (profile) => profile.id,
+          );
+
+    if (profileIds.length) {
+      await admin
+        .from("profiles")
+        .update(
+          input.status === "opted_in"
+            ? {
+                sms_opt_in: true,
+                sms_opt_in_at: now,
+                sms_opt_out_at: null,
+                sms_opt_in_source:
+                  input.source,
+              }
+            : {
+                sms_opt_in: false,
+                sms_opt_out_at: now,
+              },
+        )
+        .in("id", profileIds);
+    }
+  } catch {
+    /*
+     * The phone-level suppression record is authoritative,
+     * so profile synchronization cannot block the webhook.
+     */
   }
 
   return {
@@ -372,12 +427,14 @@ export async function sendTransactionalSms(
 
   const config = getTwilioConfig();
 
-  const payload = new URLSearchParams({
-    To: normalizedPhone,
-    MessagingServiceSid:
-      config.messagingServiceSid,
-    Body: input.body,
-  });
+const payload = new URLSearchParams({
+  To: normalizedPhone,
+  MessagingServiceSid:
+    config.messagingServiceSid,
+  Body: input.body,
+  StatusCallback:
+    `${getSiteUrl()}${TWILIO_STATUS_PATH}`,
+});
 
   try {
     const authorization =
