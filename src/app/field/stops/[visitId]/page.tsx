@@ -22,7 +22,9 @@ import { PaymentLinkButton } from "@/components/payment-link-button";
 import { ServiceChecklistPanel } from "@/components/service-checklist-panel";
 import { FieldShell } from "@/components/shells/field-shell";
 import { formatBookingAddress, humanizeStatus } from "@/lib/booking-utils";
-import { getFieldContext } from "@/lib/field-data";
+import {
+  getFieldStopContext,
+} from "@/lib/server/field-page-data";
 import { getServiceClearanceStatus } from "@/lib/payment-clearance";
 import { ensureServiceChecklistBundle } from "@/lib/service-checklists";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
@@ -67,7 +69,11 @@ export default async function FieldStopPage({
   searchParams,
 }: FieldStopPageProps) {
   const [{ visitId }, query] = await Promise.all([params, searchParams]);
-  const context = await getFieldContext(`/field/stops/${visitId}`);
+  const context =
+    await getFieldStopContext(
+      visitId,
+      `/field/stops/${visitId}`,
+    );
   const visit = context.visits.find((item) => item.id === visitId);
   const stop = context.routeStops.find((item) => item.service_visit_id === visitId);
   const booking = context.bookings.find((item) => item.id === visit?.booking_id);
@@ -75,10 +81,17 @@ export default async function FieldStopPage({
   const address =
     context.addresses.find(
       (item) =>
+        item.id ===
+        booking
+          ?.service_address_id,
+    ) ??
+    context.addresses.find(
+      (item) =>
         item.customer_id ===
           booking?.customer_id &&
         item.is_primary,
-    );
+    ) ??
+    null;
   
   if (!visit || !stop || !booking) {
     return (
@@ -129,7 +142,9 @@ export default async function FieldStopPage({
     context.photos.filter(
       (item) =>
         item.route_stop_id ===
-        stop.id,
+          stop.id ||
+        item.service_visit_id ===
+          visit.id,
     );
   
   const signedPhotos =
