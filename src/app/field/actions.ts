@@ -2,6 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { actionFailure, actionSuccess, type ActionResult } from "@/lib/action-result";
+import {
+  getAuthorizedFieldRouteDay,
+  getAuthorizedFieldStopBundle,
+  type AuthorizedFieldAuth,
+} from "@/lib/server/field-access";
 import { formatBookingAddress } from "@/lib/booking-utils";
 import {
   createRequestId,
@@ -203,26 +208,66 @@ async function requireFieldUser() {
   return auth;
 }
 
-async function getStopBundle(visitId: string) {
-  const admin = getSupabaseAdmin();
-  const { data: stop } = await admin
-    .from("route_stops")
-    .select("*")
-    .eq("service_visit_id", visitId)
-    .maybeSingle();
+type FieldStopBundle = {
+  admin: ReturnType<
+    typeof getSupabaseAdmin
+  >;
+  stop: RouteStopRow | null;
+  visit: ServiceVisitRow | null;
+  booking: BookingRow | null;
+  accessError: string | null;
+};
 
-  const routeStop = stop ?? null;
-  const { data: visit } = await admin
-    .from("service_visits")
-    .select("*")
-    .eq("id", routeStop?.service_visit_id ?? visitId)
-    .maybeSingle();
+async function getStopBundle(
+  visitId: string,
+  auth: AuthorizedFieldAuth,
+): Promise<FieldStopBundle> {
+  const access =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        visitId,
+      },
+    );
 
-  const { data: booking } = visit?.booking_id
-    ? await admin.from("bookings").select("*").eq("id", visit.booking_id).maybeSingle()
-    : { data: null };
+  if (!access.ok) {
+    logger.warn(
+      "field_stop_access_denied",
+      {
+        action:
+          "field_stop_access",
+        userId: auth.userId,
+        role:
+          auth.profile.role,
+        metadata: {
+          visitId,
+          status:
+            access.status,
+          reason:
+            access.message,
+        },
+      },
+    );
 
-  return { admin, stop: routeStop, visit: visit ?? null, booking: booking ?? null };
+    return {
+      admin:
+        getSupabaseAdmin(),
+      stop: null,
+      visit: null,
+      booking: null,
+      accessError:
+        access.message,
+    };
+  }
+
+  return {
+    admin: access.admin,
+    stop: access.stop,
+    visit: access.visit,
+    booking:
+      access.booking,
+    accessError: null,
+  };
 }
 
 async function recordServiceEvent(
@@ -338,7 +383,10 @@ export async function updateStopStatusAction(
     visit,
     booking,
   } =
-    await getStopBundle(visitId);
+    await getStopBundle(
+      visitId,
+      auth,
+    );
 
   if (!visit || !stop) {
     return actionFailure(
@@ -498,7 +546,10 @@ export async function markStopFollowUpAction(
     );
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
   if (!visit || !stop) return actionFailure("This stop could not be loaded.");
 
   const now = new Date().toISOString();
@@ -583,7 +634,10 @@ export async function requestFieldRescheduleAction(
     return actionFailure("Add a requested date or note for admin.");
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
   if (!visit || !stop || !booking) {
     return actionFailure("This stop could not be loaded.");
   }
@@ -665,7 +719,10 @@ export async function requestFieldRescheduleAction(
 export async function saveChecklistAction(formData: FormData) {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
   if (!visit || !stop) return;
 
   const checklist = checklistFields.reduce<Partial<ChecklistValues>>(
@@ -743,7 +800,10 @@ export async function saveTechnicianNotesAction(
     visit,
     booking,
   } =
-    await getStopBundle(visitId);
+    await getStopBundle(
+      visitId,
+      auth,
+    );
 
   if (!visit || !stop) {
     return actionFailure(
@@ -876,7 +936,10 @@ export async function savePhotoUploadExceptionAction(
     .trim();
 
   const { admin, stop, visit, booking } =
-    await getStopBundle(visitId);
+    await getStopBundle(
+      visitId,
+      auth,
+    );
 
   if (!visit || !stop) {
     return actionFailure("This stop could not be loaded.");
@@ -1014,6 +1077,7 @@ const validServicePhotoContentTypes = new Set([
 export async function prepareServicePhotoUploadAction(
   input: PrepareServicePhotoUploadInput,
 ): Promise<ActionResult<ServicePhotoUploadTicket>> {
+  const auth =
   await requireFieldUser();
 
   const visitId = String(input?.visitId ?? "").trim();
@@ -1039,7 +1103,10 @@ export async function prepareServicePhotoUploadAction(
     return actionFailure("Each photo must be 20 MB or smaller.");
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
 
   if (!visit || !stop || !booking) {
     return actionFailure("This stop could not be loaded.");
@@ -1087,7 +1154,10 @@ export async function finalizeServicePhotoUploadAction(
     return actionFailure("The photo was uploaded to an invalid storage bucket.");
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
 
   if (!visit || !stop || !booking) {
     return actionFailure("This stop could not be loaded.");
@@ -1231,7 +1301,10 @@ export async function uploadServicePhotosAction(formData: FormData) {
   const auth = await requireFieldUser();
   const visitId = cleanId(formData, "visitId");
   const photoType = cleanId(formData, "photoType") as PhotoType;
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
   if (!visit || !stop || !booking || !["before", "after", "issue", "other"].includes(photoType)) {
     return;
   }
@@ -1345,6 +1418,46 @@ export async function deleteServicePhotoAction(
     );
   }
 
+  const photoAccess =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        routeStopId:
+          photo.route_stop_id,
+        visitId:
+          photo.service_visit_id ??
+          (visitId || null),
+        bookingId:
+          photo.booking_id,
+      },
+    );
+  
+  if (!photoAccess.ok) {
+    return actionFailure(
+      photoAccess.message,
+    );
+  }
+  
+  if (
+    photo.route_stop_id &&
+    photo.route_stop_id !==
+      photoAccess.stop.id
+  ) {
+    return actionFailure(
+      "The photo does not belong to this field stop.",
+    );
+  }
+  
+  if (
+    photo.service_visit_id &&
+    photo.service_visit_id !==
+      photoAccess.visit.id
+  ) {
+    return actionFailure(
+      "The photo does not belong to this service visit.",
+    );
+  }
+  
   if (
     visitId &&
     photo.service_visit_id &&
@@ -1449,7 +1562,10 @@ export async function completeStopAction(
   const visitId = cleanId(formData, "visitId");
 
   const { admin, stop, visit, booking } =
-    await getStopBundle(visitId);
+    await getStopBundle(
+      visitId,
+      auth,
+    );
 
   if (!visit || !stop || !booking) {
     return actionFailure(
@@ -1659,37 +1775,25 @@ export async function readyForNextStopAction(
     );
   }
 
-  const admin =
-    getSupabaseAdmin();
+const currentAccess =
+  await getAuthorizedFieldStopBundle(
+    {
+      auth,
+      routeStopId:
+        currentStopId,
+    },
+  );
 
-  const {
-    data: currentStop,
-    error: currentStopError,
-  } = await admin
-    .from("route_stops")
-    .select("*")
-    .eq("id", currentStopId)
-    .maybeSingle();
+if (!currentAccess.ok) {
+  return actionFailure(
+    currentAccess.message,
+  );
+}
 
-  if (currentStopError) {
-    return fieldMutationFailure(
-      "load_current_stop",
-      "The current stop could not be loaded.",
-      currentStopError,
-      {
-        routeStopId:
-          currentStopId,
-      },
-    );
-  }
-
-  if (
-    !currentStop?.route_day_id
-  ) {
-    return actionFailure(
-      "The current stop is not linked to a route.",
-    );
-  }
+const {
+  admin,
+  stop: currentStop,
+} = currentAccess;
 
   if (
     currentStop.status !==
@@ -1999,7 +2103,23 @@ export async function startBreakAction(
 
   const admin =
     getSupabaseAdmin();
-
+  
+  if (routeDayId) {
+    const routeAccess =
+      await getAuthorizedFieldRouteDay(
+        {
+          auth,
+          routeDayId,
+        },
+      );
+  
+    if (!routeAccess.ok) {
+      return actionFailure(
+        routeAccess.message,
+      );
+    }
+  }
+  
   const {
     data: activeBreak,
     error: activeBreakError,
@@ -2157,7 +2277,10 @@ export async function markManualPaidAction(
     );
   }
 
-  const { admin, stop, visit, booking } = await getStopBundle(visitId);
+  const { admin, stop, visit, booking } = await getStopBundle(
+    visitId,
+    auth,
+  );
 
   if (!visit || !stop || !booking) {
     return actionFailure("This stop could not be loaded.");
@@ -2350,14 +2473,29 @@ export async function sendPaymentLinkFromFieldAction(
   const bookingId = cleanId(formData, "bookingId");
   const visitId = cleanId(formData, "visitId");
   const routeStopId = cleanId(formData, "routeStopId");
-  const admin = getSupabaseAdmin();
-  const { data: booking } = await admin
-    .from("bookings")
-    .select("*")
-    .eq("id", bookingId)
-    .maybeSingle();
-
-  if (!booking) return actionFailure("Booking was not found.");
+  const access =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        routeStopId,
+        visitId,
+        bookingId,
+      },
+    );
+  
+  if (!access.ok) {
+    return actionFailure(
+      access.message,
+    );
+  }
+  
+  const {
+    admin,
+    booking,
+    visit,
+    stop,
+  } = access;
+  
   if (!booking.payment_link) {
     return actionFailure(
       "Create a Stripe payment link before sending the payment email.",
@@ -2397,9 +2535,16 @@ export async function sendPaymentLinkFromFieldAction(
     recordServiceEvent({
       actorId: auth.userId,
       booking,
-      eventType: "field_payment_email_sent",
-      message: "Payment email sent from the field app.",
-      metadata: { visitId, routeStopId },
+      visit,
+      stop,
+      eventType:
+        "field_payment_email_sent",
+      message:
+        "Payment email sent from the field app.",
+      metadata: {
+        visitId,
+        routeStopId,
+      },
     }),
   ]);
 
