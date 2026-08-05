@@ -671,7 +671,8 @@ export type PaymentRow = {
     | "ready"
     | "paid"
     | "failed"
-    | "cancelled";
+    | "cancelled"
+    | "refunded";
 
   checkout_attempted_at:
     string | null;
