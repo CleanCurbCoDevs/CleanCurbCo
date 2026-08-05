@@ -30,6 +30,13 @@ import type {
   ServiceChecklistRow,
   ServiceVisitRow,
 } from "@/types/database";
+import {
+  completeFieldStop,
+  endBreakAndPrepareNextFieldStop,
+  prepareNextFieldStop,
+  transitionFieldStop,
+} from "@/lib/server/field-lifecycle";
+
 
 const checklistFields: Array<keyof Omit<
   ServiceChecklistRow,
@@ -350,30 +357,27 @@ export async function updateStopStatusAction(
   const visitId =
     cleanId(formData, "visitId");
 
-  const status = cleanId(
-    formData,
-    "status",
-  ) as FieldStopStatus;
+  const status =
+    cleanId(
+      formData,
+      "status",
+    ) as FieldStopStatus;
 
-  const validStatuses:
+  const progressionStatuses:
     FieldStopStatus[] = [
-      "scheduled",
       "on_the_way",
       "arrived",
       "in_progress",
-      "completed",
-      "skipped",
-      "needs_follow_up",
-      "rescheduled",
-      "cancelled",
     ];
 
   if (
     !visitId ||
-    !validStatuses.includes(status)
+    !progressionStatuses.includes(
+      status,
+    )
   ) {
     return actionFailure(
-      "Choose a valid stop status.",
+      "Choose the next valid stop status.",
     );
   }
 
@@ -382,74 +386,39 @@ export async function updateStopStatusAction(
     stop,
     visit,
     booking,
+    accessError,
   } =
     await getStopBundle(
       visitId,
       auth,
     );
 
-  if (!visit || !stop) {
+  if (
+    !stop ||
+    !visit
+  ) {
     return actionFailure(
-      "This stop could not be loaded.",
+      accessError ??
+        "This stop could not be loaded.",
     );
   }
 
-  const timestamp =
-    new Date().toISOString();
-
-  const stopUpdate:
-    Partial<RouteStopRow> = {
-      status,
-    };
-
-  if (
-    status === "in_progress" &&
-    !stop.started_at
-  ) {
-    stopUpdate.started_at =
-      timestamp;
-  }
-
-  if (
-    [
-      "completed",
-      "skipped",
-      "needs_follow_up",
-    ].includes(status)
-  ) {
-    stopUpdate.completed_at =
-      timestamp;
-  }
-
-  const [
-    stopResult,
-    visitResult,
-  ] = await Promise.all([
-    admin
-      .from("route_stops")
-      .update(stopUpdate)
-      .eq("id", stop.id),
-
-    admin
-      .from("service_visits")
-      .update({ status })
-      .eq("id", visit.id),
-  ]);
-
-  const updateError =
-    stopResult.error ??
-    visitResult.error;
-
-  if (updateError) {
-    return fieldMutationFailure(
-      "update_stop_status",
-      "The stop status could not be saved.",
-      updateError,
+  const transition =
+    await transitionFieldStop(
+      admin,
       {
-        visitId,
-        routeStopId: stop.id,
-        requestedStatus: status,
+        routeStopId:
+          stop.id,
+        actorProfileId:
+          auth.userId,
+        nextStatus:
+          status,
       },
+    );
+
+  if (!transition.ok) {
+    return actionFailure(
+      transition.message,
     );
   }
 
@@ -458,15 +427,17 @@ export async function updateStopStatusAction(
   if (
     booking &&
     status === "on_the_way" &&
-    stop.status !== "on_the_way"
+    transition.data.changed
   ) {
     try {
       const emailResult =
         await sendOnTheWayEmail(
           booking,
           {
-            bookingId: booking.id,
-            visitId: visit.id,
+            bookingId:
+              booking.id,
+            visitId:
+              visit.id,
             routeStopId:
               stop.id,
           },
@@ -485,14 +456,16 @@ export async function updateStopStatusAction(
         {
           action:
             "update_stop_status",
-          userId: auth.userId,
+          userId:
+            auth.userId,
           customerId:
             booking.customer_id,
           bookingId:
             booking.id,
           error,
           metadata: {
-            visitId: visit.id,
+            visitId:
+              visit.id,
             routeStopId:
               stop.id,
           },
@@ -504,28 +477,19 @@ export async function updateStopStatusAction(
     }
   }
 
-  await recordServiceEvent({
-    actorId: auth.userId,
-    booking,
-    visit,
-    stop,
-    eventType:
-      `stop_${status}`,
-    message:
-      status === "arrived"
-        ? "Technician marked arrived internally. No customer arrival notification was sent."
-        : `Field stop marked ${status.replaceAll(
-            "_",
-            " ",
-          )}.`,
-  });
-
-  revalidateField(visit.id);
+  revalidateField(
+    visit.id,
+  );
 
   return actionSuccess(
-    `${statusSuccessMessage(
-      status,
-    )}${emailWarning}`,
+    transition.data.changed
+      ? `${statusSuccessMessage(
+          status,
+        )}${emailWarning}`
+      : `This stop is already marked ${status.replaceAll(
+          "_",
+          " ",
+        )}.`,
   );
 }
 
@@ -1558,55 +1522,37 @@ export async function deleteServicePhotoAction(
 export async function completeStopAction(
   formData: FormData,
 ): Promise<ActionResult> {
-  const auth = await requireFieldUser();
-  const visitId = cleanId(formData, "visitId");
+  const auth =
+    await requireFieldUser();
 
-  const { admin, stop, visit, booking } =
+  const visitId =
+    cleanId(
+      formData,
+      "visitId",
+    );
+
+  const {
+    admin,
+    stop,
+    visit,
+    booking,
+    accessError,
+  } =
     await getStopBundle(
       visitId,
       auth,
     );
 
-  if (!visit || !stop || !booking) {
-    return actionFailure(
-      "This stop could not be loaded.",
-    );
-  }
-
   if (
-    booking.payment_due_at_service &&
-    booking.payment_status !== "paid"
+    !stop ||
+    !visit ||
+    !booking
   ) {
     return actionFailure(
-      "Collect and record the in-person payment before completing this stop.",
+      accessError ??
+        "This stop could not be loaded.",
     );
   }
-
-  const completedAt = new Date().toISOString();
-
-  const {
-    data: photos,
-    error: photosError,
-  } = await admin
-    .from("service_photos")
-    .select("*")
-    .eq("route_stop_id", stop.id);
-
-  if (photosError) {
-    return actionFailure(
-      `Could not verify the service photos: ${photosError.message}`,
-    );
-  }
-
-  const beforeCount =
-    photos?.filter(
-      (photo) => photo.photo_type === "before",
-    ).length ?? 0;
-
-  const afterCount =
-    photos?.filter(
-      (photo) => photo.photo_type === "after",
-    ).length ?? 0;
 
   const photoExceptionRecorded =
     hasPhotoUploadExceptionNote(
@@ -1626,133 +1572,101 @@ export async function completeStopAction(
       AFTER_PHOTO_EXCEPTION_FLAG,
     );
 
-  const {
-    data: checklist,
-    error: checklistError,
-  } = await admin
-    .from("service_checklists")
-    .select("*")
-    .eq("route_stop_id", stop.id)
-    .limit(1)
-    .maybeSingle();
-
-  if (checklistError) {
-    return actionFailure(
-      `Could not verify the cleaning checklist: ${checklistError.message}`,
+  const completion =
+    await completeFieldStop(
+      admin,
+      {
+        routeStopId:
+          stop.id,
+        actorProfileId:
+          auth.userId,
+        beforeExceptionAllowed:
+          beforePhotoException,
+        afterExceptionAllowed:
+          afterPhotoException,
+      },
     );
-  }
 
-  if (beforeCount < 1 && !beforePhotoException) {
+  if (!completion.ok) {
     return actionFailure(
-      "Upload at least one before photo or document a before-photo exception.",
+      completion.message,
     );
   }
 
   if (
-    !checklist ||
-    checklist.status !== "submitted"
+    completion.data
+      .alreadyCompleted
   ) {
-    return actionFailure(
-      "Finish and submit the cleaning checklist before completing this stop.",
+    revalidateField(
+      visit.id,
+    );
+
+    return actionSuccess(
+      "This stop was already completed.",
     );
   }
 
-  if (afterCount < 1 && !afterPhotoException) {
-    return actionFailure(
-      "Upload at least one after photo or document an after-photo exception.",
+  let emailWarning = "";
+
+  try {
+    const emailResult =
+      await sendServiceCompletedEmail(
+        booking,
+        {
+          bookingId:
+            booking.id,
+          visitId:
+            visit.id,
+          routeStopId:
+            stop.id,
+          paymentLink:
+            booking.payment_status ===
+            "paid"
+              ? null
+              : booking.payment_link,
+        },
+      );
+
+    if (
+      emailResult.status !==
+      "sent"
+    ) {
+      emailWarning =
+        " Service was completed, but the customer email was not sent.";
+    }
+  } catch (error) {
+    logger.warn(
+      "field_completion_email_failed",
+      {
+        action:
+          "complete_stop",
+        userId:
+          auth.userId,
+        customerId:
+          booking.customer_id,
+        bookingId:
+          booking.id,
+        error,
+        metadata: {
+          visitId:
+            visit.id,
+          routeStopId:
+            stop.id,
+        },
+      },
     );
+
+    emailWarning =
+      " Service was completed, but the customer email was not sent.";
   }
 
-  const { error: checklistUpdateError } =
-    await admin
-      .from("service_checklists")
-      .update({
-        before_photos_taken: beforeCount > 0,
-        after_photos_taken: afterCount > 0,
-        service_completed: true,
-        completed_by: auth.userId,
-        completed_at: completedAt,
-        booking_id: booking.id,
-        customer_id: booking.customer_id,
-      })
-      .eq("id", checklist.id);
+  revalidateField(
+    visit.id,
+  );
 
-  if (checklistUpdateError) {
-    return actionFailure(
-      `Could not finalize the cleaning checklist: ${checklistUpdateError.message}`,
-    );
-  }
-
-  const [
-    stopUpdate,
-    visitUpdate,
-    bookingUpdate,
-  ] = await Promise.all([
-    admin
-      .from("route_stops")
-      .update({
-        status: "completed",
-        completed_at: completedAt,
-      })
-      .eq("id", stop.id),
-
-    admin
-      .from("service_visits")
-      .update({
-        status: "completed",
-        completed_at: completedAt,
-      })
-      .eq("id", visit.id),
-
-    admin
-      .from("bookings")
-      .update({
-        status: "completed",
-      })
-      .eq("id", booking.id),
-  ]);
-
-  const completionError =
-    stopUpdate.error ??
-    visitUpdate.error ??
-    bookingUpdate.error;
-
-  if (completionError) {
-    return actionFailure(
-      `Could not complete the service record: ${completionError.message}`,
-    );
-  }
-
-  await sendServiceCompletedEmail(booking, {
-    bookingId: booking.id,
-    visitId: visit.id,
-    routeStopId: stop.id,
-    paymentLink:
-      booking.payment_status === "paid"
-        ? null
-        : booking.payment_link,
-  });
-
-  await recordServiceEvent({
-    actorId: auth.userId,
-    booking,
-    visit,
-    stop,
-    eventType: "stop_completed",
-    message: `Stop completed at ${formatBookingAddress(
-      booking,
-    )}.`,
-    metadata: {
-      beforeCount,
-      afterCount,
-      beforePhotoException,
-      afterPhotoException,
-    },
-  });
-
-  revalidateField(visit.id);
-
-  return actionSuccess("Stop completed.");
+  return actionSuccess(
+    `Stop completed.${emailWarning}`,
+  );
 }
 
 export async function readyForNextStopAction(
@@ -1775,76 +1689,41 @@ export async function readyForNextStopAction(
     );
   }
 
-const currentAccess =
-  await getAuthorizedFieldStopBundle(
-    {
-      auth,
-      routeStopId:
-        currentStopId,
-    },
-  );
-
-if (!currentAccess.ok) {
-  return actionFailure(
-    currentAccess.message,
-  );
-}
-
-const {
-  admin,
-  stop: currentStop,
-} = currentAccess;
-
-  if (
-    currentStop.status !==
-    "completed"
-  ) {
-    return actionFailure(
-      "Complete the current stop before moving to the next one.",
-    );
-  }
-
-  const {
-    data: nextStop,
-    error: nextStopError,
-  } = await admin
-    .from("route_stops")
-    .select("*")
-    .eq(
-      "route_day_id",
-      currentAccess.routeDay.id
-    )
-    .gt(
-      "stop_order",
-      currentStop.stop_order,
-    )
-    .not(
-      "status",
-      "in",
-      "(completed,skipped,cancelled,rescheduled)",
-    )
-    .order("stop_order", {
-      ascending: true,
-    })
-    .limit(1)
-    .maybeSingle();
-
-  if (nextStopError) {
-    return fieldMutationFailure(
-      "load_next_stop",
-      "The next stop could not be loaded.",
-      nextStopError,
+  const currentAccess =
+    await getAuthorizedFieldStopBundle(
       {
+        auth,
         routeStopId:
-          currentStop.id,
-        routeDayId:
-          currentStop.route_day_id,
+          currentStopId,
       },
     );
+
+  if (!currentAccess.ok) {
+    return actionFailure(
+      currentAccess.message,
+    );
+  }
+
+  const nextResult =
+    await prepareNextFieldStop(
+      currentAccess.admin,
+      {
+        currentRouteStopId:
+          currentAccess.stop.id,
+        actorProfileId:
+          auth.userId,
+      },
+    );
+
+  if (!nextResult.ok) {
+    return actionFailure(
+      nextResult.message,
+    );
   }
 
   if (
-    !nextStop?.service_visit_id
+    nextResult.data
+      .routeComplete
   ) {
     revalidateField();
 
@@ -1858,126 +1737,52 @@ const {
   }
 
   const {
-    data: visit,
-    error: visitError,
-  } = await admin
-    .from("service_visits")
-    .select("*")
-    .eq(
-      "id",
-      nextStop.service_visit_id,
-    )
-    .maybeSingle();
+    nextStopId,
+    nextVisitId,
+  } = nextResult.data;
 
   if (
-    visitError ||
-    !visit
+    !nextStopId ||
+    !nextVisitId
   ) {
-    return fieldMutationFailure(
-      "load_next_visit",
-      "The next service visit could not be loaded.",
-      visitError,
-      {
-        routeStopId:
-          nextStop.id,
-        visitId:
-          nextStop.service_visit_id,
-      },
+    return actionFailure(
+      "The next stop did not return a valid service visit.",
     );
   }
 
-  let booking:
-    BookingRow | null = null;
+  const nextAccess =
+    await getAuthorizedFieldStopBundle(
+      {
+        auth,
+        routeStopId:
+          nextStopId,
+        visitId:
+          nextVisitId,
+      },
+    );
 
-  if (visit.booking_id) {
-    const {
-      data,
-      error,
-    } = await admin
-      .from("bookings")
-      .select("*")
-      .eq(
-        "id",
-        visit.booking_id,
-      )
-      .maybeSingle();
-
-    if (error) {
-      return fieldMutationFailure(
-        "load_next_booking",
-        "The next booking could not be loaded.",
-        error,
-        {
-          bookingId:
-            visit.booking_id,
-          visitId: visit.id,
-        },
-      );
-    }
-
-    booking = data ?? null;
-  }
-
-  const wasAlreadyOnTheWay =
-    nextStop.status ===
-    "on_the_way";
-
-  if (!wasAlreadyOnTheWay) {
-    const [
-      stopResult,
-      visitResult,
-    ] = await Promise.all([
-      admin
-        .from("route_stops")
-        .update({
-          status:
-            "on_the_way",
-        })
-        .eq("id", nextStop.id),
-
-      admin
-        .from("service_visits")
-        .update({
-          status:
-            "on_the_way",
-        })
-        .eq("id", visit.id),
-    ]);
-
-    const updateError =
-      stopResult.error ??
-      visitResult.error;
-
-    if (updateError) {
-      return fieldMutationFailure(
-        "start_next_stop",
-        "The next stop could not be marked on the way.",
-        updateError,
-        {
-          routeStopId:
-            nextStop.id,
-          visitId: visit.id,
-        },
-      );
-    }
+  if (!nextAccess.ok) {
+    return actionFailure(
+      nextAccess.message,
+    );
   }
 
   let emailWarning = "";
 
   if (
-    booking &&
-    !wasAlreadyOnTheWay
+    nextResult.data.changed
   ) {
     try {
       const emailResult =
         await sendOnTheWayEmail(
-          booking,
+          nextAccess.booking,
           {
             bookingId:
-              booking.id,
-            visitId: visit.id,
+              nextAccess.booking.id,
+            visitId:
+              nextAccess.visit.id,
             routeStopId:
-              nextStop.id,
+              nextAccess.stop.id,
           },
         );
 
@@ -1994,16 +1799,19 @@ const {
         {
           action:
             "ready_for_next_stop",
-          userId: auth.userId,
+          userId:
+            auth.userId,
           customerId:
-            booking.customer_id,
+            nextAccess.booking
+              .customer_id,
           bookingId:
-            booking.id,
+            nextAccess.booking.id,
           error,
           metadata: {
-            visitId: visit.id,
+            visitId:
+              nextAccess.visit.id,
             routeStopId:
-              nextStop.id,
+              nextAccess.stop.id,
           },
         },
       );
@@ -2013,30 +1821,17 @@ const {
     }
   }
 
-  await recordServiceEvent({
-    actorId: auth.userId,
-    booking,
-    visit,
-    stop: nextStop,
-    eventType:
-      wasAlreadyOnTheWay
-        ? "next_stop_resumed"
-        : "next_stop_on_the_way",
-    message:
-      wasAlreadyOnTheWay
-        ? "Technician reopened the next on-the-way stop."
-        : "Technician moved to the next stop.",
-  });
-
-  revalidateField(visit.id);
+  revalidateField(
+    nextAccess.visit.id,
+  );
 
   return actionSuccess(
-    wasAlreadyOnTheWay
-      ? "Opening the next stop."
-      : `Next stop marked on the way.${emailWarning}`,
+    nextResult.data.changed
+      ? `Next stop marked on the way.${emailWarning}`
+      : "Opening the existing on-the-way stop.",
     {
       redirectTo:
-        `/field/stops/${visit.id}`,
+        `/field/stops/${nextAccess.visit.id}`,
     },
   );
 }
@@ -2214,25 +2009,219 @@ export async function startBreakAction(
   );
 }
 
-export async function endBreakAction(formData: FormData) {
-  await requireFieldUser();
-  const breakId = cleanId(formData, "breakId");
-  const readyForNext = formData.get("readyForNext") === "on";
-  const routeStopId = cleanId(formData, "routeStopId");
-  const admin = getSupabaseAdmin();
+export async function endBreakAction(
+  formData: FormData,
+): Promise<
+  ActionResult<FieldRedirectData>
+> {
+  const auth =
+    await requireFieldUser();
 
-  await admin
+  const breakId =
+    cleanId(
+      formData,
+      "breakId",
+    );
+
+  const readyForNext =
+    formData.get(
+      "readyForNext",
+    ) === "on";
+
+  const routeStopId =
+    cleanId(
+      formData,
+      "routeStopId",
+    );
+
+  if (!breakId) {
+    return actionFailure(
+      "The active break could not be identified.",
+    );
+  }
+
+  const admin =
+    getSupabaseAdmin();
+
+  if (
+    readyForNext &&
+    routeStopId
+  ) {
+    const result =
+      await endBreakAndPrepareNextFieldStop(
+        admin,
+        {
+          breakId,
+          currentRouteStopId:
+            routeStopId,
+          actorProfileId:
+            auth.userId,
+        },
+      );
+
+    if (!result.ok) {
+      return actionFailure(
+        result.message,
+      );
+    }
+
+    if (
+      result.data
+        .routeComplete
+    ) {
+      revalidateField();
+
+      return actionSuccess(
+        "Break ended. The route is complete.",
+        {
+          redirectTo:
+            "/field/today",
+        },
+      );
+    }
+
+    const {
+      nextStopId,
+      nextVisitId,
+    } = result.data;
+
+    if (
+      !nextStopId ||
+      !nextVisitId
+    ) {
+      return actionFailure(
+        "The break could not be ended with a valid next stop.",
+      );
+    }
+
+    const nextAccess =
+      await getAuthorizedFieldStopBundle(
+        {
+          auth,
+          routeStopId:
+            nextStopId,
+          visitId:
+            nextVisitId,
+        },
+      );
+
+    if (!nextAccess.ok) {
+      return actionFailure(
+        nextAccess.message,
+      );
+    }
+
+    let emailWarning = "";
+
+    if (result.data.changed) {
+      try {
+        const emailResult =
+          await sendOnTheWayEmail(
+            nextAccess.booking,
+            {
+              bookingId:
+                nextAccess.booking.id,
+              visitId:
+                nextAccess.visit.id,
+              routeStopId:
+                nextAccess.stop.id,
+            },
+          );
+
+        if (
+          emailResult.status !==
+          "sent"
+        ) {
+          emailWarning =
+            " The customer email was not sent.";
+        }
+      } catch (error) {
+        logger.warn(
+          "break_resume_email_failed",
+          {
+            action:
+              "end_break",
+            userId:
+              auth.userId,
+            customerId:
+              nextAccess.booking
+                .customer_id,
+            bookingId:
+              nextAccess.booking.id,
+            error,
+            metadata: {
+              visitId:
+                nextAccess.visit.id,
+              routeStopId:
+                nextAccess.stop.id,
+            },
+          },
+        );
+
+        emailWarning =
+          " The customer email was not sent.";
+      }
+    }
+
+    revalidateField(
+      nextAccess.visit.id,
+    );
+
+    return actionSuccess(
+      `Break ended. Opening the next stop.${emailWarning}`,
+      {
+        redirectTo:
+          `/field/stops/${nextAccess.visit.id}`,
+      },
+    );
+  }
+
+  const {
+    data: endedBreak,
+    error: endError,
+  } = await admin
     .from("route_breaks")
-    .update({ ended_at: new Date().toISOString() })
-    .eq("id", breakId);
+    .update({
+      ended_at:
+        new Date().toISOString(),
+    })
+    .eq("id", breakId)
+    .eq(
+      "technician_id",
+      auth.userId,
+    )
+    .is("ended_at", null)
+    .select("id")
+    .maybeSingle();
+
+  if (endError) {
+    return fieldMutationFailure(
+      "end_break",
+      "The break could not be ended.",
+      endError,
+      {
+        breakId,
+        technicianId:
+          auth.userId,
+      },
+    );
+  }
+
+  if (!endedBreak) {
+    return actionFailure(
+      "This break is already ended or does not belong to your account.",
+    );
+  }
 
   revalidateField();
 
-  if (readyForNext && routeStopId) {
-    const nextForm = new FormData();
-    nextForm.set("routeStopId", routeStopId);
-    await readyForNextStopAction(nextForm);
-  }
+  return actionSuccess(
+    "Break ended.",
+    {
+      redirectTo:
+        "/field/breaks",
+    },
+  );
 }
 
 export async function markManualPaidAction(
