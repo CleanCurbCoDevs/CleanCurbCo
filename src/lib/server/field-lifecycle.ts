@@ -71,6 +71,26 @@ export type NextStopResult = {
   breakId?: string;
 };
 
+export type FollowUpResult = {
+  changed: boolean;
+  status: "needs_follow_up";
+  transitionAt?: string;
+  routeStopId: string;
+  visitId: string;
+  bookingId: string;
+};
+
+export type RescheduleResult = {
+  changed: boolean;
+  requestCreated: boolean;
+  requestId: string;
+  status: "rescheduled";
+  transitionAt: string;
+  routeStopId: string;
+  visitId: string;
+  bookingId: string;
+};
+
 async function invokeLifecycleRpc<Data>(
   admin: AdminClient,
   functionName: string,
@@ -248,7 +268,37 @@ function lifecycleErrorMessage(
   ) {
     return "The related field stop could not be loaded.";
   }
+    if (
+    message.includes(
+      "field_lifecycle:invalid_follow_up_reason",
+    )
+  ) {
+    return "Choose a valid follow-up reason.";
+  }
 
+  if (
+    message.includes(
+      "field_lifecycle:follow_up_notes_required",
+    )
+  ) {
+    return "Add a note explaining the follow-up problem.";
+  }
+
+  if (
+    message.includes(
+      "field_lifecycle:reschedule_details_required",
+    )
+  ) {
+    return "Add a requested date or note for admin.";
+  }
+
+  if (
+    message.includes(
+      "field_lifecycle:break_route_mismatch",
+    )
+  ) {
+    return "This break belongs to a different route. Return to Today and open the correct route.";
+  }
   return "The field lifecycle operation failed. Refresh the page and try again.";
 }
 
@@ -344,6 +394,61 @@ export function endBreakAndPrepareNextFieldStop(
         input.currentRouteStopId,
       p_actor_profile_id:
         input.actorProfileId,
+    },
+  );
+}
+export function markFieldStopFollowUp(
+  admin: AdminClient,
+  input: {
+    routeStopId: string;
+    actorProfileId: string;
+    reason: string;
+    notes: string | null;
+  },
+) {
+  return invokeLifecycleRpc<
+    FollowUpResult
+  >(
+    admin,
+    "field_mark_follow_up_atomic",
+    {
+      p_route_stop_id:
+        input.routeStopId,
+      p_actor_profile_id:
+        input.actorProfileId,
+      p_reason:
+        input.reason,
+      p_notes:
+        input.notes,
+    },
+  );
+}
+
+export function requestFieldStopReschedule(
+  admin: AdminClient,
+  input: {
+    routeStopId: string;
+    actorProfileId: string;
+    requestedRouteDay:
+      | string
+      | null;
+    notes: string | null;
+  },
+) {
+  return invokeLifecycleRpc<
+    RescheduleResult
+  >(
+    admin,
+    "field_request_reschedule_atomic",
+    {
+      p_route_stop_id:
+        input.routeStopId,
+      p_actor_profile_id:
+        input.actorProfileId,
+      p_requested_route_day:
+        input.requestedRouteDay,
+      p_notes:
+        input.notes,
     },
   );
 }
