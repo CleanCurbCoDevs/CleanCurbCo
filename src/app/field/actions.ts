@@ -1812,7 +1812,7 @@ const {
     .select("*")
     .eq(
       "route_day_id",
-      currentStop.route_day_id,
+      currentAccess.routeDay.id
     )
     .gt(
       "stop_order",
