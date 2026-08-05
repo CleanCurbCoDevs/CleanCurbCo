@@ -12,7 +12,9 @@ import {
   useTransition,
 } from "react";
 import { useRouter } from "next/navigation";
+
 import type { ActionResult } from "@/lib/action-result";
+import pressableStyles from "./pressable.module.css";
 
 type ToastTone = "success" | "error" | "info";
 
@@ -28,20 +30,29 @@ type FeedbackContextValue = {
   error: (message: string) => void;
 };
 
-const FeedbackContext = createContext<FeedbackContextValue | null>(null);
+type RedirectData = {
+  redirectTo?: unknown;
+};
+
+const FeedbackContext =
+  createContext<FeedbackContextValue | null>(null);
 
 const FormFeedbackContext = createContext<{
   pending: boolean;
 } | null>(null);
 
 type FeedbackFormProps = {
-  action: (formData: FormData) => Promise<ActionResult | void>;
+  action: (
+    formData: FormData,
+  ) => Promise<ActionResult | void>;
   children: ReactNode;
   className?: string;
   confirmMessage?: string;
   errorMessage?: string;
-  onSuccess?: () => void;
+  followRedirect?: boolean;
+  onSuccess?: (result: ActionResult) => void;
   pendingMessage?: string;
+  requireResult?: boolean;
   resetOnSuccess?: boolean;
   successMessage: string;
 };
@@ -62,18 +73,39 @@ type InlineActionStatusProps = {
   message: string;
 };
 
-export function ActionFeedbackProvider({ children }: { children: ReactNode }) {
+export function ActionFeedbackProvider({
+  children,
+}: {
+  children: ReactNode;
+}) {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const removeToast = useCallback((id: string) => {
-    setToasts((current) => current.filter((toast) => toast.id !== id));
+    setToasts((current) =>
+      current.filter((toast) => toast.id !== id),
+    );
   }, []);
 
   const notify = useCallback(
-    (message: string, tone: ToastTone = "info") => {
+    (
+      message: string,
+      tone: ToastTone = "info",
+    ) => {
       const id = crypto.randomUUID();
-      setToasts((current) => [...current.slice(-3), { id, message, tone }]);
-      window.setTimeout(() => removeToast(id), tone === "error" ? 7000 : 4500);
+
+      setToasts((current) => [
+        ...current.slice(-3),
+        {
+          id,
+          message,
+          tone,
+        },
+      ]);
+
+      window.setTimeout(
+        () => removeToast(id),
+        tone === "error" ? 7000 : 4500,
+      );
     },
     [removeToast],
   );
@@ -81,8 +113,10 @@ export function ActionFeedbackProvider({ children }: { children: ReactNode }) {
   const value = useMemo<FeedbackContextValue>(
     () => ({
       notify,
-      success: (message) => notify(message, "success"),
-      error: (message) => notify(message, "error"),
+      success: (message) =>
+        notify(message, "success"),
+      error: (message) =>
+        notify(message, "error"),
     }),
     [notify],
   );
@@ -90,12 +124,22 @@ export function ActionFeedbackProvider({ children }: { children: ReactNode }) {
   return (
     <FeedbackContext.Provider value={value}>
       {children}
-      <div className="toast-region" aria-live="polite" aria-relevant="additions">
+
+      <div
+        className="toast-region"
+        aria-live="polite"
+        aria-relevant="additions"
+      >
         {toasts.map((toast) => (
-          <div className={`toast toast-${toast.tone}`} key={toast.id}>
+          <div
+            className={`toast toast-${toast.tone}`}
+            key={toast.id}
+          >
             <span>{toast.message}</span>
+
             <button
               aria-label="Dismiss notification"
+              className={pressableStyles.pressable}
               type="button"
               onClick={() => removeToast(toast.id)}
             >
@@ -110,9 +154,13 @@ export function ActionFeedbackProvider({ children }: { children: ReactNode }) {
 
 export function useActionFeedback() {
   const context = useContext(FeedbackContext);
+
   if (!context) {
-    throw new Error("useActionFeedback must be used within ActionFeedbackProvider.");
+    throw new Error(
+      "useActionFeedback must be used within ActionFeedbackProvider.",
+    );
   }
+
   return context;
 }
 
@@ -122,51 +170,120 @@ export function FeedbackForm({
   className,
   confirmMessage,
   errorMessage = "Action failed. Try again.",
+  followRedirect = false,
   onSuccess,
   pendingMessage = "Working...",
+  requireResult = false,
   resetOnSuccess = false,
   successMessage,
 }: FeedbackFormProps) {
   const router = useRouter();
   const feedback = useActionFeedback();
-  const [isPending, startTransition] = useTransition();
-  const [status, setStatus] = useState<InlineActionStatusProps["status"]>("idle");
+
+  const [isPending, startTransition] =
+    useTransition();
+
+  const [status, setStatus] =
+    useState<InlineActionStatusProps["status"]>(
+      "idle",
+    );
+
   const [message, setMessage] = useState("");
 
-  function handleSubmit(event: FormEvent<HTMLFormElement>) {
+  function handleSubmit(
+    event: FormEvent<HTMLFormElement>,
+  ) {
     event.preventDefault();
-    if (confirmMessage && !window.confirm(confirmMessage)) return;
+
+    if (
+      confirmMessage &&
+      !window.confirm(confirmMessage)
+    ) {
+      return;
+    }
+
     const form = event.currentTarget;
-    const nativeEvent = event.nativeEvent as SubmitEvent;
+
+    const nativeEvent =
+      event.nativeEvent as SubmitEvent;
+
     const submitter =
-      nativeEvent.submitter instanceof HTMLButtonElement
+      nativeEvent.submitter instanceof
+      HTMLButtonElement
         ? nativeEvent.submitter
         : null;
-    const formData = submitter ? new FormData(form, submitter) : new FormData(form);
+
+    const formData = submitter
+      ? new FormData(form, submitter)
+      : new FormData(form);
+
     setStatus("pending");
     setMessage(pendingMessage);
 
     startTransition(async () => {
       try {
         const result = await action(formData);
-        if (result && result.ok === false) {
-          const nextMessage = result.error ?? errorMessage;
+
+        if (!result && requireResult) {
+          const nextMessage =
+            "The server did not confirm this action. Nothing should be assumed saved.";
+
           setStatus("error");
           setMessage(nextMessage);
           feedback.error(nextMessage);
           return;
         }
 
-        const nextMessage = result?.message ?? successMessage;
+        if (result?.ok === false) {
+          const nextMessage =
+            result.error ?? errorMessage;
+
+          setStatus("error");
+          setMessage(nextMessage);
+          feedback.error(nextMessage);
+          return;
+        }
+
+        const normalizedResult: ActionResult =
+          result ?? {
+            ok: true,
+            message: successMessage,
+          };
+
+        const nextMessage =
+          normalizedResult.message ??
+          successMessage;
+
         setStatus("success");
         setMessage(nextMessage);
         feedback.success(nextMessage);
-        if (resetOnSuccess) form.reset();
-        onSuccess?.();
+
+        if (resetOnSuccess) {
+          form.reset();
+        }
+
+        onSuccess?.(normalizedResult);
+
+        const redirectTo = followRedirect
+          ? getRedirectTo(
+              normalizedResult.data,
+            )
+          : "";
+
+        if (redirectTo) {
+          router.push(redirectTo);
+          router.refresh();
+          return;
+        }
+
         router.refresh();
       } catch (caught) {
         const nextMessage =
-          caught instanceof Error && caught.message ? caught.message : errorMessage;
+          caught instanceof Error &&
+          caught.message
+            ? caught.message
+            : errorMessage;
+
         setStatus("error");
         setMessage(nextMessage);
         feedback.error(nextMessage);
@@ -175,10 +292,19 @@ export function FeedbackForm({
   }
 
   return (
-    <FormFeedbackContext.Provider value={{ pending: isPending }}>
-      <form className={className} onSubmit={handleSubmit}>
+    <FormFeedbackContext.Provider
+      value={{ pending: isPending }}
+    >
+      <form
+        className={className}
+        onSubmit={handleSubmit}
+      >
         {children}
-        <InlineActionStatus status={status} message={message} />
+
+        <InlineActionStatus
+          status={status}
+          message={message}
+        />
       </form>
     </FormFeedbackContext.Provider>
   );
@@ -194,12 +320,22 @@ export function ActionSubmitButton({
   type = "submit",
   value,
 }: ActionSubmitButtonProps) {
-  const context = useContext(FormFeedbackContext);
-  const pending = context?.pending ?? false;
+  const context =
+    useContext(FormFeedbackContext);
+
+  const pending =
+    context?.pending ?? false;
 
   return (
     <button
-      className={className}
+      aria-busy={pending}
+      className={[
+        className,
+        pressableStyles.pressable,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      data-pending={pending ? "true" : "false"}
       disabled={disabled || pending}
       formAction={formAction}
       name={name}
@@ -211,15 +347,56 @@ export function ActionSubmitButton({
   );
 }
 
-export function InlineActionStatus({ status, message }: InlineActionStatusProps) {
-  if (status === "idle" || !message) return null;
+export function InlineActionStatus({
+  status,
+  message,
+}: InlineActionStatusProps) {
+  if (
+    status === "idle" ||
+    !message
+  ) {
+    return null;
+  }
 
   return (
     <p
-      className={`form-status-message form-status-${status === "error" ? "error" : "success"}`}
-      role={status === "error" ? "alert" : "status"}
+      className={`form-status-message form-status-${
+        status === "error"
+          ? "error"
+          : "success"
+      }`}
+      role={
+        status === "error"
+          ? "alert"
+          : "status"
+      }
     >
       {message}
     </p>
   );
+}
+
+function getRedirectTo(
+  data: unknown,
+) {
+  if (
+    !data ||
+    typeof data !== "object"
+  ) {
+    return "";
+  }
+
+  const redirectTo = (
+    data as RedirectData
+  ).redirectTo;
+
+  if (
+    typeof redirectTo !== "string" ||
+    !redirectTo.startsWith("/") ||
+    redirectTo.startsWith("//")
+  ) {
+    return "";
+  }
+
+  return redirectTo;
 }
