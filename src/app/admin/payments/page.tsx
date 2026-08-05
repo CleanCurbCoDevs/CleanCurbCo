@@ -387,7 +387,6 @@ export default async function AdminPaymentsPage({
                           defaultAmount={booking.estimated_price}
                           defaultDescription={`Clean Curb Co. service at ${booking.street_address}`}
                           frequency={booking.frequency}
-                          paymentId={latestPayment?.id}
                           serviceVisitId={
                             context.visits.find(
                               (visit) => visit.booking_id === booking.id,
