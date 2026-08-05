@@ -64,7 +64,6 @@ export function AdminPaymentCreator({
   customerId,
   serviceVisitId,
   routeStopId,
-  paymentId,
   defaultAmount,
   defaultDescription,
   frequency,
@@ -75,7 +74,6 @@ export function AdminPaymentCreator({
   customerId?: string | null;
   serviceVisitId?: string | null;
   routeStopId?: string | null;
-  paymentId?: string | null;
   defaultAmount: number;
   defaultDescription: string;
   frequency?: string | null;
@@ -154,9 +152,6 @@ export function AdminPaymentCreator({
 
                     route_stop_id:
                       routeStopId,
-
-                    payment_id:
-                      paymentId,
 
                     amount:
                       Number(
