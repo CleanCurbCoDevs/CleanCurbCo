@@ -321,9 +321,17 @@ async function updatePaymentState(input: {
     }
     
     if (previousBooking) {
-      const preserveExistingPaidBooking =
-        previousBooking.payment_status === "paid" &&
-        input.bookingPaymentStatus !== "refunded";
+      const preserveSettledBooking =
+        previousBooking
+          .payment_status ===
+          "refunded" ||
+        (
+          previousBooking
+            .payment_status ===
+            "paid" &&
+          input.bookingPaymentStatus !==
+            "refunded"
+        );
 
       const bookingUpdate: Partial<BookingRow> = {
         stripe_checkout_session_id:
@@ -337,7 +345,7 @@ async function updatePaymentState(input: {
           previousBooking.stripe_subscription_id,
       };
 
-      if (!preserveExistingPaidBooking && input.bookingPaymentStatus) {
+      if (!preserveSettledBooking && input.bookingPaymentStatus) {
         bookingUpdate.payment_status = input.bookingPaymentStatus;
         bookingUpdate.payment_provider = "stripe";
         bookingUpdate.payment_preference = "stripe";
@@ -346,7 +354,7 @@ async function updatePaymentState(input: {
       }
 
       if (
-        !preserveExistingPaidBooking &&
+        !preserveSettledBooking &&
         input.bookingPaymentStatus === "paid"
       ) {
         bookingUpdate.paid_at = now;
@@ -356,7 +364,7 @@ async function updatePaymentState(input: {
       }
 
       if (
-        !preserveExistingPaidBooking &&
+        !preserveSettledBooking &&
         input.bookingPaymentStatus === "failed"
       ) {
         bookingUpdate.payment_failed_at = now;
