@@ -1279,16 +1279,8 @@ export async function finalizeServicePhotoUploadAction(
         fileName,
     )
   ) {
-    await admin.storage
-      .from(
-        SERVICE_PHOTO_BUCKET,
-      )
-      .remove([
-        storagePath,
-      ]);
-
     return actionFailure(
-      "Supabase has not confirmed this photo yet. Select it and try the upload again.",
+      "Supabase has not confirmed this photo yet.",
     );
   }
 
