@@ -493,9 +493,29 @@ function ChecklistNotice({ notice }: { notice: string }) {
       ack_required:
         "Please acknowledge that final submission locks the checklist and generates the PDF.",
       locked: "This checklist has already been submitted and is locked.",
+      creating:
+        "The final checklist PDF is already being generated. Refresh the stop in a moment.",
+
+      save_failed:
+        "Checklist progress could not be saved. Refresh the stop and try again.",
+
+      submit_failed:
+        "The checklist could not be prepared for final submission. Refresh the stop and try again.",
+
       pdf_failed:
-        "Checklist items were saved, but PDF generation/upload failed. Please try final submission again.",
-      correction_added: "Correction note added.",
+        "Checklist progress was saved, but PDF generation or upload failed. Submit the checklist again.",
+
+      archive_failed:
+        "The PDF could not be safely attached to the final checklist record. Submit the checklist again.",
+
+      invalid_items:
+        "The checklist changed after this page loaded. Refresh the stop before saving.",
+
+      forbidden:
+        "This checklist belongs to another technician’s route.",
+
+      correction_added:
+        "Correction note added.",
       correction_empty: "Please enter a correction note.",
       missing: "Checklist record could not be loaded for this service visit.",
     }[notice] ?? null;
