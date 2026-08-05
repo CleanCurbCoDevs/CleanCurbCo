@@ -732,14 +732,6 @@ export async function submitServiceChecklistAction(
     );
 
   if (!finalization.ok) {
-    await admin.storage
-      .from(
-        storageBucket,
-      )
-      .remove([
-        storagePath,
-      ]);
-
     await failChecklistSubmission(
       admin,
       {
