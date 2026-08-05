@@ -1302,14 +1302,6 @@ export async function finalizeServicePhotoUploadAction(
     );
 
   if (!result.ok) {
-    await admin.storage
-      .from(
-        SERVICE_PHOTO_BUCKET,
-      )
-      .remove([
-        storagePath,
-      ]);
-
     return actionFailure(
       result.message,
     );
