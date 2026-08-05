@@ -3,6 +3,7 @@
 import { type ChangeEvent, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import {
+  discardPreparedServicePhotoUploadAction,
   finalizeServicePhotoUploadAction,
   prepareServicePhotoUploadAction,
 } from "@/app/field/actions";
@@ -98,7 +99,12 @@ export function FieldPhotoUploader({
 
     const queue = [...files];
     let completed = 0;
-
+    let pendingUpload:
+      | {
+          bucket: string;
+          path: string;
+        }
+      | null = null;
     setIsUploading(true);
     setNotice(null);
 
@@ -112,7 +118,12 @@ export function FieldPhotoUploader({
         }
 
         setProgress(`Preparing photo ${index + 1} of ${queue.length}...`);
-
+        pendingUpload = {
+          bucket:
+            prepared.data.bucket,
+          path:
+            prepared.data.path,
+        };
         const prepared = await prepareServicePhotoUploadAction({
           visitId,
           photoType,
@@ -120,7 +131,7 @@ export function FieldPhotoUploader({
           contentType,
           size: file.size,
         });
-
+      
         if (!prepared.ok || !prepared.data) {
           throw new Error(
             prepared.error ?? `Could not prepare ${file.name} for upload.`,
@@ -150,22 +161,40 @@ export function FieldPhotoUploader({
 
         setProgress(`Confirming photo ${index + 1} of ${queue.length}...`);
 
-        let finalized = await finalizeServicePhotoUploadAction({
-          visitId,
-          photoType,
-          storageBucket: prepared.data.bucket,
-          storagePath: prepared.data.path,
-        });
+        let finalized =
+          await finalizeServicePhotoUploadAction(
+            {
+              visitId,
+              photoType,
+              storageBucket:
+                prepared.data.bucket,
+              storagePath:
+                prepared.data.path,
+              contentType:
+                prepared.data.contentType,
+              size:
+                file.size,
+            },
+          );
 
         // Storage listings can occasionally lag immediately after an upload.
         if (!finalized.ok) {
           await sleep(750);
-          finalized = await finalizeServicePhotoUploadAction({
-            visitId,
-            photoType,
-            storageBucket: prepared.data.bucket,
-            storagePath: prepared.data.path,
-          });
+          finalized =
+            await finalizeServicePhotoUploadAction(
+              {
+                visitId,
+                photoType,
+                storageBucket:
+                  prepared.data.bucket,
+                storagePath:
+                  prepared.data.path,
+                contentType:
+                  prepared.data.contentType,
+                size:
+                  file.size,
+              },
+            );
         }
 
         if (!finalized.ok) {
@@ -174,7 +203,8 @@ export function FieldPhotoUploader({
               `${file.name} reached storage but could not be attached to this stop.`,
           );
         }
-
+        pendingUpload =
+          null;
         completed += 1;
         setFiles(queue.slice(completed));
       }
@@ -188,6 +218,18 @@ export function FieldPhotoUploader({
       });
       router.refresh();
     } catch (caught) {
+      if (pendingUpload) {
+        await discardPreparedServicePhotoUploadAction(
+          {
+            visitId,
+            photoType,
+            storageBucket:
+              pendingUpload.bucket,
+            storagePath:
+              pendingUpload.path,
+          },
+        );
+      }
       const message =
         caught instanceof Error && caught.message
           ? caught.message
