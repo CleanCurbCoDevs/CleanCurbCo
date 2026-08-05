@@ -18,6 +18,7 @@ import {
   sendServiceCompletedEmail,
 } from "@/lib/email/sendFieldNotifications";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
+import { createAdminNotification } from "@/lib/server/admin-notifications";
 import { requireField } from "@/lib/supabase/auth";
 import { isAdminRole } from "@/lib/supabase/roles";
 import type {
