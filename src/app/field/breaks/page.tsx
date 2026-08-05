@@ -17,6 +17,10 @@ import {
   UserRound,
   Wrench,
 } from "lucide-react";
+import {
+  ActionSubmitButton,
+  FeedbackForm,
+} from "@/components/action-feedback";
 
 import {
   endBreakAction,
@@ -369,9 +373,13 @@ export default async function FieldBreaksPage({
             </div>
           ) : null}
 
-          <form
+          <FeedbackForm
             action={endBreakAction}
             className="field-break-end-form"
+            followRedirect
+            pendingMessage="Ending break..."
+            requireResult
+            successMessage="Break ended."
           >
             <input
               type="hidden"
@@ -393,16 +401,22 @@ export default async function FieldBreaksPage({
               />
             ) : null}
 
-            <button type="submit">
-              <Play size={22} aria-hidden="true" />
-
+            <ActionSubmitButton
+              className=""
+              pendingLabel="Ending Break..."
+            >
+              <Play
+                size={22}
+                aria-hidden="true"
+              />
+            
               <span>
                 {routeStopId
                   ? "End Break & Resume Route"
                   : "End Break"}
               </span>
-            </button>
-          </form>
+            </ActionSubmitButton>
+          </FeedbackForm>
         </section>
       ) : (
         <>
@@ -451,9 +465,12 @@ export default async function FieldBreaksPage({
                 const Icon = reason.icon;
 
                 return (
-                  <form
+                  <FeedbackForm
                     action={startBreakAction}
                     key={reason.value}
+                    pendingMessage={`Starting ${reason.label.toLowerCase()} break...`}
+                    requireResult
+                    successMessage={`${reason.label} break started.`}
                   >
                     <input
                       type="hidden"
@@ -467,23 +484,24 @@ export default async function FieldBreaksPage({
                       value={reason.value}
                     />
 
-                    <button
+                    <ActionSubmitButton
                       className="field-break-quick-button"
-                      type="submit"
+                      pendingLabel="Starting..."
                     >
                       <Icon
                         size={25}
                         aria-hidden="true"
                       />
-
+                    
                       <span>
                         <strong>{reason.label}</strong>
+                    
                         <small>
                           {reason.description}
                         </small>
                       </span>
-                    </button>
-                  </form>
+                    </ActionSubmitButton>
+                  </FeedbackForm>
                 );
               })}
             </div>
@@ -549,9 +567,12 @@ export default async function FieldBreaksPage({
                       />
                     </summary>
 
-                    <form
+                    <FeedbackForm
                       action={startBreakAction}
                       className="field-break-detail-form"
+                      pendingMessage={`Starting ${reason.label.toLowerCase()} break...`}
+                      requireResult
+                      successMessage={`${reason.label} break started.`}
                     >
                       <input
                         type="hidden"
@@ -591,10 +612,13 @@ export default async function FieldBreaksPage({
                         />
                       </label>
 
-                      <button type="submit">
+                      <ActionSubmitButton
+                        className=""
+                        pendingLabel="Starting Break..."
+                      >
                         Start {reason.label} Break
-                      </button>
-                    </form>
+                      </ActionSubmitButton>
+                    </FeedbackForm>
                   </details>
                 );
               })}
@@ -752,23 +776,27 @@ export default async function FieldBreaksPage({
       </section>
 
       {routeStopId && !activeBreak ? (
-        <form
+        <FeedbackForm
           action={readyForNextStopAction}
           className="field-floating-action"
+          followRedirect
+          pendingMessage="Opening next stop..."
+          requireResult
+          successMessage="Opening next stop."
         >
           <input
             type="hidden"
             name="routeStopId"
             value={routeStopId}
           />
-
-          <button
+        
+          <ActionSubmitButton
             className="button button-primary"
-            type="submit"
+            pendingLabel="Opening Next Stop..."
           >
             Ready for Next Stop
-          </button>
-        </form>
+          </ActionSubmitButton>
+        </FeedbackForm>
       ) : null}
     </FieldShell>
   );
