@@ -7,6 +7,9 @@ import { rejectCrossOriginRequest } from "@/lib/server/request-guards";
 import { createRequestId, logger } from "@/lib/server/logger";
 import { safeRedirectForRole } from "@/lib/security/redirects";
 import { getStripe } from "@/lib/stripe";
+import {
+  getAuthorizedFieldStopBundle,
+} from "@/lib/server/field-access";
 import { getCurrentProfile } from "@/lib/supabase/auth";
 import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import { isFieldRole } from "@/lib/supabase/roles";
@@ -187,7 +190,7 @@ export async function POST(request: Request) {
   let bookingId = cleanId(payload, "booking_id", "bookingId");
   let serviceVisitId = cleanId(payload, "service_visit_id", "serviceVisitId");
   const paymentId = cleanId(payload, "payment_id", "paymentId");
-  const routeStopId = cleanId(payload, "route_stop_id", "routeStopId");
+  let routeStopId = cleanId(payload, "route_stop_id", "routeStopId");
   const requestedCustomerId = cleanId(payload, "customer_id", "customerId");
   const paymentType = cleanPaymentType(payload);
 
@@ -259,6 +262,229 @@ export async function POST(request: Request) {
     booking = data ?? null;
   }
 
+  if (
+    routeStop &&
+    visit &&
+    routeStop.service_visit_id &&
+    routeStop.service_visit_id !==
+      visit.id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The route stop and service visit do not match.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    routeStop &&
+    booking &&
+    routeStop.booking_id &&
+    routeStop.booking_id !==
+      booking.id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The route stop and booking do not match.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    visit &&
+    booking &&
+    visit.booking_id &&
+    visit.booking_id !==
+      booking.id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The service visit and booking do not match.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    payment &&
+    booking &&
+    payment.booking_id &&
+    payment.booking_id !==
+      booking.id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The payment record does not belong to this booking.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    payment &&
+    visit &&
+    payment.service_visit_id &&
+    payment.service_visit_id !==
+      visit.id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The payment record does not belong to this service visit.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    requestedCustomerId &&
+    booking?.customer_id &&
+    requestedCustomerId !==
+      booking.customer_id
+  ) {
+    return NextResponse.json(
+      {
+        error:
+          "The requested customer does not own this booking.",
+        requestId,
+      },
+      {
+        status: 400,
+      },
+    );
+  }
+  
+  if (
+    auth.profile.role ===
+    "technician"
+  ) {
+    const access =
+      await getAuthorizedFieldStopBundle(
+        {
+          auth,
+          routeStopId:
+            routeStop?.id ??
+            routeStopId,
+          visitId:
+            visit?.id ??
+            serviceVisitId,
+          bookingId:
+            booking?.id ??
+            bookingId,
+        },
+      );
+  
+    if (!access.ok) {
+      logger.warn(
+        "stripe_checkout_field_access_denied",
+        {
+          requestId,
+          route,
+          action:
+            "stripe_checkout_create",
+          userId:
+            auth.userId,
+          role:
+            auth.profile.role,
+          bookingId:
+            booking?.id ??
+            bookingId ??
+            null,
+          metadata: {
+            routeStopId:
+              routeStop?.id ??
+              routeStopId ??
+              null,
+            serviceVisitId:
+              visit?.id ??
+              serviceVisitId ??
+              null,
+            reason:
+              access.message,
+          },
+        },
+      );
+  
+      return NextResponse.json(
+        {
+          error:
+            access.message,
+          requestId,
+        },
+        {
+          status:
+            access.status,
+        },
+      );
+    }
+  
+    routeStop =
+      access.stop;
+  
+    visit =
+      access.visit;
+  
+    booking =
+      access.booking;
+  
+    routeStopId =
+      access.stop.id;
+  
+    serviceVisitId =
+      access.visit.id;
+  
+    bookingId =
+      access.booking.id;
+  
+    if (
+      payment &&
+      (
+        (
+          payment.booking_id &&
+          payment.booking_id !==
+            access.booking.id
+        ) ||
+        (
+          payment.service_visit_id &&
+          payment.service_visit_id !==
+            access.visit.id
+        )
+      )
+    ) {
+      return NextResponse.json(
+        {
+          error:
+            "The payment record is not attached to your assigned field stop.",
+          requestId,
+        },
+        {
+          status: 403,
+        },
+      );
+    }
+  }
+  
   if (!booking && !payment && !requestedCustomerId) {
     return NextResponse.json(
       { error: "Provide booking_id, service_visit_id, payment_id, or customer_id." },
