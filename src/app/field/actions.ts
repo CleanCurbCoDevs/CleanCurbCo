@@ -2317,12 +2317,13 @@ export async function markManualPaidAction(
     );
   }
 
-  const {
-    admin,
-    stop,
-    visit,
-    accessError,
-  } =
+    const {
+      admin,
+      stop,
+      visit,
+      booking,
+      accessError,
+    } =
     await getStopBundle(
       visitId,
       auth,
@@ -2330,7 +2331,8 @@ export async function markManualPaidAction(
 
   if (
     !visit ||
-    !stop
+    !stop ||
+    !booking
   ) {
     return actionFailure(
       accessError ??
@@ -2338,6 +2340,52 @@ export async function markManualPaidAction(
     );
   }
 
+  const authoritativeServiceCents =
+    Math.round(
+      Number(
+        booking.estimated_price,
+      ) * 100,
+    );
+
+  const enteredServiceCents =
+    Math.round(
+      serviceAmount * 100,
+    );
+
+  if (
+    !Number.isFinite(
+      authoritativeServiceCents,
+    ) ||
+    authoritativeServiceCents <= 0
+  ) {
+    return actionFailure(
+      "The booking does not have a valid service amount. Admin review is required.",
+    );
+  }
+
+  if (
+    !isAdminRole(
+      auth.profile.role,
+    ) &&
+    enteredServiceCents !==
+      authoritativeServiceCents
+  ) {
+    return actionFailure(
+      `The service amount must match the booking total of $${(
+        authoritativeServiceCents /
+        100
+      ).toFixed(2)}. Only an admin or owner may override it.`,
+    );
+  }
+
+  const recordedServiceAmount =
+    isAdminRole(
+      auth.profile.role,
+    )
+      ? serviceAmount
+      : authoritativeServiceCents /
+        100;
+  
   const result =
     await recordManualFieldPayment(
       admin,
@@ -2346,7 +2394,8 @@ export async function markManualPaidAction(
           stop.id,
         actorProfileId:
           auth.userId,
-        serviceAmount,
+       serviceAmount:
+          recordedServiceAmount,
         tipAmount,
         method,
         notes:
