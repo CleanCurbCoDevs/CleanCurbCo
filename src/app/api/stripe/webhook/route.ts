@@ -155,6 +155,67 @@ async function updatePaymentState(input: {
     );
   }
 
+  const rawCheckoutGeneration =
+    input.metadata
+      ?.checkout_generation;
+
+  const incomingCheckoutGeneration =
+    typeof rawCheckoutGeneration ===
+    "number"
+      ? rawCheckoutGeneration
+      : typeof rawCheckoutGeneration ===
+          "string"
+        ? Number(
+            rawCheckoutGeneration,
+          )
+        : null;
+
+  if (
+    incomingCheckoutGeneration !==
+      null &&
+    Number.isInteger(
+      incomingCheckoutGeneration,
+    ) &&
+    incomingCheckoutGeneration !==
+      existingPayment
+        .checkout_generation
+  ) {
+    logger.info(
+      "stripe_webhook_checkout_generation_ignored",
+      {
+        requestId:
+          input.requestId,
+        route:
+          "/api/stripe/webhook",
+        customerId:
+          existingPayment
+            .customer_id,
+        bookingId:
+          existingPayment
+            .booking_id,
+        metadata: {
+          paymentId:
+            existingPayment.id,
+          stripeEventId:
+            input.stripeEventId,
+          eventType:
+            input.eventType,
+          incomingCheckoutGeneration,
+          currentCheckoutGeneration:
+            existingPayment
+              .checkout_generation,
+          incomingCheckoutSessionId:
+            input.checkoutSessionId,
+          currentCheckoutSessionId:
+            existingPayment
+              .stripe_checkout_session_id,
+        },
+      },
+    );
+
+    return;
+  }
+  
   const preserveSettledPayment =
     existingPayment.status ===
       "refunded" ||
