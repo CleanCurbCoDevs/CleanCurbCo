@@ -647,6 +647,21 @@ export type NotificationEventRow = {
   related_route_stop_id: string | null;
   resend_id: string | null;
   error_message: string | null;
+  provider_message_id: string | null;
+  provider_status: string | null;
+  provider_error_code: string | null;
+  delivered_at: string | null;
+};
+
+export type SmsContactPreferenceRow = {
+  normalized_phone: string;
+  status: "opted_in" | "opted_out";
+  opted_in_at: string | null;
+  opted_out_at: string | null;
+  source: string | null;
+  last_inbound_message_sid: string | null;
+  created_at: string;
+  updated_at: string;
 };
 
 export type PaymentRow = {
@@ -1287,7 +1302,7 @@ export type Database = {
         Relationships: [];
       };
 
-            booking_exceptions: {
+      booking_exceptions: {
         Row: BookingExceptionRow;
         Insert:
           Partial<BookingExceptionRow> &
@@ -1456,7 +1471,7 @@ export type Database = {
         Relationships: [];
       };
 
-            customer_files: {
+      customer_files: {
         Row: CustomerFileRow;
 
         Insert:
@@ -1657,6 +1672,16 @@ export type Database = {
         Insert: Partial<NotificationEventRow> &
           Pick<NotificationEventRow, "channel" | "template_key">;
         Update: Partial<NotificationEventRow>;
+        Relationships: [];
+      };
+      sms_contact_preferences: {
+        Row: SmsContactPreferenceRow;
+        Insert: Partial<SmsContactPreferenceRow> &
+          Pick<
+            SmsContactPreferenceRow,
+            "normalized_phone" | "status"
+          >;
+        Update: Partial<SmsContactPreferenceRow>;
         Relationships: [];
       };
       payments: {
