@@ -6,7 +6,7 @@ import {
   checklistStatuses,
   ensureServiceChecklistBundle,
   generateChecklistPdf,
-  unresolvedChecklistItems,
+  type ServiceChecklistBundle,
 } from "@/lib/service-checklists";
 import { writeAdminAuditLog } from "@/lib/server/admin-audit";
 import { createRequestId, logger, maskEmail } from "@/lib/server/logger";
@@ -14,6 +14,11 @@ import { getSupabaseAdmin } from "@/lib/supabase/admin";
 import {
   getAuthorizedFieldStopBundle,
 } from "@/lib/server/field-access";
+import {
+  failChecklistSubmission,
+  finalizeChecklistSubmission,
+  saveChecklistWork,
+} from "@/lib/server/checklist-submission";
 import { requireAdmin, requireField } from "@/lib/supabase/auth";
 import { cleanLongText, cleanString, pickEnum } from "@/lib/validation";
 import type { ChecklistItemStatus, Database } from "@/types/database";
@@ -40,40 +45,61 @@ async function logServiceEvent(
   }
 }
 
-async function saveChecklistItemsFromForm(
-  input: {
-    admin: AdminClient;
-    formData: FormData;
-    checklistId: string;
-    itemIds: string[];
-    actorId: string;
-  },
-) {
-  const resolvedAt = new Date().toISOString();
+type ChecklistFormItem = {
+  id: string;
+  status:
+    ChecklistItemStatus;
+  notes:
+    string | null;
+};
 
-  await Promise.all(
-    input.itemIds.map((itemId) => {
-      const status = pickEnum<ChecklistItemStatus>(
-        input.formData.get(`status-${itemId}`),
-        checklistStatuses,
-        "pending",
-      );
-      const notes =
-        cleanLongText(input.formData.get(`notes-${itemId}`), 1500) || null;
+function checklistItemsFromForm(
+  formData: FormData,
+  bundle:
+    ServiceChecklistBundle,
+): ChecklistFormItem[] | null {
+  const itemIds =
+    validatedChecklistItemIds(
+      formData,
+      new Set(
+        bundle.items.map(
+          (item) =>
+            item.id,
+        ),
+      ),
+    );
 
-      return input.admin
-        .from("service_checklist_items")
-        .update({
-          status,
-          notes,
-          resolved_at: status === "pending" ? null : resolvedAt,
-          resolved_by: status === "pending" ? null : input.actorId,
-        })
-      .eq("id", itemId)
-      .eq(
-        "checklist_id",
-        input.checklistId,
-      );
+  if (
+    !itemIds ||
+    itemIds.length !==
+      bundle.items.length
+  ) {
+    return null;
+  }
+
+  return itemIds.map(
+    (itemId) => ({
+      id:
+        itemId,
+
+      status:
+        pickEnum<
+          ChecklistItemStatus
+        >(
+          formData.get(
+            `status-${itemId}`,
+          ),
+          checklistStatuses,
+          "pending",
+        ),
+
+      notes:
+        cleanLongText(
+          formData.get(
+            `notes-${itemId}`,
+          ),
+          1500,
+        ) || null,
     }),
   );
 }
@@ -105,12 +131,37 @@ function validatedChecklistItemIds(
   );
 }
 
-export async function saveServiceChecklistDraftAction(formData: FormData) {
-  const visitId = cleanString(formData.get("visitId"), 80);
-  const returnTo = returnToFrom(formData, visitId ? `/field/stops/${visitId}` : "/field/today");
-  const auth = await requireField(returnTo);
+export async function saveServiceChecklistDraftAction(
+  formData: FormData,
+) {
+  const visitId =
+    cleanString(
+      formData.get(
+        "visitId",
+      ),
+      80,
+    );
 
-  if (auth.status !== "ok" || !visitId) return;
+  const returnTo =
+    returnToFrom(
+      formData,
+      visitId
+        ? `/field/stops/${visitId}`
+        : "/field/today",
+    );
+
+  const auth =
+    await requireField(
+      returnTo,
+    );
+
+  if (
+    auth.status !==
+      "ok" ||
+    !visitId
+  ) {
+    return;
+  }
 
   const access =
     await getAuthorizedFieldStopBundle(
@@ -119,79 +170,181 @@ export async function saveServiceChecklistDraftAction(formData: FormData) {
         visitId,
       },
     );
-  
+
   if (!access.ok) {
     redirectWithStatus(
       returnTo,
-      access.status === 403
+      access.status ===
+        403
         ? "forbidden"
         : "missing",
     );
   }
-    
-  const admin = getSupabaseAdmin();
-  const bundle = await ensureServiceChecklistBundle(admin, visitId);
-  if (!bundle) redirectWithStatus(returnTo, "missing");
-  if (bundle.checklist.status === "submitted") redirectWithStatus(returnTo, "locked");
 
-  const itemIds =
-    validatedChecklistItemIds(
-      formData,
-      new Set(
-        bundle.items.map(
-          (item) => item.id,
-        ),
-      ),
+  const admin =
+    access.admin;
+
+  const bundle =
+    await ensureServiceChecklistBundle(
+      admin,
+      visitId,
     );
-  
-  if (!itemIds) {
+
+  if (!bundle) {
+    redirectWithStatus(
+      returnTo,
+      "missing",
+    );
+  }
+
+  if (
+    bundle.checklist
+      .status ===
+    "submitted"
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "locked",
+    );
+  }
+
+  const items =
+    checklistItemsFromForm(
+      formData,
+      bundle,
+    );
+
+  if (!items) {
     redirectWithStatus(
       returnTo,
       "invalid_items",
     );
   }
 
-  await saveChecklistItemsFromForm({
-    admin,
-    formData,
-    checklistId:
-      bundle.checklist.id,
-    itemIds,
-    actorId:
-      auth.userId,
-  });
-  
-  await admin
-    .from("service_checklists")
-    .update({
-      status: "draft",
-      overall_notes: cleanLongText(formData.get("overallNotes"), 3000) || null,
-      booking_id: bundle.booking.id,
-      customer_id: bundle.booking.customer_id,
-      route_stop_id: bundle.stop?.id ?? bundle.checklist.route_stop_id,
-    })
-    .eq("id", bundle.checklist.id);
+  const result =
+    await saveChecklistWork(
+      admin,
+      {
+        routeStopId:
+          access.stop.id,
 
-  await logServiceEvent(admin, {
-    actor_profile_id: auth.userId,
-    booking_id: bundle.booking.id,
-    service_visit_id: bundle.visit.id,
-    route_stop_id: bundle.stop?.id ?? null,
-    event_type: "service_checklist_saved",
-    message: "Service checklist draft saved.",
-  });
+        actorProfileId:
+          auth.userId,
 
-  revalidateChecklistPaths(bundle.visit.id, bundle.booking.customer_id);
-  redirectWithStatus(returnTo, "saved");
+        items,
+
+        overallNotes:
+          cleanLongText(
+            formData.get(
+              "overallNotes",
+            ),
+            3000,
+          ) || null,
+
+        prepareSubmission:
+          false,
+      },
+    );
+
+  if (!result.ok) {
+    logger.error(
+      "service_checklist_draft_save_failed",
+      {
+        action:
+          "checklist_draft_save",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          bundle.booking
+            .customer_id,
+        bookingId:
+          bundle.booking.id,
+        error:
+          result.error,
+        metadata: {
+          visitId,
+          checklistId:
+            bundle.checklist.id,
+          code:
+            result.code,
+        },
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "save_failed",
+    );
+  }
+
+  if (
+    result.data
+      .alreadySubmitted
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "locked",
+    );
+  }
+
+  if (
+    result.data
+      .inProgress
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "creating",
+    );
+  }
+
+  revalidateChecklistPaths(
+    bundle.visit.id,
+    bundle.booking
+      .customer_id,
+  );
+
+  redirectWithStatus(
+    returnTo,
+    "saved",
+  );
 }
 
-export async function submitServiceChecklistAction(formData: FormData) {
-  const requestId = createRequestId();
-  const visitId = cleanString(formData.get("visitId"), 80);
-  const returnTo = returnToFrom(formData, visitId ? `/field/stops/${visitId}` : "/field/today");
-  const auth = await requireField(returnTo);
+export async function submitServiceChecklistAction(
+  formData: FormData,
+) {
+  const requestId =
+    createRequestId();
 
-  if (auth.status !== "ok" || !visitId) return;
+  const visitId =
+    cleanString(
+      formData.get(
+        "visitId",
+      ),
+      80,
+    );
+
+  const returnTo =
+    returnToFrom(
+      formData,
+      visitId
+        ? `/field/stops/${visitId}`
+        : "/field/today",
+    );
+
+  const auth =
+    await requireField(
+      returnTo,
+    );
+
+  if (
+    auth.status !==
+      "ok" ||
+    !visitId
+  ) {
+    return;
+  }
 
   const access =
     await getAuthorizedFieldStopBundle(
@@ -200,185 +353,572 @@ export async function submitServiceChecklistAction(formData: FormData) {
         visitId,
       },
     );
-  
+
   if (!access.ok) {
     redirectWithStatus(
       returnTo,
-      access.status === 403
+      access.status ===
+        403
         ? "forbidden"
         : "missing",
     );
   }
-  
-  if (formData.get("finalizeAck") !== "on") {
-    redirectWithStatus(returnTo, "ack_required");
-  }
 
-  const admin = getSupabaseAdmin();
-  const initialBundle = await ensureServiceChecklistBundle(admin, visitId);
-  if (!initialBundle) redirectWithStatus(returnTo, "missing");
-  if (initialBundle.checklist.status === "submitted") {
-    redirectWithStatus(returnTo, "locked");
-  }
-
-  const itemIds =
-    validatedChecklistItemIds(
-      formData,
-      new Set(
-        initialBundle.items.map(
-          (item) => item.id,
-        ),
-      ),
+  if (
+    formData.get(
+      "finalizeAck",
+    ) !== "on"
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "ack_required",
     );
-  
-  if (!itemIds) {
+  }
+
+  const admin =
+    access.admin;
+
+  const initialBundle =
+    await ensureServiceChecklistBundle(
+      admin,
+      visitId,
+    );
+
+  if (!initialBundle) {
+    redirectWithStatus(
+      returnTo,
+      "missing",
+    );
+  }
+
+  const items =
+    checklistItemsFromForm(
+      formData,
+      initialBundle,
+    );
+
+  if (!items) {
     redirectWithStatus(
       returnTo,
       "invalid_items",
     );
   }
 
-  await saveChecklistItemsFromForm({
-    admin,
-    formData,
-    checklistId:
+  const preparation =
+    await saveChecklistWork(
+      admin,
+      {
+        routeStopId:
+          access.stop.id,
+
+        actorProfileId:
+          auth.userId,
+
+        items,
+
+        overallNotes:
+          cleanLongText(
+            formData.get(
+              "overallNotes",
+            ),
+            3000,
+          ) || null,
+
+        prepareSubmission:
+          true,
+      },
+    );
+
+  if (!preparation.ok) {
+    logger.error(
+      "service_checklist_submission_prepare_failed",
+      {
+        requestId,
+        action:
+          "checklist_submission_prepare",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          initialBundle.booking
+            .customer_id,
+        bookingId:
+          initialBundle.booking.id,
+        error:
+          preparation.error,
+        metadata: {
+          visitId,
+          checklistId:
+            initialBundle
+              .checklist.id,
+          code:
+            preparation.code,
+        },
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "submit_failed",
+    );
+  }
+
+  if (
+    preparation.data
+      .alreadySubmitted
+  ) {
+    revalidateChecklistPaths(
       initialBundle
-        .checklist.id,
-    itemIds,
-    actorId:
-      auth.userId,
-  });
+        .visit.id,
+      initialBundle
+        .booking
+        .customer_id,
+    );
 
-  const submittedAt = new Date().toISOString();
-  await admin
-    .from("service_checklists")
-    .update({
-      overall_notes: cleanLongText(formData.get("overallNotes"), 3000) || null,
-      booking_id: initialBundle.booking.id,
-      customer_id: initialBundle.booking.customer_id,
-      route_stop_id: initialBundle.stop?.id ?? initialBundle.checklist.route_stop_id,
-    })
-    .eq("id", initialBundle.checklist.id);
+    redirectWithStatus(
+      returnTo,
+      "submitted",
+    );
+  }
 
-  const bundle = await ensureServiceChecklistBundle(admin, visitId);
-  if (!bundle) redirectWithStatus(returnTo, "missing");
+  if (
+    preparation.data
+      .inProgress
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "creating",
+    );
+  }
 
-  if (unresolvedChecklistItems(bundle.items).length) {
-    redirectWithStatus(returnTo, "unresolved");
+  if (
+    preparation.data
+      .unresolvedCount > 0
+  ) {
+    redirectWithStatus(
+      returnTo,
+      "unresolved",
+    );
+  }
+
+  const bundle =
+    await ensureServiceChecklistBundle(
+      admin,
+      visitId,
+    );
+
+  if (!bundle) {
+    await failChecklistSubmission(
+      admin,
+      {
+        checklistId:
+          preparation.data
+            .checklistId,
+
+        actorProfileId:
+          auth.userId,
+
+        generation:
+          preparation.data
+            .generation,
+
+        error:
+          "Checklist bundle could not be reloaded after submission preparation.",
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "missing",
+    );
+  }
+
+  const preparedAt =
+    preparation.data
+      .preparedAt ??
+    new Date().toISOString();
+
+  const storageBucket =
+    "service-documents";
+
+  const storagePath =
+    `checklists/${bundle.visit.id}/${bundle.checklist.id}-${preparation.data.generation}.pdf`;
+
+  let pdfBuffer:
+    Buffer;
+
+  try {
+    pdfBuffer =
+      await generateChecklistPdf(
+        {
+          checklist: {
+            ...bundle.checklist,
+
+            submitted_at:
+              preparedAt,
+
+            submitted_by:
+              auth.userId,
+          },
+
+          items:
+            bundle.items,
+
+          booking:
+            bundle.booking,
+
+          visit:
+            bundle.visit,
+
+          submittedBy:
+            auth.profile,
+        },
+      );
+  } catch (error) {
+    await failChecklistSubmission(
+      admin,
+      {
+        checklistId:
+          bundle.checklist.id,
+
+        actorProfileId:
+          auth.userId,
+
+        generation:
+          preparation.data
+            .generation,
+
+        error:
+          error instanceof
+          Error
+            ? error.message
+            : "Checklist PDF generation failed.",
+      },
+    );
+
+    logger.error(
+      "checklist_pdf_generation_failed",
+      {
+        requestId,
+        action:
+          "checklist_submitted",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          bundle.booking
+            .customer_id,
+        bookingId:
+          bundle.booking.id,
+        error,
+        metadata: {
+          visitId:
+            bundle.visit.id,
+          checklistId:
+            bundle.checklist.id,
+          generation:
+            preparation.data
+              .generation,
+        },
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "pdf_failed",
+    );
+  }
+
+  const {
+    error: uploadError,
+  } = await admin.storage
+    .from(
+      storageBucket,
+    )
+    .upload(
+      storagePath,
+      pdfBuffer,
+      {
+        contentType:
+          "application/pdf",
+
+        upsert:
+          false,
+      },
+    );
+
+  if (uploadError) {
+    await admin.storage
+      .from(
+        storageBucket,
+      )
+      .remove([
+        storagePath,
+      ]);
+
+    await failChecklistSubmission(
+      admin,
+      {
+        checklistId:
+          bundle.checklist.id,
+
+        actorProfileId:
+          auth.userId,
+
+        generation:
+          preparation.data
+            .generation,
+
+        error:
+          uploadError.message,
+      },
+    );
+
+    logger.error(
+      "checklist_pdf_upload_failed",
+      {
+        requestId,
+        action:
+          "checklist_submitted",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          bundle.booking
+            .customer_id,
+        bookingId:
+          bundle.booking.id,
+        error:
+          uploadError,
+        metadata: {
+          visitId:
+            bundle.visit.id,
+          checklistId:
+            bundle.checklist.id,
+          storagePath,
+          generation:
+            preparation.data
+              .generation,
+        },
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "pdf_failed",
+    );
+  }
+
+  const finalization =
+    await finalizeChecklistSubmission(
+      admin,
+      {
+        checklistId:
+          bundle.checklist.id,
+
+        actorProfileId:
+          auth.userId,
+
+        generation:
+          preparation.data
+            .generation,
+
+        storageBucket,
+        storagePath,
+      },
+    );
+
+  if (!finalization.ok) {
+    await admin.storage
+      .from(
+        storageBucket,
+      )
+      .remove([
+        storagePath,
+      ]);
+
+    await failChecklistSubmission(
+      admin,
+      {
+        checklistId:
+          bundle.checklist.id,
+
+        actorProfileId:
+          auth.userId,
+
+        generation:
+          preparation.data
+            .generation,
+
+        error:
+          finalization.message,
+      },
+    );
+
+    logger.error(
+      "checklist_pdf_archive_finalization_failed",
+      {
+        requestId,
+        action:
+          "checklist_submitted",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          bundle.booking
+            .customer_id,
+        bookingId:
+          bundle.booking.id,
+        error:
+          finalization.error,
+        metadata: {
+          visitId:
+            bundle.visit.id,
+          checklistId:
+            bundle.checklist.id,
+          storagePath,
+          generation:
+            preparation.data
+              .generation,
+          code:
+            finalization.code,
+        },
+      },
+    );
+
+    redirectWithStatus(
+      returnTo,
+      "archive_failed",
+    );
   }
 
   try {
-    const pdfBuffer = await generateChecklistPdf({
-      checklist: {
-        ...bundle.checklist,
-        submitted_at: submittedAt,
-        submitted_by: auth.userId,
-      },
-      items: bundle.items,
-      booking: bundle.booking,
-      visit: bundle.visit,
-      submittedBy: auth.profile,
-    });
-    const storagePath = `checklists/${bundle.visit.id}/${bundle.checklist.id}-${Date.now()}.pdf`;
-    const { error: uploadError } = await admin.storage
-      .from("service-documents")
-      .upload(storagePath, pdfBuffer, {
-        contentType: "application/pdf",
-        upsert: true,
-      });
-
-    if (uploadError) {
-      throw uploadError;
-    }
-
-    await admin
-      .from("service_checklists")
-      .update({
-        status: "submitted",
-        submitted_at: submittedAt,
-        submitted_by: auth.userId,
-        pdf_storage_bucket: "service-documents",
-        pdf_storage_path: storagePath,
-        pdf_generated_at: submittedAt,
-      })
-      .eq("id", bundle.checklist.id);
-
-    await admin.from("service_checklist_documents").insert({
-      checklist_id: bundle.checklist.id,
-      service_visit_id: bundle.visit.id,
-      booking_id: bundle.booking.id,
-      customer_id: bundle.booking.customer_id,
-      document_type: "checklist_pdf",
-      storage_bucket: "service-documents",
-      storage_path: storagePath,
-      is_customer_visible: true,
-      generated_by: auth.userId,
-      generated_at: submittedAt,
-      notes: "Final service checklist report.",
-    });
-
-    await logServiceEvent(admin, {
-      actor_profile_id: auth.userId,
-      booking_id: bundle.booking.id,
-      service_visit_id: bundle.visit.id,
-      route_stop_id: bundle.stop?.id ?? null,
-      event_type: "service_checklist_submitted",
-      message: "Service checklist submitted and PDF generated.",
-      metadata: { storagePath },
-    });
-
     await writeAdminAuditLog({
-      action: "checklist_submitted",
-      actor_user_id: auth.userId,
-      actor_email: maskEmail(auth.email),
-      actor_role: auth.profile.role,
-      target_type: "service_checklist",
-      target_id: bundle.checklist.id,
-      customer_id: bundle.booking.customer_id,
-      booking_id: bundle.booking.id,
-      before_summary: { status: bundle.checklist.status },
+      action:
+        "checklist_submitted",
+
+      actor_user_id:
+        auth.userId,
+
+      actor_email:
+        maskEmail(
+          auth.email,
+        ),
+
+      actor_role:
+        auth.profile.role,
+
+      target_type:
+        "service_checklist",
+
+      target_id:
+        bundle.checklist.id,
+
+      customer_id:
+        bundle.booking
+          .customer_id,
+
+      booking_id:
+        bundle.booking.id,
+
+      before_summary: {
+        status:
+          bundle.checklist
+            .status,
+      },
+
       after_summary: {
-        status: "submitted",
-        serviceVisitId: bundle.visit.id,
-        documentType: "checklist_pdf",
-      },
-      request_id: requestId,
-      status: "success",
-    });
+        status:
+          "submitted",
 
-    logger.info("service_checklist_submitted", {
-      requestId,
-      action: "checklist_submitted",
-      userId: auth.userId,
-      role: auth.profile.role,
-      customerId: bundle.booking.customer_id,
-      bookingId: bundle.booking.id,
-      metadata: {
-        checklistId: bundle.checklist.id,
-        visitId: bundle.visit.id,
-      },
-    });
+        serviceVisitId:
+          bundle.visit.id,
 
-    revalidateChecklistPaths(bundle.visit.id, bundle.booking.customer_id);
+        documentType:
+          "checklist_pdf",
+
+        submissionGeneration:
+          preparation.data
+            .generation,
+      },
+
+      request_id:
+        requestId,
+
+      status:
+        "success",
+    });
   } catch (error) {
-    logger.error("checklist_pdf_generation_or_upload_failed", {
-      requestId,
-      action: "checklist_submitted",
-      userId: auth.userId,
-      role: auth.profile.role,
-      customerId: bundle.booking.customer_id,
-      bookingId: bundle.booking.id,
-      error,
-      metadata: {
-        visitId: bundle.visit.id,
-        checklistId: bundle.checklist.id,
+    logger.warn(
+      "checklist_submission_audit_log_failed",
+      {
+        requestId,
+        action:
+          "checklist_submitted",
+        userId:
+          auth.userId,
+        role:
+          auth.profile.role,
+        customerId:
+          bundle.booking
+            .customer_id,
+        bookingId:
+          bundle.booking.id,
+        error,
+        metadata: {
+          checklistId:
+            bundle.checklist.id,
+          visitId:
+            bundle.visit.id,
+        },
       },
-    });
-
-    redirectWithStatus(returnTo, "pdf_failed");
+    );
   }
 
-  redirectWithStatus(returnTo, "submitted");
+  logger.info(
+    "service_checklist_submitted",
+    {
+      requestId,
+      action:
+        "checklist_submitted",
+      userId:
+        auth.userId,
+      role:
+        auth.profile.role,
+      customerId:
+        bundle.booking
+          .customer_id,
+      bookingId:
+        bundle.booking.id,
+      metadata: {
+        checklistId:
+          bundle.checklist.id,
+        visitId:
+          bundle.visit.id,
+        generation:
+          preparation.data
+            .generation,
+        storagePath:
+          finalization.data
+            .storagePath,
+      },
+    },
+  );
+
+  revalidateChecklistPaths(
+    bundle.visit.id,
+    bundle.booking
+      .customer_id,
+  );
+
+  redirectWithStatus(
+    returnTo,
+    "submitted",
+  );
 }
 
 export async function addChecklistCorrectionAction(formData: FormData) {
