@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Camera,
   CheckCircle2,
+  ChevronLeft,
   ChevronRight,
   ClipboardCheck,
   DollarSign,
@@ -16,7 +17,11 @@ import {
   formatBookingAddress,
   humanizeStatus,
 } from "@/lib/booking-utils";
-import { getFieldContext } from "@/lib/field-data";
+import {
+  getFieldHistoryPage,
+  type FieldHistoryQuery,
+  type FieldHistoryRecord,
+} from "@/lib/server/field-history";
 import { isAdminRole } from "@/lib/supabase/roles";
 
 export const metadata: Metadata = {
@@ -24,405 +29,110 @@ export const metadata: Metadata = {
 };
 
 type HistoryPageProps = {
-  searchParams?: Promise<{
-    q?: string;
-    year?: string;
-    month?: string;
-    day?: string;
-    status?: string;
-    technician?: string;
-    time?: string;
-    proof?: string;
-    issues?: string;
-    sort?: string;
-  }>;
-};
-
-type HistoryRecord = {
-  stop: Awaited<
-    ReturnType<typeof getFieldContext>
-  >["routeStops"][number];
-  visit:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["visits"][number]
-    | null;
-  booking:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["bookings"][number]
-    | null;
-  routeDay:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["routeDays"][number]
-    | null;
-  checklist:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["checklists"][number]
-    | null;
-  payment:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["payments"][number]
-    | null;
-  technician:
-    | Awaited<
-        ReturnType<typeof getFieldContext>
-      >["profiles"][number]
-    | null;
-  beforePhotoCount: number;
-  afterPhotoCount: number;
-  issuePhotoCount: number;
-  completedBy: string | null;
-  eventDate: string;
+  searchParams?: Promise<
+    FieldHistoryQuery
+  >;
 };
 
 export default async function FieldHistoryPage({
   searchParams,
 }: HistoryPageProps) {
-  const context = await getFieldContext("/field/history");
-  const query = await searchParams;
-  
-  const searchTerm = query?.q?.trim().toLowerCase() ?? "";
-  const selectedYear = query?.year ?? "";
-  const selectedMonth = query?.month ?? "";
-  const selectedDay = query?.day ?? "";
-  const selectedStatus = query?.status ?? "";
-  const selectedTechnician = query?.technician ?? "";
-  const selectedTime = query?.time ?? "";
-  const selectedProof = query?.proof ?? "";
-  const issuesOnly = query?.issues === "true";
-  const selectedSort = query?.sort ?? "newest";
+  const query =
+    (
+      await searchParams
+    ) ?? {};
 
-  if (context.auth.status !== "ok") {
+  const history =
+    await getFieldHistoryPage(
+      query,
+      "/field/history",
+    );
+
+  const {
+    filters,
+    metrics,
+    pagination,
+  } = history;
+
+  const searchTerm =
+    filters.search;
+
+  const selectedYear =
+    filters.year;
+
+  const selectedMonth =
+    filters.month;
+
+  const selectedDay =
+    filters.day;
+
+  const selectedStatus =
+    filters.status;
+
+  const selectedTechnician =
+    filters.technician;
+
+  const selectedTime =
+    filters.time;
+
+  const selectedProof =
+    filters.proof;
+
+  const issuesOnly =
+    filters.issuesOnly;
+
+  const selectedSort =
+    filters.sort;
+
+  if (
+    history.auth.status !==
+    "ok"
+  ) {
     return (
-      <FieldShell title="History" auth={context.auth}>
+      <FieldShell
+        title="History"
+        auth={
+          history.auth
+        }
+      >
         <section className="field-empty-state">
-          <h2>History is unavailable.</h2>
-          <p>Please sign in again to review service records.</p>
+          <h2>
+            History is unavailable.
+          </h2>
+
+          <p>
+            Please sign in again to review service records.
+          </p>
         </section>
       </FieldShell>
     );
   }
 
-  const canViewAllHistory = isAdminRole(
-    context.auth.profile.role,
-  );
-
-  const userId = context.auth.userId;
-
-  const companyRecords: HistoryRecord[] =
-    context.routeStops
-      .filter((stop) =>
-        [
-          "completed",
-          "needs_follow_up",
-          "skipped",
-        ].includes(stop.status),
-      )
-      .map((stop) => {
-        const visit =
-          context.visits.find(
-            (item) =>
-              item.id === stop.service_visit_id,
-          ) ?? null;
-
-        const booking =
-          context.bookings.find(
-            (item) => item.id === stop.booking_id,
-          ) ?? null;
-
-        const routeDay =
-          context.routeDays.find(
-            (item) => item.id === stop.route_day_id,
-          ) ?? null;
-
-        const checklist =
-          context.checklists.find(
-            (item) =>
-              item.route_stop_id === stop.id ||
-              item.service_visit_id ===
-                stop.service_visit_id,
-          ) ?? null;
-
-        const payment =
-          context.payments.find(
-            (item) =>
-              item.booking_id === stop.booking_id,
-          ) ?? null;
-
-        const completedBy =
-          checklist?.completed_by ??
-          checklist?.submitted_by ??
-          null;
-
-        const responsibleTechnicianId =
-          completedBy ??
-          routeDay?.assigned_technician_id ??
-          null;
-
-        const technician =
-          context.profiles.find(
-            (profile) =>
-              profile.id === responsibleTechnicianId,
-          ) ?? null;
-
-        const stopPhotos = context.photos.filter(
-          (photo) =>
-            photo.route_stop_id === stop.id ||
-            photo.service_visit_id ===
-              stop.service_visit_id,
-        );
-
-        const eventDate =
-          stop.completed_at ??
-          checklist?.completed_at ??
-          checklist?.submitted_at ??
-          stop.updated_at;
-
-        return {
-          stop,
-          visit,
-          booking,
-          routeDay,
-          checklist,
-          payment,
-          technician,
-          beforePhotoCount: stopPhotos.filter(
-            (photo) => photo.photo_type === "before",
-          ).length,
-          afterPhotoCount: stopPhotos.filter(
-            (photo) => photo.photo_type === "after",
-          ).length,
-          issuePhotoCount: stopPhotos.filter(
-            (photo) => photo.photo_type === "issue",
-          ).length,
-          completedBy,
-          eventDate,
-        };
-      })
-      .sort((a, b) =>
-        b.eventDate.localeCompare(a.eventDate),
-      );
-
-  /*
-   * Permission boundary:
-   *
-   * Admins and owners receive all company records.
-   *
-   * Field technicians receive:
-   * 1. Records where the checklist says they completed/submitted it.
-   * 2. Older records with no recorded completer where they were the
-   *    technician assigned to the route.
-   *
-   * This filtering happens before totals, searching, and grouping.
-   */
-  const visibleRecords = canViewAllHistory
-    ? companyRecords
-    : companyRecords.filter((record) => {
-        if (record.completedBy) {
-          return record.completedBy === userId;
-        }
-
-        return (
-          record.routeDay?.assigned_technician_id ===
-          userId
-        );
-      });
-
-  const availableYears = Array.from(
-    new Set(
-      visibleRecords.map((record) =>
-        getEasternDateParts(record.eventDate).year,
-      ),
-    ),
-  ).sort((a, b) => Number(b) - Number(a));
-  
-  const availableTechnicians = Array.from(
-    new Map(
-      visibleRecords
-        .filter((record) => record.technician)
-        .map((record) => {
-          const technician = record.technician!;
-  
-          const name =
-            [technician.first_name, technician.last_name]
-              .filter(Boolean)
-              .join(" ") ||
-            technician.email ||
-            "Technician";
-  
-          return [
-            technician.id,
-            {
-              id: technician.id,
-              name,
-            },
-          ] as const;
-        }),
-    ).values(),
-  ).sort((a, b) => a.name.localeCompare(b.name));
-  
-  const filteredRecords = visibleRecords
-    .filter((record) => {
-      const booking = record.booking;
-      const dateParts = getEasternDateParts(record.eventDate);
-  
-      if (searchTerm) {
-        const searchableText = [
-          booking?.first_name,
-          booking?.last_name,
-          booking?.email,
-          booking?.phone,
-          booking?.street_address,
-          booking?.city,
-          booking?.zip_code,
-          record.routeDay?.route_name,
-          record.routeDay?.service_area,
-          record.technician?.first_name,
-          record.technician?.last_name,
-          record.stop.technician_notes,
-        ]
-          .filter(Boolean)
-          .join(" ")
-          .toLowerCase();
-  
-        if (!searchableText.includes(searchTerm)) {
-          return false;
-        }
-      }
-  
-      if (
-        selectedYear &&
-        dateParts.year !== selectedYear
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedMonth &&
-        dateParts.month !== selectedMonth
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedDay &&
-        dateParts.date !== selectedDay
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedStatus &&
-        record.stop.status !== selectedStatus
-      ) {
-        return false;
-      }
-  
-      if (
-        canViewAllHistory &&
-        selectedTechnician &&
-        record.technician?.id !== selectedTechnician
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedTime &&
-        getTimeOfDay(record.eventDate) !== selectedTime
-      ) {
-        return false;
-      }
-  
-      const checklistComplete =
-        record.checklist?.status === "submitted";
-  
-      const proofComplete =
-        record.beforePhotoCount > 0 &&
-        checklistComplete &&
-        record.afterPhotoCount > 0;
-  
-      if (
-        selectedProof === "complete" &&
-        !proofComplete
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedProof === "missing_before" &&
-        record.beforePhotoCount > 0
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedProof === "missing_checklist" &&
-        checklistComplete
-      ) {
-        return false;
-      }
-  
-      if (
-        selectedProof === "missing_after" &&
-        record.afterPhotoCount > 0
-      ) {
-        return false;
-      }
-  
-      const hasIssue =
-        record.stop.status === "needs_follow_up" ||
-        record.stop.issue_flags.length > 0 ||
-        record.issuePhotoCount > 0;
-  
-      if (issuesOnly && !hasIssue) {
-        return false;
-      }
-  
-      return true;
-    })
-    .sort((a, b) =>
-      sortHistoryRecords(a, b, selectedSort),
+  const canViewAllHistory =
+    isAdminRole(
+      history.auth
+        .profile.role,
     );
-  const completedRecords = visibleRecords.filter(
-    (record) => record.stop.status === "completed",
-  );
 
-  const followUpRecords = visibleRecords.filter(
-    (record) =>
-      record.stop.status === "needs_follow_up",
-  );
+  const availableYears =
+    history.availableYears.map(
+      String,
+    );
 
-  const completedWithProof = completedRecords.filter(
-    (record) =>
-      record.beforePhotoCount > 0 &&
-      record.afterPhotoCount > 0 &&
-      record.checklist?.status === "submitted",
-  );
+  const availableTechnicians =
+    history.technicians;
 
-  const servicedRevenue = completedRecords.reduce(
-    (total, record) => {
-      const amount =
-        record.payment?.status === "paid"
-          ? Number(record.payment.amount ?? 0)
-          : Number(
-              record.booking?.estimated_price ?? 0,
-            );
+  const filteredRecords =
+    history.records;
 
-      return total + (Number.isFinite(amount) ? amount : 0);
-    },
-    0,
-  );
+  const groupedRecords =
+    groupRecordsByMonth(
+      filteredRecords,
+    );
 
-  const groupedRecords = groupRecordsByMonth(
-    filteredRecords,
-  );
-
-  const hasActiveFilters = Boolean(
-    searchTerm ||
+  const hasActiveFilters =
+    Boolean(
+      searchTerm ||
       selectedYear ||
       selectedMonth ||
       selectedDay ||
@@ -431,9 +141,10 @@ export default async function FieldHistoryPage({
       selectedTime ||
       selectedProof ||
       issuesOnly ||
-      selectedSort !== "newest",
-  );
-  
+      selectedSort !==
+        "newest",
+    );
+
   const activeFilterCount = [
     searchTerm,
     selectedYear,
@@ -443,9 +154,33 @@ export default async function FieldHistoryPage({
     selectedTechnician,
     selectedTime,
     selectedProof,
-    issuesOnly ? "issues" : "",
-    selectedSort !== "newest" ? selectedSort : "",
-  ].filter(Boolean).length;
+    issuesOnly
+      ? "issues"
+      : "",
+    selectedSort !==
+      "newest"
+      ? selectedSort
+      : "",
+  ].filter(
+    Boolean,
+  ).length;
+
+  const previousPageHref =
+    pagination.page > 1
+      ? buildHistoryPageHref(
+          query,
+          pagination.page - 1,
+        )
+      : null;
+
+  const nextPageHref =
+    pagination.page <
+    pagination.pageCount
+      ? buildHistoryPageHref(
+          query,
+          pagination.page + 1,
+        )
+      : null;
   
   return (
     <FieldShell
@@ -459,7 +194,7 @@ export default async function FieldHistoryPage({
           ? "Completed work and field exceptions across the company."
           : "Your completed services and follow-up records."
       }
-      auth={context.auth}
+      auth={history.auth}
     >
       <section className="field-history-hero">
         <div>
@@ -504,30 +239,54 @@ export default async function FieldHistoryPage({
         <HistoryMetric
           icon={CheckCircle2}
           label="Completed"
-          value={completedRecords.length}
+          value={metrics.completedCount}
         />
 
         <HistoryMetric
           icon={AlertTriangle}
           label="Follow-Ups"
           tone="warning"
-          value={followUpRecords.length}
+          value={metrics.followUpCount}
         />
 
         <HistoryMetric
           icon={ClipboardCheck}
           label="Proof Complete"
           tone="success"
-          value={completedWithProof.length}
+          value={metrics.proofCompleteCount}
         />
 
         <HistoryMetric
           icon={DollarSign}
           label="Serviced"
-          value={formatMoney(servicedRevenue)}
+          value={formatMoney(
+            metrics.servicedRevenue,
+          )}
         />
       </section>
 
+      {history.loadError ? (
+        <section
+          className="field-history-empty"
+          role="alert"
+        >
+          <AlertTriangle
+            size={42}
+            aria-hidden="true"
+          />
+
+          <div>
+            <h2>
+              History could not be loaded
+            </h2>
+
+            <p>
+              {history.loadError}
+            </p>
+          </div>
+        </section>
+      ) : null}
+      
       <details
         className="field-history-filter-panel"
         open={hasActiveFilters}
@@ -777,16 +536,22 @@ export default async function FieldHistoryPage({
 
       <div className="field-history-results-note">
         <strong>
-          {filteredRecords.length}{" "}
-          {filteredRecords.length === 1
+          {pagination.totalCount}{" "}
+          {pagination.totalCount ===
+          1
             ? "record"
             : "records"}
         </strong>
-      
+
         <span>
           {hasActiveFilters
-            ? `shown from ${visibleRecords.length} available`
+            ? `matched from ${metrics.scopeCount} available`
             : "available in this history"}
+
+          {pagination.pageCount >
+          1
+            ? ` · page ${pagination.page} of ${pagination.pageCount}`
+            : ""}
         </span>
       </div>
 
@@ -854,6 +619,59 @@ export default async function FieldHistoryPage({
           )}
         </section>
       )}
+
+      {pagination.pageCount >
+      1 ? (
+        <nav
+          aria-label="Service history pages"
+          className="field-history-filter-actions"
+        >
+          {previousPageHref ? (
+            <Link
+              href={
+                previousPageHref
+              }
+            >
+              <ChevronLeft
+                size={19}
+                aria-hidden="true"
+              />
+
+              Previous
+            </Link>
+          ) : (
+            <span>
+              First page
+            </span>
+          )}
+
+          <strong>
+            Page{" "}
+            {pagination.page}{" "}
+            of{" "}
+            {pagination.pageCount}
+          </strong>
+
+          {nextPageHref ? (
+            <Link
+              href={
+                nextPageHref
+              }
+            >
+              Next
+
+              <ChevronRight
+                size={19}
+                aria-hidden="true"
+              />
+            </Link>
+          ) : (
+            <span>
+              Last page
+            </span>
+          )}
+        </nav>
+      ) : null}
     </FieldShell>
   );
 }
@@ -862,7 +680,7 @@ function HistoryCard({
   record,
   canViewAllHistory,
 }: {
-  record: HistoryRecord;
+  record: FieldHistoryRecord;
   canViewAllHistory: boolean;
 }) {
   const {
@@ -875,6 +693,8 @@ function HistoryCard({
     beforePhotoCount,
     afterPhotoCount,
     issuePhotoCount,
+    beforeProofComplete,
+    afterProofComplete,
     eventDate,
   } = record;
 
@@ -958,8 +778,8 @@ function HistoryCard({
   
           <small>
             {checklistComplete &&
-            beforePhotoCount > 0 &&
-            afterPhotoCount > 0
+            beforeProofComplete &&
+            afterProofComplete
               ? "Proof complete"
               : "Proof incomplete"}
           </small>
@@ -998,10 +818,19 @@ function HistoryCard({
   
         <div className="field-history-proof">
           <ProofItem
-            complete={beforePhotoCount > 0}
+            complete={
+              beforeProofComplete
+            }
             icon={Camera}
             label="Before"
-            value={beforePhotoCount}
+            value={
+              beforePhotoCount >
+              0
+                ? beforePhotoCount
+                : beforeProofComplete
+                  ? "Exception"
+                  : 0
+            }
           />
   
           <ProofItem
@@ -1012,10 +841,19 @@ function HistoryCard({
           />
   
           <ProofItem
-            complete={afterPhotoCount > 0}
+            complete={
+              afterProofComplete
+            }
             icon={Camera}
             label="After"
-            value={afterPhotoCount}
+            value={
+              afterPhotoCount >
+              0
+                ? afterPhotoCount
+                : afterProofComplete
+                  ? "Exception"
+                  : 0
+            }
           />
         </div>
   
@@ -1119,9 +957,14 @@ function HistoryMetric({
 }
 
 function groupRecordsByMonth(
-  records: HistoryRecord[],
+  records:
+    FieldHistoryRecord[],
 ) {
-  const groups = new Map<string, HistoryRecord[]>();
+  const groups =
+    new Map<
+      string,
+      FieldHistoryRecord[]
+    >();
 
   records.forEach((record) => {
     const date = new Date(record.eventDate);
@@ -1158,99 +1001,56 @@ function groupRecordsByMonth(
   );
 }
 
-function getEasternDateParts(value: string) {
-  const parts = new Intl.DateTimeFormat(
-    "en-US",
-    {
-      timeZone: "America/New_York",
-      year: "numeric",
-      month: "2-digit",
-      day: "2-digit",
-      hour: "2-digit",
-      hourCycle: "h23",
+function buildHistoryPageHref(
+  query:
+    FieldHistoryQuery,
+  page:
+    number,
+) {
+  const params =
+    new URLSearchParams();
+
+  Object.entries(
+    query,
+  ).forEach(
+    (
+      [
+        key,
+        value,
+      ],
+    ) => {
+      const cleaned =
+        value?.trim() ?? "";
+
+      if (
+        !cleaned ||
+        key === "page"
+      ) {
+        return;
+      }
+
+      params.set(
+        key,
+        cleaned,
+      );
     },
-  ).formatToParts(new Date(value));
-
-  const year =
-    parts.find((part) => part.type === "year")
-      ?.value ?? "";
-
-  const month =
-    parts.find((part) => part.type === "month")
-      ?.value ?? "";
-
-  const day =
-    parts.find((part) => part.type === "day")
-      ?.value ?? "";
-
-  const hour = Number(
-    parts.find((part) => part.type === "hour")
-      ?.value ?? 0,
   );
 
-  return {
-    year,
-    month,
-    day,
-    hour,
-    date: `${year}-${month}-${day}`,
-  };
-}
-
-function getTimeOfDay(value: string) {
-  const { hour } = getEasternDateParts(value);
-
-  if (hour < 12) return "morning";
-  if (hour < 17) return "afternoon";
-  return "evening";
-}
-
-function getCustomerSortName(record: HistoryRecord) {
-  return [
-    record.booking?.last_name,
-    record.booking?.first_name,
-  ]
-    .filter(Boolean)
-    .join(" ")
-    .toLowerCase();
-}
-
-function sortHistoryRecords(
-  a: HistoryRecord,
-  b: HistoryRecord,
-  sort: string,
-) {
-  if (sort === "oldest") {
-    return a.eventDate.localeCompare(b.eventDate);
-  }
-
-  if (sort === "customer_asc") {
-    return getCustomerSortName(a).localeCompare(
-      getCustomerSortName(b),
+  if (page > 1) {
+    params.set(
+      "page",
+      String(
+        page,
+      ),
     );
   }
 
-  if (sort === "customer_desc") {
-    return getCustomerSortName(b).localeCompare(
-      getCustomerSortName(a),
-    );
-  }
+  const search =
+    params.toString();
 
-  if (sort === "time_asc") {
-    return (
-      getEasternDateParts(a.eventDate).hour -
-      getEasternDateParts(b.eventDate).hour
-    );
-  }
-
-  if (sort === "time_desc") {
-    return (
-      getEasternDateParts(b.eventDate).hour -
-      getEasternDateParts(a.eventDate).hour
-    );
-  }
-
-  return b.eventDate.localeCompare(a.eventDate);
+  return search
+    ? `/field/history?${search}`
+    : "/field/history";
 }
 
 function formatServiceDate(value: string) {
